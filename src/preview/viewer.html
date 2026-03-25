@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mordheim Map Preview</title>
+  <style>
+    * { margin: 0; padding: 0; }
+    body { overflow: hidden; background: #1a1a2e; }
+    canvas { display: block; }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: #ccc;
+      font-family: monospace;
+      font-size: 14px;
+      background: rgba(0,0,0,0.7);
+      padding: 8px 12px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">Loading map... (drag to rotate, scroll to zoom)</div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
+    camera.position.set(40, 40, 40);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(24, 5, 24);
+    controls.update();
+
+    // Grid helper
+    const grid = new THREE.GridHelper(48, 48, 0x444444, 0x222222);
+    grid.position.set(24, -0.01, 24);
+    scene.add(grid);
+
+    // Load the generated model
+    const loader = new GLTFLoader();
+    loader.load('/model.glb', (gltf) => {
+      scene.add(gltf.scene);
+
+      // Count meshes and triangles
+      let meshCount = 0;
+      let triCount = 0;
+      gltf.scene.traverse((child) => {
+        if (child.isMesh) {
+          meshCount++;
+          const geo = child.geometry;
+          triCount += geo.index ? geo.index.count / 3 : geo.attributes.position.count / 3;
+        }
+      });
+
+      document.getElementById('info').textContent =
+        `Meshes: ${meshCount} | Triangles: ${Math.round(triCount)} | Drag to rotate, scroll to zoom`;
+    }, undefined, (err) => {
+      document.getElementById('info').textContent = `Error loading model: ${err.message}`;
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
