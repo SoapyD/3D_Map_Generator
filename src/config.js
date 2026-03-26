@@ -34,7 +34,7 @@ export const BUILDING = {
     tall:   { tierMin: 3, tierMax: 4 },
   },
   gap: 0.5,                // minimum gap between buildings (inches)
-  cellSizeMultiplier: 1.25,// grid cell = avg small footprint × this
+  cellSizeMultiplier: 1.5,// grid cell = avg small footprint × this
   deleteRatio: 0.15,       // fraction of small buildings randomly deleted
 };
 
@@ -63,8 +63,8 @@ export const CONNECTIVITY = {
   ladderWallOffset: 0.3,   // offset from wall to prevent clashing
   maxWalkwayLength: 15,    // inches
   minWalkwayLength: 3,     // inches
-  walkwayKeepRatio: 0.3,   // fraction of walkways kept per tier
-  ladderCullRatio: 0.4,    // fraction of red/orange ladders kept
+  walkwayKeepRatio: 0.6,   // fraction of walkways kept per tier
+  ladderCullRatio: 0.6,    // fraction of red/orange ladders kept
   proximity: 3,            // minimum distance between same-type connectors
   mapBoundaryMargin: 2,    // keep ladders away from map edge (inches)
   // Orange ladder spawn chances per tier
