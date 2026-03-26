@@ -35,25 +35,26 @@ export function generateBuildings(gridData, config, rng) {
   const { tiers } = config;
   const buildings = [];
 
-  // Use the average small footprint size
+  // Use the average small footprint size to determine grid count
   const avgSize = (FOOTPRINTS.small.min + FOOTPRINTS.small.max) / 2;
-  const cellSize = avgSize * 1.25;
+  const minCellSize = avgSize * 1.25;
 
-  const cols = Math.floor(config.mapWidth / cellSize);
-  const rows = Math.floor(config.mapDepth / cellSize);
-  const offsetX = (config.mapWidth - cols * cellSize) / 2;
-  const offsetZ = (config.mapDepth - rows * cellSize) / 2;
+  // Figure out how many fit, then stretch the cell size to fill the map
+  const cols = Math.floor(config.mapWidth / minCellSize);
+  const rows = Math.floor(config.mapDepth / minCellSize);
+  const cellW = config.mapWidth / cols;
+  const cellD = config.mapDepth / rows;
 
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
-      const cellX = offsetX + col * cellSize;
-      const cellZ = offsetZ + row * cellSize;
+      const cellX = col * cellW;
+      const cellZ = row * cellD;
 
       // Building fills most of the cell, centred
       const w = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
       const d = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
-      const x = cellX + (cellSize - w) / 2;
-      const z = cellZ + (cellSize - d) / 2;
+      const x = cellX + (cellW - w) / 2;
+      const z = cellZ + (cellD - d) / 2;
 
       // Random height
       const heightKey = rng.pick(['short', 'medium', 'tall']);
