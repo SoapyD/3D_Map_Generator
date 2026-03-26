@@ -65,28 +65,74 @@ export function generateBuildings(gridData, config, rng) {
     }
   }
 
-  // Place a large building in the centre of the map
-  const fp = FOOTPRINTS.large;
-  const bigW = rng.float(fp.min, fp.max);
-  const bigD = rng.float(fp.min, fp.max);
-  const bigX = (config.mapWidth - bigW) / 2;
-  const bigZ = (config.mapDepth - bigD) / 2;
-  const bigTier = rng.int(3, 5);
-  const bigBuilding = { x: bigX, z: bigZ, w: bigW, d: bigD, maxTier: bigTier, size: 'large', height: 'tall', blockIndex: 0 };
+  // Pick a layout for larger buildings
+  const layout = rng.int(0, 4);
+  const bigBuildings = placeBigLayout(layout, config, tiers, rng);
 
-  // Remove small buildings that touch the big one
+  // Remove small buildings that touch any big building
   const surviving = buildings.filter((b) => {
-    return !(b.x < bigBuilding.x + bigBuilding.w + BUILDING_GAP && b.x + b.w > bigBuilding.x - BUILDING_GAP &&
-             b.z < bigBuilding.z + bigBuilding.d + BUILDING_GAP && b.z + b.d > bigBuilding.z - BUILDING_GAP);
+    for (const big of bigBuildings) {
+      if (b.x < big.x + big.w + BUILDING_GAP && b.x + b.w > big.x - BUILDING_GAP &&
+          b.z < big.z + big.d + BUILDING_GAP && b.z + b.d > big.z - BUILDING_GAP) {
+        return false;
+      }
+    }
+    return true;
   });
 
-  // Delete 20-30% of remaining small buildings
+  // Delete 15% of remaining small buildings
   const deleteRatio = 0.15;
   rng.shuffle(surviving);
   const keepCount = Math.ceil(surviving.length * (1 - deleteRatio));
   const culled = surviving.slice(0, keepCount);
 
-  return { ...gridData, buildings: [bigBuilding, ...culled] };
+  return { ...gridData, buildings: [...bigBuildings, ...culled] };
+}
+
+/**
+ * Place larger buildings according to one of 5 layout options.
+ *
+ * 0: 1 large in centre
+ * 1: 2 large — top-left + bottom-right
+ * 2: 3 medium — top-left + bottom-right + top-right
+ * 3: 3 medium — top-left + bottom-left + top-right
+ * 4: 4 medium — 2 in top-left + bottom-right + top-right
+ */
+function placeBigLayout(layout, config, maxTiers, rng) {
+  const mw = config.mapWidth;
+  const md = config.mapDepth;
+  const margin = 2; // keep away from map edge
+
+  // Quadrant centres
+  const TL = { x: mw * 0.25, z: md * 0.25 };
+  const TR = { x: mw * 0.75, z: md * 0.25 };
+  const BL = { x: mw * 0.25, z: md * 0.75 };
+  const BR = { x: mw * 0.75, z: md * 0.75 };
+  const C  = { x: mw * 0.5, z: md * 0.5 };
+
+  function makeBig(sizeKey, pos) {
+    const fp = FOOTPRINTS[sizeKey];
+    const w = rng.float(fp.min, fp.max);
+    const d = rng.float(fp.min, fp.max);
+    const x = Math.max(margin, Math.min(pos.x - w / 2, mw - w - margin));
+    const z = Math.max(margin, Math.min(pos.z - d / 2, md - d - margin));
+    const maxTier = rng.int(3, Math.min(5, maxTiers));
+    return { x, z, w, d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0 };
+  }
+
+  switch (layout) {
+    case 0: return [makeBig('large', C)];
+    case 1: return [makeBig('large', TL), makeBig('large', BR)];
+    case 2: return [makeBig('medium', TL), makeBig('medium', BR), makeBig('medium', TR)];
+    case 3: return [makeBig('medium', TL), makeBig('medium', BL), makeBig('medium', TR)];
+    case 4: {
+      // 2 in top-left quadrant (offset slightly), 1 BR, 1 TR
+      const TL1 = { x: mw * 0.15, z: md * 0.15 };
+      const TL2 = { x: mw * 0.35, z: md * 0.35 };
+      return [makeBig('medium', TL1), makeBig('medium', TL2), makeBig('medium', BR), makeBig('medium', TR)];
+    }
+  }
+  return [];
 }
 
 /**
