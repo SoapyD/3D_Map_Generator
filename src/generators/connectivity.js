@@ -503,8 +503,8 @@ export function generateConnectivity(data, config, rng) {
             }
           }
 
-          // Must span at least 3 tiers
-          if (topTier - tier < 3) continue;
+          // Must span at least 2 tiers
+          if (topTier - tier < 2) continue;
           const y1 = topTier * tierHeight;
 
           orangeLadders.push({
