@@ -158,6 +158,19 @@ export function generateConnectivity(data, config, rng) {
             walkway.blocked = true;
           }
 
+          // Verify both ends touch a floor section at this tier
+          let startTouches = false, endTouches = false;
+          for (const s of floorData.sections) {
+            if (walkway.axis === 'x') {
+              if (Math.abs(s.x + s.w - walkway.x) < 0.5 && walkway.z + walkway.d > s.z && walkway.z < s.z + s.d) startTouches = true;
+              if (Math.abs(s.x - (walkway.x + walkway.w)) < 0.5 && walkway.z + walkway.d > s.z && walkway.z < s.z + s.d) endTouches = true;
+            } else {
+              if (Math.abs(s.z + s.d - walkway.z) < 0.5 && walkway.x + walkway.w > s.x && walkway.x < s.x + s.w) startTouches = true;
+              if (Math.abs(s.z - (walkway.z + walkway.d)) < 0.5 && walkway.x + walkway.w > s.x && walkway.x < s.x + s.w) endTouches = true;
+            }
+          }
+          if (!startTouches || !endTouches) continue;
+
           walkways.push(walkway);
         }
       }
