@@ -12,6 +12,7 @@ import { generateBuildings } from './generators/buildings.js';
 import { generateFloors } from './generators/floors.js';
 import { generateWalls } from './generators/walls.js';
 import { generateConnectivity } from './generators/connectivity.js';
+import { generateCover } from './generators/cover.js';
 import { buildScene } from './generators/scene-builder.js';
 import { exportToGlb, getOutputPath } from './export/glb-exporter.js';
 
@@ -48,14 +49,19 @@ async function main() {
   console.log(`  ${wallData.walls.length} wall segments`);
 
   // Stage 5: Connectivity
-  console.log('[5/6] Connecting levels...');
+  console.log('[5/7] Connecting levels...');
   const connData = generateConnectivity(wallData, config, rng);
   const c = connData.connections;
   console.log(`  ${c.ladders.length} ladders, ${c.walkways.length} walkways`);
 
+  // Stage 6: Cover
+  console.log('[6/7] Placing cover...');
+  const coverData = generateCover(connData, config, rng);
+  console.log(`  ${coverData.cover.length} cover pieces`);
+
   // Build 3D scene
-  console.log('[6/6] Building scene and exporting...');
-  const scene = buildScene(connData, config);
+  console.log('[7/7] Building scene and exporting...');
+  const scene = buildScene(coverData, config);
 
   // Export
   await mkdir(config.outputDir, { recursive: true });

@@ -69,24 +69,33 @@ export function generateBuildings(gridData, config, rng) {
   const layout = rng.int(0, 4);
   const bigBuildings = placeBigLayout(layout, config, tiers, rng);
 
-  // Remove small buildings that touch any big building
-  const surviving = buildings.filter((b) => {
+  // Remove small buildings that touch any big building — track them
+  const surviving = [];
+  const displacedByBig = [];
+  for (const b of buildings) {
+    let displaced = false;
     for (const big of bigBuildings) {
       if (b.x < big.x + big.w + BUILDING_GAP && b.x + b.w > big.x - BUILDING_GAP &&
           b.z < big.z + big.d + BUILDING_GAP && b.z + b.d > big.z - BUILDING_GAP) {
-        return false;
+        displaced = true;
+        break;
       }
     }
-    return true;
-  });
+    if (displaced) displacedByBig.push(b);
+    else surviving.push(b);
+  }
 
-  // Delete 15% of remaining small buildings
+  // Delete 15% of remaining small buildings — track deleted positions for cover placement
   const deleteRatio = 0.15;
   rng.shuffle(surviving);
   const keepCount = Math.ceil(surviving.length * (1 - deleteRatio));
   const culled = surviving.slice(0, keepCount);
+  const randomlyDeleted = surviving.slice(keepCount);
 
-  return { ...gridData, buildings: [...bigBuildings, ...culled] };
+  // All deleted buildings = displaced by big + randomly culled
+  const deletedBuildings = [...displacedByBig, ...randomlyDeleted];
+
+  return { ...gridData, buildings: [...bigBuildings, ...culled], deletedBuildings };
 }
 
 /**
