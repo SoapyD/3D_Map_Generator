@@ -22,7 +22,7 @@ import path from 'path';
 
 const CATEGORIES = [
   'walls', 'landmark_walls', 'floors', 'objects',
-  'ladders', 'walkways', 'courtyards', 'base_map',
+  'ladders', 'walkways', 'courtyards', 'base_map', 'domes',
 ];
 
 /**

@@ -89,6 +89,12 @@ export const COVER = {
   maxTall: 3,              // max tall objects total
   rooftopChance: 0.5,      // chance per rooftop quadrant
   maxHeightUnderBuilding: 3.0, // cap for cover under big buildings
+  // 3" pillar roof: 'none' | 'dome' | 'spire'
+  roof3Chances: { none: 0.33, dome: 0.33, spire: 0.34 },
+  // 6" pillar roof: 'dome' | 'spire' (always has one)
+  roof6Chances: { dome: 0.5, spire: 0.5 },
+  // 6" pillar decoration: 'none' | 'skirt' | 'cube'
+  deco6Chances: { none: 0.33, skirt: 0.33, cube: 0.34 },
   // Interior cover
   interiorMaxMedium: 1,    // max objects per mid-floor for medium buildings
   interiorMaxLarge: 3,     // max objects per mid-floor for large buildings
@@ -97,6 +103,16 @@ export const COVER = {
 // --- Geometry ---
 export const GEOMETRY = {
   tileSize: 3,             // inches per texture repeat
+};
+
+// --- Ladder Display ---
+export const LADDER_DISPLAY = {
+  showBoxLadders: false,     // show the original box ladders (debug)
+  showMeshLadders: true,     // show the detailed ladder meshes (poles + rungs)
+  poleRadius: 0.1,           // radius of ladder poles (inches)
+  rungRadius: 0.08,          // radius of rungs
+  rungSpacing: 0.75,         // inches between rungs
+  rungInset: 0.1,            // how far rungs sit inside the poles
 };
 
 // --- Deletion Toggles ---

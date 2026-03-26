@@ -165,3 +165,140 @@ function mergeBufferGeometries(geometries) {
 
   return merged;
 }
+
+/**
+ * Create a pillar with configurable roof and decoration.
+ *
+ * @param {number} cx - Centre X
+ * @param {number} y - Base Y
+ * @param {number} cz - Centre Z
+ * @param {number} w - Width
+ * @param {number} d - Depth
+ * @param {number} height - Total height
+ * @param {THREE.Material} bodyMaterial
+ * @param {object} opts
+ * @param {string} opts.roof - 'none' | 'dome' | 'spire'
+ * @param {THREE.Material} [opts.roofMaterial] - Material for dome/spire
+ * @param {string} opts.decoration - 'none' | 'skirt' | 'cube'
+ * @param {THREE.Material} [opts.decoMaterial] - Material for skirt/cube
+ * @returns {THREE.Group}
+ */
+export function createPillar(cx, y, cz, w, d, height, bodyMaterial, opts = {}) {
+  const group = new THREE.Group();
+  const radius = Math.min(w, d) / 2;
+  const roofType = opts.roof || 'none';
+  const decoType = opts.decoration || 'none';
+  const roofMat = opts.roofMaterial || bodyMaterial;
+  const decoMat = opts.decoMaterial || bodyMaterial;
+
+  // Calculate roof height
+  let roofHeight = 0;
+  if (roofType === 'dome') roofHeight = radius * 0.6;
+  else if (roofType === 'spire') roofHeight = radius * 2;
+
+  const columnHeight = height - roofHeight;
+
+  // Column body
+  const columnGeo = new THREE.CylinderGeometry(radius, radius, columnHeight, 8);
+  const column = new THREE.Mesh(columnGeo, bodyMaterial);
+  column.position.set(cx, y + columnHeight / 2, cz);
+  group.add(column);
+
+  // Roof
+  if (roofType === 'dome') {
+    const domeGeo = new THREE.SphereGeometry(radius, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+    const dome = new THREE.Mesh(domeGeo, roofMat);
+    dome.position.set(cx, y + columnHeight, cz);
+    group.add(dome);
+  } else if (roofType === 'spire') {
+    const spireGeo = new THREE.ConeGeometry(radius, roofHeight, 8);
+    const spire = new THREE.Mesh(spireGeo, roofMat);
+    spire.position.set(cx, y + columnHeight + roofHeight / 2, cz);
+    group.add(spire);
+  }
+
+  // Decoration — top flush with top of column
+  if (decoType === 'skirt') {
+    const skirtRadius = w * 0.65;
+    const skirtHeight = 0.3;
+    const skirtGeo = new THREE.CylinderGeometry(skirtRadius, skirtRadius, skirtHeight, 12);
+    const skirt = new THREE.Mesh(skirtGeo, roofMat); // same colour as dome/spire
+    skirt.position.set(cx, y + columnHeight - skirtHeight / 2, cz);
+    group.add(skirt);
+  } else if (decoType === 'cube') {
+    const cubeSize = w * 1.3;
+    const cubeHeight = height * 0.25;
+    const cubeGeo = new THREE.BoxGeometry(cubeSize, cubeHeight, cubeSize);
+    const cube = new THREE.Mesh(cubeGeo, bodyMaterial); // same colour as pillar body
+    cube.position.set(cx, y + columnHeight - cubeHeight / 2, cz);
+    group.add(cube);
+  }
+
+  return group;
+}
+
+/**
+ * Create a detailed ladder mesh: two vertical poles with horizontal rungs.
+ *
+ * @param {object} ladder - { x, z, w, d, y0, y1 }
+ * @param {THREE.Material} material
+ * @param {object} opts - { poleRadius, rungRadius, rungSpacing, rungInset }
+ * @returns {THREE.Mesh}
+ */
+export function createLadderMesh(ladder, material, opts) {
+  const { poleRadius, rungRadius, rungSpacing, rungInset } = opts;
+  const height = ladder.y1 - ladder.y0;
+  if (height <= 0) return null;
+
+  const segments = 6; // polygon segments for cylinders
+  const geometries = [];
+
+  // Determine ladder orientation — thin axis faces the wall
+  const isThinX = ladder.w < ladder.d;
+  const ladderWidth = isThinX ? ladder.d : ladder.w;
+
+  // Pole positions: at each side of the ladder's wide axis
+  const cx = ladder.x + ladder.w / 2;
+  const cz = ladder.z + ladder.d / 2;
+  const cy = ladder.y0 + height / 2;
+
+  const halfSpread = (ladderWidth / 2) - poleRadius - rungInset;
+
+  // Two vertical poles
+  for (const side of [-1, 1]) {
+    const poleGeo = new THREE.CylinderGeometry(poleRadius, poleRadius, height, segments);
+    if (isThinX) {
+      poleGeo.translate(cx, cy, cz + side * halfSpread);
+    } else {
+      poleGeo.translate(cx + side * halfSpread, cy, cz);
+    }
+    geometries.push(poleGeo);
+  }
+
+  // Rungs
+  const rungCount = Math.floor(height / rungSpacing);
+  const rungLength = halfSpread * 2;
+  for (let i = 1; i <= rungCount; i++) {
+    const ry = ladder.y0 + i * rungSpacing;
+    if (ry >= ladder.y1 - rungSpacing * 0.3) break;
+
+    const rungGeo = new THREE.CylinderGeometry(rungRadius, rungRadius, rungLength, segments);
+    // Rotate rung to be horizontal
+    if (isThinX) {
+      rungGeo.rotateX(Math.PI / 2);
+      rungGeo.translate(cx, ry, cz);
+    } else {
+      rungGeo.rotateZ(Math.PI / 2);
+      rungGeo.translate(cx, ry, cz);
+    }
+    geometries.push(rungGeo);
+  }
+
+  if (geometries.length === 0) return null;
+
+  const merged = mergeBufferGeometries(geometries);
+  geometries.forEach((g) => g.dispose());
+
+  const mesh = new THREE.Mesh(merged, material);
+  return mesh;
+}

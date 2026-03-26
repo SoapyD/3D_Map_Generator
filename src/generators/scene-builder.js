@@ -4,8 +4,10 @@
  */
 
 import * as THREE from 'three';
-import { createFloorSlab, createWallSlab, createSlab } from '../core/geometry.js';
+import { createFloorSlab, createWallSlab, createSlab, createLadderMesh, createPillar } from '../core/geometry.js';
 import { buildTexturePools, pickFromPool } from './textures.js';
+import { LADDER_DISPLAY, COVER } from '../config.js';
+import { createRng } from '../core/rng.js';
 
 // Debug materials (flat colours)
 const DEBUG_MATERIALS = {
@@ -111,14 +113,34 @@ export function buildScene(data, config) {
   if (data.connections) {
     const { ladders, walkways } = data.connections;
 
+    const ladderOpts = {
+      poleRadius: LADDER_DISPLAY.poleRadius,
+      rungRadius: LADDER_DISPLAY.rungRadius,
+      rungSpacing: LADDER_DISPLAY.rungSpacing,
+      rungInset: LADDER_DISPLAY.rungInset,
+    };
+
+    // Helper: add ladder (box + mesh versions)
+    function addLadder(l, material, name) {
+      if (LADDER_DISPLAY.showBoxLadders) {
+        const height = l.y1 - l.y0;
+        const box = createSlab(l.x + l.w / 2, l.y0 + height / 2, l.z + l.d / 2, l.w, height, l.d, material);
+        box.name = name + '_box';
+        scene.add(box);
+      }
+      if (LADDER_DISPLAY.showMeshLadders) {
+        const mesh = createLadderMesh(l, material, ladderOpts);
+        if (mesh) {
+          mesh.name = name;
+          scene.add(mesh);
+        }
+      }
+    }
+
     // Yellow ladders
     for (let i = 0; i < ladders.length; i++) {
-      const l = ladders[i];
-      const height = l.y1 - l.y0;
       const material = debug ? DEBUG_MATERIALS.ladder : pickFromPool(pools.ladders, i);
-      const mesh = createSlab(l.x + l.w / 2, l.y0 + height / 2, l.z + l.d / 2, l.w, height, l.d, material);
-      mesh.name = `ladder_${i}`;
-      scene.add(mesh);
+      addLadder(ladders[i], material, `ladder_${i}`);
     }
 
     // Walkways
@@ -138,41 +160,31 @@ export function buildScene(data, config) {
     // Red ground ladders
     const groundLadders = data.connections.groundLadders || [];
     for (let i = 0; i < groundLadders.length; i++) {
-      const l = groundLadders[i];
-      const height = l.y1 - l.y0;
       const material = debug ? DEBUG_MATERIALS.groundLadder : pickFromPool(pools.ladders, i + 10);
-      const mesh = createSlab(l.x + l.w / 2, l.y0 + height / 2, l.z + l.d / 2, l.w, height, l.d, material);
-      mesh.name = `ground_ladder_${i}`;
-      scene.add(mesh);
+      addLadder(groundLadders[i], material, `ground_ladder_${i}`);
     }
 
     // Orange ladders
     const orangeLadders = data.connections.orangeLadders || [];
     for (let i = 0; i < orangeLadders.length; i++) {
       const l = orangeLadders[i];
-      const height = l.y1 - l.y0;
       const material = l.bad ? DEBUG_MATERIALS.badLadder : (debug ? DEBUG_MATERIALS.orangeLadder : pickFromPool(pools.ladders, i + 20));
-      const mesh = createSlab(l.x + l.w / 2, l.y0 + height / 2, l.z + l.d / 2, l.w, height, l.d, material);
-      mesh.name = l.bad ? `orange_ladder_BAD_${i}` : `orange_ladder_${i}`;
-      scene.add(mesh);
+      addLadder(l, material, l.bad ? `orange_ladder_BAD_${i}` : `orange_ladder_${i}`);
     }
 
     // Interior ladders — cyan
     const interiorLadders = data.connections.interiorLadders || [];
     for (let i = 0; i < interiorLadders.length; i++) {
-      const l = interiorLadders[i];
-      const height = l.y1 - l.y0;
       const material = debug ? DEBUG_MATERIALS.interiorLadder : pickFromPool(pools.ladders, i + 30);
-      const mesh = createSlab(l.x + l.w / 2, l.y0 + height / 2, l.z + l.d / 2, l.w, height, l.d, material);
-      mesh.name = `interior_ladder_${i}`;
-      scene.add(mesh);
+      addLadder(interiorLadders[i], material, `interior_ladder_${i}`);
     }
 
     // Ladder platforms — white
     const ladderPlatforms = data.connections.ladderPlatforms || [];
     for (let i = 0; i < ladderPlatforms.length; i++) {
       const p = ladderPlatforms[i];
-      const material = debug ? DEBUG_MATERIALS.ladderPlatform : pickFromPool(pools.floors, i);
+      // All platforms from the same ladder share the same texture
+      const material = debug ? DEBUG_MATERIALS.ladderPlatform : pickFromPool(pools.floors, p.ladderIndex);
       const mesh = createFloorSlab({ x: p.x, z: p.z, w: p.w, d: p.d }, p.y, 0.2, material);
       mesh.name = `ladder_platform_${i}`;
       scene.add(mesh);
@@ -181,21 +193,69 @@ export function buildScene(data, config) {
 
   // Cover pieces
   if (data.cover) {
+    const coverRng = createRng(config.seed + 7777);
+
+    // Weighted pick helper
+    function weightedPick(chances) {
+      const roll = coverRng.random();
+      let cumulative = 0;
+      for (const [key, weight] of Object.entries(chances)) {
+        cumulative += weight;
+        if (roll < cumulative) return key;
+      }
+      return Object.keys(chances)[0];
+    }
+
     for (let i = 0; i < data.cover.length; i++) {
       const c = data.cover[i];
-      let material;
+      let bodyMat;
       if (debug) {
-        material = DEBUG_MATERIALS.cover;
+        bodyMat = DEBUG_MATERIALS.cover;
       } else if (c.height > 1.5) {
-        // Tall objects use wall textures
-        material = pickFromPool(pools.objects, i);
+        bodyMat = pickFromPool(pools.objects, i);
       } else {
-        // Small objects: 50/50 crate or stone block
-        material = (i % 2 === 0) ? pickFromPool(pools.objects, i) : pickFromPool(pools.objects, i);
+        bodyMat = pickFromPool(pools.objects, i);
       }
-      const mesh = createSlab(c.x + c.w / 2, c.y + c.height / 2, c.z + c.d / 2, c.w, c.height, c.d, material);
-      mesh.name = `cover_${i}`;
-      scene.add(mesh);
+
+      if (c.height >= 6) {
+        // 6" pillar: always dome or spire, optional decoration
+        const roof = weightedPick(COVER.roof6Chances);
+        const deco = weightedPick(COVER.deco6Chances);
+        const roofMat = debug ? DEBUG_MATERIALS.cover : pickFromPool(pools.domes, i);
+        const decoMat = debug ? DEBUG_MATERIALS.wall : pickFromPool(pools.walls, i);
+
+        const pillar = createPillar(c.x + c.w / 2, c.y, c.z + c.d / 2, c.w, c.d, c.height, bodyMat, {
+          roof,
+          roofMaterial: roofMat,
+          decoration: deco,
+          decoMaterial: decoMat,
+        });
+        pillar.name = `cover_${i}`;
+        scene.add(pillar);
+      } else if (c.height >= 3) {
+        // 3" pillar: none/dome/spire, never decoration
+        const roof = weightedPick(COVER.roof3Chances);
+        const roofMat = debug ? DEBUG_MATERIALS.cover : pickFromPool(pools.domes, i);
+
+        if (roof === 'none') {
+          const mesh = createSlab(c.x + c.w / 2, c.y + c.height / 2, c.z + c.d / 2, c.w, c.height, c.d, bodyMat);
+          mesh.name = `cover_${i}`;
+          scene.add(mesh);
+        } else {
+          const pillar = createPillar(c.x + c.w / 2, c.y, c.z + c.d / 2, c.w, c.d, c.height, bodyMat, {
+            roof,
+            roofMaterial: roofMat,
+            decoration: 'none',
+          });
+          pillar.name = `cover_${i}`;
+          scene.add(pillar);
+        }
+      } else {
+        // Low cover: regular box
+        const mesh = createSlab(c.x + c.w / 2, c.y + c.height / 2, c.z + c.d / 2, c.w, c.height, c.d, bodyMat);
+        mesh.name = `cover_${i}`;
+        scene.add(mesh);
+      }
     }
   }
 

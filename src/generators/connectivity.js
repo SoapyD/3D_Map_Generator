@@ -857,7 +857,8 @@ export function generateConnectivity(data, config, rng) {
   const ladderPlatforms = [];
   const allLadders = [...survivingYellow, ...finalRed, ...finalOrange, ...finalInterior];
 
-  for (const ladder of allLadders) {
+  for (let li = 0; li < allLadders.length; li++) {
+    const ladder = allLadders[li];
     if (ladder.bad) continue;
     const startTier = Math.ceil(ladder.y0 / tierHeight);
     const endTier = Math.floor(ladder.y1 / tierHeight);
@@ -909,6 +910,7 @@ export function generateConnectivity(data, config, rng) {
         x: px, z: pz,
         w: PLATFORM_SIZE, d: PLATFORM_SIZE,
         y: py,
+        ladderIndex: li,
       });
     }
   }
