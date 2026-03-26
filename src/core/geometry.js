@@ -13,8 +13,37 @@ import * as THREE from 'three';
  * @param {THREE.Material} material
  * @returns {THREE.Mesh}
  */
+const TILE_SIZE = 3; // inches per texture repeat
+
 export function createSlab(x, y, z, width, height, depth, material) {
   const geometry = new THREE.BoxGeometry(width, height, depth);
+
+  // Scale UVs so textures tile at a fixed real-world scale
+  const uv = geometry.getAttribute('uv');
+  if (uv) {
+    // BoxGeometry has 6 faces. Each face's UVs map 0-1.
+    // We scale them by the face dimensions / TILE_SIZE.
+    // Face order: +x, -x, +y, -y, +z, -z (4 verts each = 24 total)
+    const scales = [
+      [depth / TILE_SIZE, height / TILE_SIZE],  // +x face
+      [depth / TILE_SIZE, height / TILE_SIZE],  // -x face
+      [width / TILE_SIZE, depth / TILE_SIZE],   // +y face (top)
+      [width / TILE_SIZE, depth / TILE_SIZE],   // -y face (bottom)
+      [width / TILE_SIZE, height / TILE_SIZE],  // +z face
+      [width / TILE_SIZE, height / TILE_SIZE],  // -z face
+    ];
+
+    for (let face = 0; face < 6; face++) {
+      const [su, sv] = scales[face];
+      for (let v = 0; v < 4; v++) {
+        const idx = face * 4 + v;
+        uv.setX(idx, uv.getX(idx) * su);
+        uv.setY(idx, uv.getY(idx) * sv);
+      }
+    }
+    uv.needsUpdate = true;
+  }
+
   const mesh = new THREE.Mesh(geometry, material);
   mesh.position.set(x, y, z);
   return mesh;

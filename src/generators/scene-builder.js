@@ -1,11 +1,14 @@
 /**
  * Scene Builder — converts pipeline data into Three.js scene geometry.
+ * Uses debug colours when config.debug is true, textured materials otherwise.
  */
 
 import * as THREE from 'three';
 import { createFloorSlab, createWallSlab, createSlab } from '../core/geometry.js';
+import { buildTexturePools, pickFromPool } from './textures.js';
 
-const MATERIALS = {
+// Debug materials (flat colours)
+const DEBUG_MATERIALS = {
   base: new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.9 }),
   floor: [
     new THREE.MeshStandardMaterial({ color: 0x8b7355, roughness: 0.8 }),
@@ -15,30 +18,65 @@ const MATERIALS = {
     new THREE.MeshStandardMaterial({ color: 0x4d442a, roughness: 0.8 }),
   ],
   wall: new THREE.MeshStandardMaterial({ color: 0x9b8b75, roughness: 0.85 }),
-  ladder: new THREE.MeshStandardMaterial({ color: 0xcccc22, roughness: 0.7 }),   // yellow
-  walkway: new THREE.MeshStandardMaterial({ color: 0x4488cc, roughness: 0.7 }),  // blue
-  ramp: new THREE.MeshStandardMaterial({ color: 0x44aa44, roughness: 0.7 }),     // green
-  groundLadder: new THREE.MeshStandardMaterial({ color: 0xcc4444, roughness: 0.7 }), // red
-  orangeLadder: new THREE.MeshStandardMaterial({ color: 0xee8822, roughness: 0.7 }), // orange
-  cover: new THREE.MeshStandardMaterial({ color: 0x8844cc, roughness: 0.7 }),       // purple
-  interiorCover: new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.7 }),  // grey
-  deletedFootprint: new THREE.MeshStandardMaterial({ color: 0xff66aa, roughness: 0.7 }), // pink (debug)
+  ladder: new THREE.MeshStandardMaterial({ color: 0xcccc22, roughness: 0.7 }),
+  walkway: new THREE.MeshStandardMaterial({ color: 0x4488cc, roughness: 0.7 }),
+  ramp: new THREE.MeshStandardMaterial({ color: 0x44aa44, roughness: 0.7 }),
+  groundLadder: new THREE.MeshStandardMaterial({ color: 0xcc4444, roughness: 0.7 }),
+  orangeLadder: new THREE.MeshStandardMaterial({ color: 0xee8822, roughness: 0.7 }),
+  cover: new THREE.MeshStandardMaterial({ color: 0x8844cc, roughness: 0.7 }),
+  interiorCover: new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.7 }),
+  deletedFootprint: new THREE.MeshStandardMaterial({ color: 0xff66aa, roughness: 0.7 }),
 };
+
+/**
+ * Find which building a floor section or wall belongs to.
+ */
+function findBuildingIndex(x, z, buildings) {
+  for (let i = 0; i < buildings.length; i++) {
+    const b = buildings[i];
+    if (x >= b.x - 0.5 && x <= b.x + b.w + 0.5 && z >= b.z - 0.5 && z <= b.z + b.d + 0.5) {
+      return i;
+    }
+  }
+  return -1;
+}
 
 /**
  * Build a Three.js scene from the pipeline data.
  */
 export function buildScene(data, config) {
   const scene = new THREE.Scene();
+  const debug = config.debug;
+
+  // Build texture pools for textured mode
+  let pools = null;
+  if (!debug) {
+    pools = buildTexturePools(config.textureSet || 'base');
+  }
 
   // Build floor slabs
   for (const floorData of data.floors) {
     const tier = floorData.tier;
     const y = tier * config.tierHeight;
-    const material =
-      tier === 0 ? MATERIALS.base : MATERIALS.floor[Math.min(tier - 1, MATERIALS.floor.length - 1)];
 
     for (const section of floorData.sections) {
+      let material;
+      if (debug) {
+        material = tier === 0
+          ? DEBUG_MATERIALS.base
+          : DEBUG_MATERIALS.floor[Math.min(tier - 1, DEBUG_MATERIALS.floor.length - 1)];
+      } else if (tier === 0) {
+        material = pickFromPool(pools.base_map, Math.floor(section.x * 7 + section.z * 13));
+      } else {
+        const bi = findBuildingIndex(section.x, section.z, data.buildings);
+        if (bi >= 0 && data.buildings[bi].size !== 'small') {
+          // Deleted footprints use courtyard
+          material = pickFromPool(pools.floors, bi);
+        } else {
+          material = pickFromPool(pools.floors, bi >= 0 ? bi : 0);
+        }
+      }
+
       const mesh = createFloorSlab(section, y, config.slabThickness, material);
       mesh.name = `floor_t${tier}_${Math.round(section.x)}_${Math.round(section.z)}`;
       scene.add(mesh);
@@ -49,9 +87,18 @@ export function buildScene(data, config) {
   if (data.walls) {
     for (let i = 0; i < data.walls.length; i++) {
       const w = data.walls[i];
-      const mesh = createWallSlab(
-        w.x, w.z, w.length, w.height, w.baseY, w.thickness, w.axis, MATERIALS.wall,
-      );
+      let material;
+      if (debug) {
+        material = DEBUG_MATERIALS.wall;
+      } else {
+        const bi = findBuildingIndex(w.x, w.z, data.buildings);
+        if (bi >= 0 && (data.buildings[bi].size === 'large' || data.buildings[bi].size === 'medium')) {
+          material = pickFromPool(pools.landmark_walls, bi);
+        } else {
+          material = pickFromPool(pools.walls, bi >= 0 ? bi : i);
+        }
+      }
+      const mesh = createWallSlab(w.x, w.z, w.length, w.height, w.baseY, w.thickness, w.axis, material);
       mesh.name = `wall_${i}`;
       scene.add(mesh);
     }
@@ -61,95 +108,84 @@ export function buildScene(data, config) {
   if (data.connections) {
     const { ladders, walkways } = data.connections;
 
-    // Ladders — thin vertical slabs (yellow)
+    // Yellow ladders
     for (let i = 0; i < ladders.length; i++) {
       const l = ladders[i];
       const height = l.y1 - l.y0;
-      const mesh = createSlab(
-        l.x + l.w / 2,
-        l.y0 + height / 2,
-        l.z + l.d / 2,
-        l.w, height, l.d,
-        MATERIALS.ladder,
-      );
+      const material = debug ? DEBUG_MATERIALS.ladder : pickFromPool(pools.ladders, i);
+      const mesh = createSlab(l.x + l.w / 2, l.y0 + height / 2, l.z + l.d / 2, l.w, height, l.d, material);
       mesh.name = `ladder_${i}`;
       scene.add(mesh);
     }
 
-    // Walkways — flat horizontal slabs (blue = ok, green = blocked for debug)
+    // Walkways
     for (let i = 0; i < walkways.length; i++) {
       const w = walkways[i];
-      const mat = w.blocked ? MATERIALS.ramp : MATERIALS.walkway;
-      const mesh = createFloorSlab(
-        { x: w.x, z: w.z, w: w.w, d: w.d },
-        w.y,
-        0.3,
-        mat,
-      );
+      let material;
+      if (debug) {
+        material = w.blocked ? DEBUG_MATERIALS.ramp : DEBUG_MATERIALS.walkway;
+      } else {
+        material = pickFromPool(pools.walkways, i);
+      }
+      const mesh = createFloorSlab({ x: w.x, z: w.z, w: w.w, d: w.d }, w.y, 0.3, material);
       mesh.name = w.blocked ? `walkway_BLOCKED_${i}` : `walkway_${i}`;
       scene.add(mesh);
     }
 
-    // Ground ladders — thin vertical slabs (red)
+    // Red ground ladders
     const groundLadders = data.connections.groundLadders || [];
     for (let i = 0; i < groundLadders.length; i++) {
       const l = groundLadders[i];
       const height = l.y1 - l.y0;
-      const mesh = createSlab(
-        l.x + l.w / 2,
-        l.y0 + height / 2,
-        l.z + l.d / 2,
-        l.w, height, l.d,
-        MATERIALS.groundLadder,
-      );
+      const material = debug ? DEBUG_MATERIALS.groundLadder : pickFromPool(pools.ladders, i + 10);
+      const mesh = createSlab(l.x + l.w / 2, l.y0 + height / 2, l.z + l.d / 2, l.w, height, l.d, material);
       mesh.name = `ground_ladder_${i}`;
       scene.add(mesh);
     }
 
-    // Orange ladders — thin vertical slabs (orange)
+    // Orange ladders
     const orangeLadders = data.connections.orangeLadders || [];
     for (let i = 0; i < orangeLadders.length; i++) {
       const l = orangeLadders[i];
       const height = l.y1 - l.y0;
-      const mesh = createSlab(
-        l.x + l.w / 2,
-        l.y0 + height / 2,
-        l.z + l.d / 2,
-        l.w, height, l.d,
-        MATERIALS.orangeLadder,
-      );
+      const material = debug ? DEBUG_MATERIALS.orangeLadder : pickFromPool(pools.ladders, i + 20);
+      const mesh = createSlab(l.x + l.w / 2, l.y0 + height / 2, l.z + l.d / 2, l.w, height, l.d, material);
       mesh.name = `orange_ladder_${i}`;
       scene.add(mesh);
     }
   }
 
-  // Cover pieces — purple boxes
+  // Cover pieces
   if (data.cover) {
     for (let i = 0; i < data.cover.length; i++) {
       const c = data.cover[i];
-      const mesh = createSlab(
-        c.x + c.w / 2,
-        c.y + c.height / 2,
-        c.z + c.d / 2,
-        c.w, c.height, c.d,
-        MATERIALS.cover,
-      );
+      let material;
+      if (debug) {
+        material = DEBUG_MATERIALS.cover;
+      } else if (c.height > 1.5) {
+        // Tall objects use wall textures
+        material = pickFromPool(pools.objects, i);
+      } else {
+        // Small objects: 50/50 crate or stone block
+        material = (i % 2 === 0) ? pickFromPool(pools.objects, i) : pickFromPool(pools.objects, i);
+      }
+      const mesh = createSlab(c.x + c.w / 2, c.y + c.height / 2, c.z + c.d / 2, c.w, c.height, c.d, material);
       mesh.name = `cover_${i}`;
       scene.add(mesh);
     }
   }
 
-  // Interior cover — grey boxes
+  // Interior cover
   if (data.interiorCover) {
     for (let i = 0; i < data.interiorCover.length; i++) {
       const c = data.interiorCover[i];
-      const mesh = createSlab(
-        c.x + c.w / 2,
-        c.y + c.height / 2,
-        c.z + c.d / 2,
-        c.w, c.height, c.d,
-        MATERIALS.interiorCover,
-      );
+      let material;
+      if (debug) {
+        material = DEBUG_MATERIALS.interiorCover;
+      } else {
+        material = (i % 2 === 0) ? pickFromPool(pools.objects, i + 50) : pickFromPool(pools.objects, i + 50);
+      }
+      const mesh = createSlab(c.x + c.w / 2, c.y + c.height / 2, c.z + c.d / 2, c.w, c.height, c.d, material);
       mesh.name = `interior_cover_${i}`;
       scene.add(mesh);
     }
@@ -159,60 +195,17 @@ export function buildScene(data, config) {
   if (data.deletedFootprints) {
     for (let i = 0; i < data.deletedFootprints.length; i++) {
       const df = data.deletedFootprints[i];
-      const mesh = createFloorSlab(
-        { x: df.x, z: df.z, w: df.w, d: df.d },
-        0.55, // above the base slab (0.5 thick)
-        0.1,
-        MATERIALS.deletedFootprint,
-      );
+      let material;
+      if (debug) {
+        material = DEBUG_MATERIALS.deletedFootprint;
+      } else {
+        material = pickFromPool(pools.courtyards, i);
+      }
+      const mesh = createFloorSlab({ x: df.x, z: df.z, w: df.w, d: df.d }, 0.55, 0.1, material);
       mesh.name = `deleted_${i}`;
       scene.add(mesh);
     }
   }
 
   return scene;
-}
-
-/**
- * Build an angled ramp mesh.
- * The ramp goes from y0 at one end to y1 at the other.
- */
-function buildRampMesh(ramp, material) {
-  const { x, z, w, d, y0, y1, side } = ramp;
-  const thickness = 0.3;
-
-  // Create a box and shear it to form a ramp
-  // Simpler approach: use a flat slab positioned at the midpoint angle
-  const length = ramp.axis === 'x' ? w : d;
-  const width = ramp.axis === 'x' ? d : w;
-  const height = y1 - y0;
-  const rampLength = Math.sqrt(length * length + height * height);
-  const angle = Math.atan2(height, length);
-
-  const geometry = new THREE.BoxGeometry(rampLength, thickness, width);
-  const mesh = new THREE.Mesh(geometry, material);
-
-  // Position at midpoint
-  const midX = x + w / 2;
-  const midZ = z + d / 2;
-  const midY = (y0 + y1) / 2;
-  mesh.position.set(midX, midY, midZ);
-
-  // Rotate to angle — direction depends on which side the ramp is on
-  switch (side) {
-    case 'north':
-      mesh.rotation.z = angle;
-      break;
-    case 'south':
-      mesh.rotation.z = -angle;
-      break;
-    case 'west':
-      mesh.rotation.x = -angle;
-      break;
-    case 'east':
-      mesh.rotation.x = angle;
-      break;
-  }
-
-  return mesh;
 }

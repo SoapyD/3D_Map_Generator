@@ -28,6 +28,11 @@ export async function exportToGlb(scene, outputPath) {
   const bufferViews = [];
   const materials = [];
   const materialMap = new Map();
+  const textures = [];
+  const images = [];
+  const imageMap = new Map();
+  const samplers = [];
+  let hasSampler = false;
   const bufferParts = [];
   let byteOffset = 0;
 
@@ -38,6 +43,7 @@ export async function exportToGlb(scene, outputPath) {
 
     const position = geo.getAttribute('position');
     const normal = geo.getAttribute('normal');
+    const uv = geo.getAttribute('uv');
     const index = geo.getIndex();
 
     // Material
@@ -49,13 +55,42 @@ export async function exportToGlb(scene, outputPath) {
       matIdx = materials.length;
       materialMap.set(matKey, matIdx);
       const c = mesh.material.color || new THREE.Color(0x888888);
-      materials.push({
+      const matDef = {
         pbrMetallicRoughness: {
           baseColorFactor: [c.r, c.g, c.b, 1.0],
           metallicFactor: mesh.material.metalness || 0,
           roughnessFactor: mesh.material.roughness || 0.8,
         },
-      });
+      };
+
+      // Embed PNG texture if available
+      if (mesh.material._pngBuffer) {
+        const pngBuf = mesh.material._pngBuffer;
+        let imgIdx;
+        if (imageMap.has(pngBuf)) {
+          imgIdx = imageMap.get(pngBuf);
+        } else {
+          const padding = (4 - (pngBuf.length % 4)) % 4;
+          const paddedPng = padding > 0 ? Buffer.concat([pngBuf, Buffer.alloc(padding)]) : pngBuf;
+          const viewIdx = bufferViews.length;
+          bufferViews.push({ buffer: 0, byteOffset, byteLength: pngBuf.length });
+          bufferParts.push(paddedPng);
+          byteOffset += paddedPng.length;
+          imgIdx = images.length;
+          images.push({ bufferView: viewIdx, mimeType: 'image/png' });
+          imageMap.set(pngBuf, imgIdx);
+        }
+        if (!hasSampler) {
+          samplers.push({ magFilter: 9728, minFilter: 9728, wrapS: 10497, wrapT: 10497 });
+          hasSampler = true;
+        }
+        const texIdx = textures.length;
+        textures.push({ source: imgIdx, sampler: 0 });
+        matDef.pbrMetallicRoughness.baseColorTexture = { index: texIdx };
+        matDef.pbrMetallicRoughness.baseColorFactor = [1, 1, 1, 1];
+      }
+
+      materials.push(matDef);
     }
 
     // Position buffer
@@ -104,6 +139,19 @@ export async function exportToGlb(scene, outputPath) {
       byteOffset += normBuf.length;
     }
 
+    // UV buffer
+    let uvAccIdx;
+    if (uv) {
+      const uvData = new Float32Array(uv.array);
+      const uvBuf = Buffer.from(uvData.buffer);
+      const uvViewIdx = bufferViews.length;
+      bufferViews.push({ buffer: 0, byteOffset, byteLength: uvBuf.length, target: 34962 });
+      bufferParts.push(uvBuf);
+      uvAccIdx = accessors.length;
+      accessors.push({ bufferView: uvViewIdx, componentType: 5126, count: uv.count, type: 'VEC2' });
+      byteOffset += uvBuf.length;
+    }
+
     // Index buffer
     let idxAccIdx;
     if (index) {
@@ -138,6 +186,7 @@ export async function exportToGlb(scene, outputPath) {
       material: matIdx,
     };
     if (normAccIdx !== undefined) primitive.attributes.NORMAL = normAccIdx;
+    if (uvAccIdx !== undefined) primitive.attributes.TEXCOORD_0 = uvAccIdx;
     if (idxAccIdx !== undefined) primitive.indices = idxAccIdx;
 
     const meshIdx = meshDefs.length;
@@ -160,6 +209,10 @@ export async function exportToGlb(scene, outputPath) {
     materials,
     buffers: [{ byteLength: byteOffset }],
   };
+
+  if (textures.length > 0) gltf.textures = textures;
+  if (images.length > 0) gltf.images = images;
+  if (samplers.length > 0) gltf.samplers = samplers;
 
   const jsonStr = JSON.stringify(gltf);
   const jsonBuf = Buffer.from(jsonStr, 'utf-8');

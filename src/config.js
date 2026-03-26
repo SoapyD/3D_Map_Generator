@@ -13,8 +13,9 @@ const DEFAULTS = {
   streetWidth: 3.5,   // minimum street width (inches)
   damageLevel: 0.5,   // 0-1, how ruined the buildings are
   maxSightline: 24,   // max unbroken line of sight (inches)
-  textureSet: 'gothic',
+  textureSet: 'base',
   preview: false,
+  debug: false,
   outputDir: 'output',
 };
 
@@ -26,6 +27,11 @@ export function parseArgs(argv) {
 
     if (arg === '--preview') {
       config.preview = true;
+      continue;
+    }
+
+    if (arg === '--debug') {
+      config.debug = true;
       continue;
     }
 

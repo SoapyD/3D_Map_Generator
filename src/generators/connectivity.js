@@ -249,19 +249,18 @@ export function generateConnectivity(data, config, rng) {
 
       if (!touchesWall) continue;
 
-      // Place ladder flat against the wall, same width as the walkway
-      // Offset slightly (0.3") from the wall to prevent clashing
+      // Place ladder flat against the wall, half walkway width, centred
       const wallOffset = 0.3;
       let ladderX, ladderZ, ladderW, ladderD;
       if (w.axis === 'x') {
         ladderX = endpoint === 'start' ? w.x - LADDER_DEPTH + wallOffset : w.x + w.w - wallOffset;
-        ladderZ = w.z;
+        ladderZ = w.z + w.d / 2 - LADDER_WIDTH / 2;
         ladderW = LADDER_DEPTH;
-        ladderD = w.d;
+        ladderD = LADDER_WIDTH;
       } else {
-        ladderX = w.x;
+        ladderX = w.x + w.w / 2 - LADDER_WIDTH / 2;
         ladderZ = endpoint === 'start' ? w.z - LADDER_DEPTH + wallOffset : w.z + w.d - wallOffset;
-        ladderW = w.w;
+        ladderW = LADDER_WIDTH;
         ladderD = LADDER_DEPTH;
       }
 
@@ -335,7 +334,7 @@ export function generateConnectivity(data, config, rng) {
         if (edge.side === 'west' && edge.x < MAP_BOUNDARY_MARGIN) continue;
         if (edge.side === 'east' && edge.x > config.mapWidth - MAP_BOUNDARY_MARGIN) continue;
 
-        const ladderWidth = WALKWAY_WIDTH;
+        const ladderWidth = LADDER_WIDTH;
 
         // Visual ladder position: centred on edge midpoint, flat against wall, offset 0.3" out
         let lx, lz, lw, ld;
@@ -473,19 +472,19 @@ export function generateConnectivity(data, config, rng) {
           const spawnChance = tier === 0 ? 0.10 : tier === 1 ? 0.20 : 0.30;
           if (!rng.chance(spawnChance)) continue;
 
-          // Position: centred on edge, outside building, walkway width
+          // Position: centred on edge, outside building, ladder width
           const wallOffset = 0.3;
           let lx, lz, lw, ld;
           if (edge.axis === 'x') {
-            lx = edge.x + edge.len / 2 - WALKWAY_WIDTH / 2;
+            lx = edge.x + edge.len / 2 - LADDER_WIDTH / 2;
             lz = edge.side === 'north' ? edge.z - wallOffset : edge.z - LADDER_DEPTH + wallOffset;
-            lw = WALKWAY_WIDTH;
+            lw = LADDER_WIDTH;
             ld = LADDER_DEPTH;
           } else {
             lx = edge.side === 'west' ? edge.x - wallOffset : edge.x - LADDER_DEPTH + wallOffset;
-            lz = edge.z + edge.len / 2 - WALKWAY_WIDTH / 2;
+            lz = edge.z + edge.len / 2 - LADDER_WIDTH / 2;
             lw = LADDER_DEPTH;
-            ld = WALKWAY_WIDTH;
+            ld = LADDER_WIDTH;
           }
 
           // Climb upward through multiple tiers until no floor exists
