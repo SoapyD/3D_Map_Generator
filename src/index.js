@@ -5,6 +5,7 @@
  */
 
 import { mkdir } from 'fs/promises';
+import path from 'path';
 import { parseArgs } from './config.js';
 import { createRng } from './core/rng.js';
 import { generateGrid } from './generators/grid.js';
@@ -67,16 +68,17 @@ async function main() {
   // Export
   await mkdir(config.outputDir, { recursive: true });
 
-  if (config.obj) {
-    const { dir, baseName } = getObjOutputPath(config);
-    const objPath = await exportToObj(scene, dir, baseName);
-    console.log(`\nDone! OBJ output: ${objPath}`);
-  }
-
+  // Always export both GLB and OBJ with texture atlas
   const outputPath = getOutputPath(config);
   await exportToGlb(scene, outputPath);
 
-  console.log(`\nDone! Output: ${outputPath}`);
+  const { dir, baseName } = getObjOutputPath(config);
+  const objPath = await exportToObj(scene, dir, baseName);
+
+  console.log(`\nDone!`);
+  console.log(`  GLB: ${outputPath}`);
+  console.log(`  OBJ: ${objPath}`);
+  console.log(`  Texture: ${path.join(dir, baseName + '.png')}`);
 
   if (config.preview) {
     console.log('\nStarting preview server...');
