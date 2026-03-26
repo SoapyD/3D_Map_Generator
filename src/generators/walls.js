@@ -12,7 +12,7 @@
  *   3: south, east
  */
 
-const WALL_QUAD_SIZE = 3;
+const WALL_QUAD_SIZE = 1.5;
 const UPPER_REMOVAL_RATIO = 0.7;
 const LOWER_REMOVAL_RATIO = 0.5;
 
