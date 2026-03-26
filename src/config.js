@@ -15,6 +15,7 @@ const DEFAULTS = {
   maxSightline: 24,   // max unbroken line of sight (inches)
   textureSet: 'gothic',
   preview: false,
+  debug: false,
   outputDir: 'output',
 };
 
@@ -26,6 +27,11 @@ export function parseArgs(argv) {
 
     if (arg === '--preview') {
       config.preview = true;
+      continue;
+    }
+
+    if (arg === '--debug') {
+      config.debug = true;
       continue;
     }
 
