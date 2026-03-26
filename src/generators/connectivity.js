@@ -160,8 +160,36 @@ export function generateConnectivity(data, config, rng) {
     }
   }
 
-  const connections = { ladders, walkways };
+  // Strip intersecting walkways: loop through, if current walkway intersects
+  // another, mark the other for dropping. Skip intersection checks against
+  // walkways already marked for dropping.
+  const toDrop = new Set();
+  for (let i = 0; i < walkways.length; i++) {
+    if (toDrop.has(i)) continue;
+    for (let j = i + 1; j < walkways.length; j++) {
+      if (toDrop.has(j)) continue;
+      if (walkwaysIntersect(walkways[i], walkways[j])) {
+        toDrop.add(j);
+      }
+    }
+  }
+  const filteredWalkways = walkways.filter((_, i) => !toDrop.has(i));
+
+  const connections = { ladders, walkways: filteredWalkways };
   return { ...data, connections };
+}
+
+/**
+ * Check if two walkways intersect (AABB overlap at the same tier).
+ */
+function walkwaysIntersect(a, b) {
+  if (Math.abs(a.y - b.y) > 0.5) return false; // different tiers
+  return (
+    a.x < b.x + b.w &&
+    a.x + a.w > b.x &&
+    a.z < b.z + b.d &&
+    a.z + a.d > b.z
+  );
 }
 
 /**
