@@ -175,7 +175,21 @@ export function generateConnectivity(data, config, rng) {
   }
   const filteredWalkways = walkways.filter((_, i) => !toDrop.has(i));
 
-  const connections = { ladders, walkways: filteredWalkways };
+  // Keep only 20% of walkways per tier
+  const byTier = new Map();
+  for (const w of filteredWalkways) {
+    const t = Math.round(w.y / tierHeight);
+    if (!byTier.has(t)) byTier.set(t, []);
+    byTier.get(t).push(w);
+  }
+  const culledWalkways = [];
+  for (const [, tierWalkways] of byTier) {
+    rng.shuffle(tierWalkways);
+    const keep = Math.max(1, Math.ceil(tierWalkways.length * 0.3));
+    culledWalkways.push(...tierWalkways.slice(0, keep));
+  }
+
+  const connections = { ladders, walkways: culledWalkways };
   return { ...data, connections };
 }
 
