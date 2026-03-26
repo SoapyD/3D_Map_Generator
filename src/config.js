@@ -95,6 +95,35 @@ export const GEOMETRY = {
   tileSize: 3,             // inches per texture repeat
 };
 
+// --- Deletion Toggles ---
+// Set any to false to disable that deletion rule (useful for debugging)
+export const DELETIONS = {
+  // Buildings
+  buildingRandomCull: true,        // delete 15% of small buildings randomly
+  buildingDisplaceByLarge: true,   // delete small buildings overlapping large ones
+
+  // Walkways
+  walkwayWallCollision: true,      // drop walkways that hit walls on their tier
+  walkwayBothEndsCheck: true,      // drop walkways where one end has no floor
+  walkwayIntersectionStrip: true,  // drop walkways that overlap other walkways
+  walkwayKeepRatioCull: true,      // cull walkways to keepRatio per tier
+  walkwayProximityCull: true,      // drop walkways too close to other walkways
+
+  // Yellow ladders (walkway-wall ladders)
+  yellowLadderProximityCull: true, // drop yellow ladders too close to red/orange
+
+  // Red ladders (ground)
+  redLadderWalkwayOverlap: true,   // drop red ladders touching walkways
+  redLadderCull: true,             // cull red ladders to ladderCullRatio
+  redLadderProximityCull: true,    // drop red ladders too close to red/orange
+
+  // Orange ladders (free-standing)
+  orangeLadderWalkwayOverlap: true,// drop orange ladders touching walkways
+  orangeLadderRedOverlap: true,    // drop orange ladders touching red ladders
+  orangeLadderCull: true,          // cull orange ladders to ladderCullRatio
+  orangeLadderProximityCull: true, // drop orange ladders too close to other orange
+};
+
 // --- CLI parser ---
 export function parseArgs(argv) {
   const config = { ...DEFAULTS };

@@ -8,7 +8,7 @@
  * Output: Array of buildings { x, z, w, d, maxTier, size, blockIndex }
  */
 
-import { BUILDING } from '../config.js';
+import { BUILDING, DELETIONS } from '../config.js';
 
 const FOOTPRINTS = BUILDING.footprints;
 const HEIGHTS = BUILDING.heights;
@@ -61,25 +61,35 @@ export function generateBuildings(gridData, config, rng) {
   // Remove small buildings that touch any big building — track them
   const surviving = [];
   const displacedByBig = [];
-  for (const b of buildings) {
-    let displaced = false;
-    for (const big of bigBuildings) {
-      if (b.x < big.x + big.w + BUILDING_GAP && b.x + b.w > big.x - BUILDING_GAP &&
-          b.z < big.z + big.d + BUILDING_GAP && b.z + b.d > big.z - BUILDING_GAP) {
-        displaced = true;
-        break;
+  if (DELETIONS.buildingDisplaceByLarge) {
+    for (const b of buildings) {
+      let displaced = false;
+      for (const big of bigBuildings) {
+        if (b.x < big.x + big.w + BUILDING_GAP && b.x + b.w > big.x - BUILDING_GAP &&
+            b.z < big.z + big.d + BUILDING_GAP && b.z + b.d > big.z - BUILDING_GAP) {
+          displaced = true;
+          break;
+        }
       }
+      if (displaced) displacedByBig.push(b);
+      else surviving.push(b);
     }
-    if (displaced) displacedByBig.push(b);
-    else surviving.push(b);
+  } else {
+    surviving.push(...buildings);
   }
 
   // Delete 15% of remaining small buildings — track deleted positions for cover placement
-  const deleteRatio = BUILDING.deleteRatio;
-  rng.shuffle(surviving);
-  const keepCount = Math.ceil(surviving.length * (1 - deleteRatio));
-  const culled = surviving.slice(0, keepCount);
-  const randomlyDeleted = surviving.slice(keepCount);
+  let culled, randomlyDeleted;
+  if (DELETIONS.buildingRandomCull) {
+    const deleteRatio = BUILDING.deleteRatio;
+    rng.shuffle(surviving);
+    const keepCount = Math.ceil(surviving.length * (1 - deleteRatio));
+    culled = surviving.slice(0, keepCount);
+    randomlyDeleted = surviving.slice(keepCount);
+  } else {
+    culled = surviving;
+    randomlyDeleted = [];
+  }
 
   // All deleted buildings = displaced by big + randomly culled
   const deletedBuildings = [...displacedByBig, ...randomlyDeleted];
