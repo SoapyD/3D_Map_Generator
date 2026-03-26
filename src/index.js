@@ -15,6 +15,7 @@ import { generateConnectivity } from './generators/connectivity.js';
 import { generateCover } from './generators/cover.js';
 import { buildScene } from './generators/scene-builder.js';
 import { exportToGlb, getOutputPath } from './export/glb-exporter.js';
+import { exportToObj, getObjOutputPath } from './export/obj-exporter.js';
 
 async function main() {
   const config = parseArgs(process.argv);
@@ -65,6 +66,13 @@ async function main() {
 
   // Export
   await mkdir(config.outputDir, { recursive: true });
+
+  if (config.obj) {
+    const { dir, baseName } = getObjOutputPath(config);
+    const objPath = await exportToObj(scene, dir, baseName);
+    console.log(`\nDone! OBJ output: ${objPath}`);
+  }
+
   const outputPath = getOutputPath(config);
   await exportToGlb(scene, outputPath);
 

@@ -16,6 +16,7 @@ const DEFAULTS = {
   textureSet: 'base',
   preview: false,
   debug: false,
+  obj: false,
   outputDir: 'output',
 };
 
@@ -32,6 +33,11 @@ export function parseArgs(argv) {
 
     if (arg === '--debug') {
       config.debug = true;
+      continue;
+    }
+
+    if (arg === '--obj') {
+      config.obj = true;
       continue;
     }
 
