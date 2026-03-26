@@ -71,16 +71,17 @@ export function buildScene(data, config) {
       scene.add(mesh);
     }
 
-    // Walkways — flat horizontal slabs (blue)
+    // Walkways — flat horizontal slabs (blue = ok, green = blocked for debug)
     for (let i = 0; i < walkways.length; i++) {
       const w = walkways[i];
+      const mat = w.blocked ? MATERIALS.ramp : MATERIALS.walkway;
       const mesh = createFloorSlab(
         { x: w.x, z: w.z, w: w.w, d: w.d },
         w.y,
         0.3,
-        MATERIALS.walkway,
+        mat,
       );
-      mesh.name = `walkway_${i}`;
+      mesh.name = w.blocked ? `walkway_BLOCKED_${i}` : `walkway_${i}`;
       scene.add(mesh);
     }
   }

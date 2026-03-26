@@ -139,20 +139,24 @@ export function generateConnectivity(data, config, rng) {
             walkway = { type: 'walkway', x: clampedX - WALKWAY_WIDTH / 2, z: gs, w: WALKWAY_WIDTH, d: len, y, axis: 'z' };
           }
 
-          // Drop if it hits a wall on this tier
-          const tierY = (tier - 1) * tierHeight + slabThickness;
+          // Check against walls on this exact floor level only
+          // Wall baseY for this tier's walls = tier * tierHeight + slabThickness
+          const wallTierY = tier * tierHeight + slabThickness;
+          const margin = 0.3;
           let hitsWall = false;
           for (const wall of data.walls) {
-            if (Math.abs(wall.baseY - tierY) > 0.5) continue;
+            if (Math.abs(wall.baseY - wallTierY) > 0.5) continue;
             const wallX1 = wall.axis === 'x' ? wall.x + wall.length : wall.x + wall.thickness;
             const wallZ1 = wall.axis === 'z' ? wall.z + wall.length : wall.z + wall.thickness;
-            if (walkway.x < wallX1 && walkway.x + walkway.w > wall.x &&
-                walkway.z < wallZ1 && walkway.z + walkway.d > wall.z) {
+            if (walkway.x < wallX1 + margin && walkway.x + walkway.w > wall.x - margin &&
+                walkway.z < wallZ1 + margin && walkway.z + walkway.d > wall.z - margin) {
               hitsWall = true;
               break;
             }
           }
-          if (hitsWall) continue;
+          if (hitsWall) {
+            walkway.blocked = true;
+          }
 
           walkways.push(walkway);
         }
