@@ -86,7 +86,8 @@ export function generateCover(data, config, rng) {
       if (!present) continue;
 
       const y = tier * tierHeight + slabThickness;
-      const count = rng.int(0, maxObjects);
+      // Bias toward placing objects — roll twice and take the higher value
+      const count = Math.max(rng.int(0, maxObjects), rng.int(0, maxObjects));
 
       for (let i = 0; i < count; i++) {
         // Pick a random present quadrant
