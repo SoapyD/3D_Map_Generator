@@ -51,7 +51,7 @@ export function buildScene(data, config) {
   // Build texture pools for textured mode
   let pools = null;
   if (!debug) {
-    pools = buildTexturePools();
+    pools = buildTexturePools(config.textureSet || 'base');
   }
 
   // Build floor slabs
@@ -66,7 +66,7 @@ export function buildScene(data, config) {
           ? DEBUG_MATERIALS.base
           : DEBUG_MATERIALS.floor[Math.min(tier - 1, DEBUG_MATERIALS.floor.length - 1)];
       } else if (tier === 0) {
-        material = pickFromPool(pools.base, Math.floor(section.x * 7 + section.z * 13));
+        material = pickFromPool(pools.base_map, Math.floor(section.x * 7 + section.z * 13));
       } else {
         const bi = findBuildingIndex(section.x, section.z, data.buildings);
         if (bi >= 0 && data.buildings[bi].size !== 'small') {
@@ -93,7 +93,7 @@ export function buildScene(data, config) {
       } else {
         const bi = findBuildingIndex(w.x, w.z, data.buildings);
         if (bi >= 0 && (data.buildings[bi].size === 'large' || data.buildings[bi].size === 'medium')) {
-          material = pickFromPool(pools.landmarkWalls, bi);
+          material = pickFromPool(pools.landmark_walls, bi);
         } else {
           material = pickFromPool(pools.walls, bi >= 0 ? bi : i);
         }
@@ -125,7 +125,7 @@ export function buildScene(data, config) {
       if (debug) {
         material = w.blocked ? DEBUG_MATERIALS.ramp : DEBUG_MATERIALS.walkway;
       } else {
-        material = pickFromPool(pools.floors, i);
+        material = pickFromPool(pools.walkways, i);
       }
       const mesh = createFloorSlab({ x: w.x, z: w.z, w: w.w, d: w.d }, w.y, 0.3, material);
       mesh.name = w.blocked ? `walkway_BLOCKED_${i}` : `walkway_${i}`;
@@ -164,10 +164,10 @@ export function buildScene(data, config) {
         material = DEBUG_MATERIALS.cover;
       } else if (c.height > 1.5) {
         // Tall objects use wall textures
-        material = pickFromPool(pools.stoneBlocks, i);
+        material = pickFromPool(pools.objects, i);
       } else {
         // Small objects: 50/50 crate or stone block
-        material = (i % 2 === 0) ? pickFromPool(pools.crates, i) : pickFromPool(pools.stoneBlocks, i);
+        material = (i % 2 === 0) ? pickFromPool(pools.objects, i) : pickFromPool(pools.objects, i);
       }
       const mesh = createSlab(c.x + c.w / 2, c.y + c.height / 2, c.z + c.d / 2, c.w, c.height, c.d, material);
       mesh.name = `cover_${i}`;
@@ -183,7 +183,7 @@ export function buildScene(data, config) {
       if (debug) {
         material = DEBUG_MATERIALS.interiorCover;
       } else {
-        material = (i % 2 === 0) ? pickFromPool(pools.crates, i + 50) : pickFromPool(pools.stoneBlocks, i + 50);
+        material = (i % 2 === 0) ? pickFromPool(pools.objects, i + 50) : pickFromPool(pools.objects, i + 50);
       }
       const mesh = createSlab(c.x + c.w / 2, c.y + c.height / 2, c.z + c.d / 2, c.w, c.height, c.d, material);
       mesh.name = `interior_cover_${i}`;
