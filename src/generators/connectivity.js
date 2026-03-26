@@ -414,7 +414,115 @@ export function generateConnectivity(data, config, rng) {
     return true;
   });
 
-  const connections = { ladders, walkways: culledWalkways, groundLadders: filteredGroundLadders };
+  // Orange ladders: placed on any quadrant edge, any tier except top.
+  // Go up one tier. Only kept if they connect to a floor above.
+  // Deleted if they touch a walkway or red ladder.
+  const orangeLadders = [];
+
+  for (let bi = 0; bi < data.buildings.length; bi++) {
+    const b = data.buildings[bi];
+    const bq = data.buildingQuadrants[bi];
+
+    for (let tier = 0; tier < config.tiers; tier++) {
+      // Use tier 1 quadrants for ground level, otherwise the tier's quadrants
+      const present = tier === 0
+        ? (bq.tiers[1] || new Set([0, 1, 2, 3]))
+        : bq.tiers[tier];
+      if (!present) continue;
+
+      for (const q of present) {
+        const qr = getQuadrantRect(b, q);
+
+        // External edges only
+        const neighborN = (q === 2) ? 0 : (q === 3) ? 1 : -1;
+        const neighborS = (q === 0) ? 2 : (q === 1) ? 3 : -1;
+        const neighborW = (q === 1) ? 0 : (q === 3) ? 2 : -1;
+        const neighborE = (q === 0) ? 1 : (q === 2) ? 3 : -1;
+
+        const edges = [];
+        if (neighborN < 0 || !present.has(neighborN))
+          edges.push({ side: 'north', x: qr.x, z: qr.z, len: qr.w, axis: 'x' });
+        if (neighborS < 0 || !present.has(neighborS))
+          edges.push({ side: 'south', x: qr.x, z: qr.z + qr.d, len: qr.w, axis: 'x' });
+        if (neighborW < 0 || !present.has(neighborW))
+          edges.push({ side: 'west', x: qr.x, z: qr.z, len: qr.d, axis: 'z' });
+        if (neighborE < 0 || !present.has(neighborE))
+          edges.push({ side: 'east', x: qr.x + qr.w, z: qr.z, len: qr.d, axis: 'z' });
+
+        for (const edge of edges) {
+          // Skip edges near map boundary
+          if (edge.side === 'north' && edge.z < MAP_BOUNDARY_MARGIN) continue;
+          if (edge.side === 'south' && edge.z > config.mapDepth - MAP_BOUNDARY_MARGIN) continue;
+          if (edge.side === 'west' && edge.x < MAP_BOUNDARY_MARGIN) continue;
+          if (edge.side === 'east' && edge.x > config.mapWidth - MAP_BOUNDARY_MARGIN) continue;
+
+          // Spawn chance: 15% on ground floor, 50% on tier 1, 70% on tier 2+
+          const spawnChance = tier === 0 ? 0.15 : tier === 1 ? 0.5 : 0.7;
+          if (!rng.chance(spawnChance)) continue;
+
+          // Position: centred on edge, outside building
+          const wallOffset = 0.3;
+          let lx, lz, lw, ld;
+          if (edge.axis === 'x') {
+            lx = edge.x + edge.len / 2 - WALKWAY_WIDTH / 2;
+            lz = edge.side === 'north' ? edge.z - wallOffset : edge.z - LADDER_DEPTH + wallOffset;
+            lw = WALKWAY_WIDTH;
+            ld = LADDER_DEPTH;
+          } else {
+            lx = edge.side === 'west' ? edge.x - wallOffset : edge.x - LADDER_DEPTH + wallOffset;
+            lz = edge.z + edge.len / 2 - WALKWAY_WIDTH / 2;
+            lw = LADDER_DEPTH;
+            ld = WALKWAY_WIDTH;
+          }
+
+          const y0 = tier * tierHeight;
+          const y1 = (tier + 1) * tierHeight;
+
+          // Only keep if there's a floor at tier+1 near this quadrant
+          const floorAbove = data.floors.find((f) => f.tier === tier + 1);
+          if (!floorAbove) continue;
+          const hasFloor = floorAbove.sections.some((s) =>
+            s.x < qr.x + qr.w - 0.1 && s.x + s.w > qr.x + 0.1 &&
+            s.z < qr.z + qr.d - 0.1 && s.z + s.d > qr.z + 0.1
+          );
+          if (!hasFloor) continue;
+
+          orangeLadders.push({
+            type: 'orange_ladder',
+            x: lx, z: lz,
+            w: lw, d: ld,
+            y0, y1,
+          });
+        }
+      }
+    }
+  }
+
+  // Remove orange ladders that touch any walkway or red ladder
+  const filteredOrangeLadders = orangeLadders.filter((ol) => {
+    for (const w of culledWalkways) {
+      if (ol.x < w.x + w.w && ol.x + ol.w > w.x &&
+          ol.z < w.z + w.d && ol.z + ol.d > w.z) {
+        return false;
+      }
+    }
+    for (const gl of filteredGroundLadders) {
+      if (ol.x < gl.x + gl.w && ol.x + ol.w > gl.x &&
+          ol.z < gl.z + gl.d && ol.z + ol.d > gl.z) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  // Cull red and orange ladders to 40% each
+  rng.shuffle(filteredGroundLadders);
+  const culledGroundLadders = filteredGroundLadders.slice(0, Math.max(1, Math.ceil(filteredGroundLadders.length * 0.4)));
+
+  rng.shuffle(filteredOrangeLadders);
+  const culledOrangeLadders = filteredOrangeLadders.slice(0, Math.max(1, Math.ceil(filteredOrangeLadders.length * 0.4)));
+
+  const connections = { ladders, walkways: culledWalkways, groundLadders: culledGroundLadders, orangeLadders: culledOrangeLadders };
   return { ...data, connections };
 }
 

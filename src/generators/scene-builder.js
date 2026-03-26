@@ -19,6 +19,7 @@ const MATERIALS = {
   walkway: new THREE.MeshStandardMaterial({ color: 0x4488cc, roughness: 0.7 }),  // blue
   ramp: new THREE.MeshStandardMaterial({ color: 0x44aa44, roughness: 0.7 }),     // green
   groundLadder: new THREE.MeshStandardMaterial({ color: 0xcc4444, roughness: 0.7 }), // red
+  orangeLadder: new THREE.MeshStandardMaterial({ color: 0xee8822, roughness: 0.7 }), // orange
 };
 
 /**
@@ -99,6 +100,22 @@ export function buildScene(data, config) {
         MATERIALS.groundLadder,
       );
       mesh.name = `ground_ladder_${i}`;
+      scene.add(mesh);
+    }
+
+    // Orange ladders — thin vertical slabs (orange)
+    const orangeLadders = data.connections.orangeLadders || [];
+    for (let i = 0; i < orangeLadders.length; i++) {
+      const l = orangeLadders[i];
+      const height = l.y1 - l.y0;
+      const mesh = createSlab(
+        l.x + l.w / 2,
+        l.y0 + height / 2,
+        l.z + l.d / 2,
+        l.w, height, l.d,
+        MATERIALS.orangeLadder,
+      );
+      mesh.name = `orange_ladder_${i}`;
       scene.add(mesh);
     }
   }
