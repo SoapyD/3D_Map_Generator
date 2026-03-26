@@ -284,7 +284,7 @@ export function generateConnectivity(data, config, rng) {
         else break;
       }
 
-      const ladderY0 = w.y;
+      const ladderY0 = w.y; // start at walkway level
       const ladderY1 = (topTier + 1) * tierHeight;
 
       if (ladderY1 > ladderY0) {
@@ -542,15 +542,16 @@ export function generateConnectivity(data, config, rng) {
   rng.shuffle(filteredOrangeLadders);
   const culledOrangeLadders = filteredOrangeLadders.slice(0, Math.max(1, Math.ceil(filteredOrangeLadders.length * 0.4)));
 
-  // Proximity culling — remove walkways/ladders that are too close to their own kind
-  const PROXIMITY = 3; // inches
+  // Proximity culling — only delete if same tier start point
+  const PROXIMITY = 3;
 
-  // Walkways: cull those close to other walkways
+  // Walkways
   const walkwayDropSet = new Set();
   for (let i = 0; i < culledWalkways.length; i++) {
     if (walkwayDropSet.has(i)) continue;
     for (let j = i + 1; j < culledWalkways.length; j++) {
       if (walkwayDropSet.has(j)) continue;
+      if (Math.abs(culledWalkways[i].y - culledWalkways[j].y) > 0.5) continue;
       if (isClose(culledWalkways[i], culledWalkways[j], PROXIMITY)) {
         walkwayDropSet.add(j);
       }
@@ -558,15 +559,13 @@ export function generateConnectivity(data, config, rng) {
   }
   const finalWalkways = culledWalkways.filter((_, i) => !walkwayDropSet.has(i));
 
-  // Ladders: yellow checked against red + orange, red against red + orange, orange against orange
-  // Build combined list for checking against
+  // Yellow ladders vs red + orange (same start tier only)
   const allRedOrange = [...culledGroundLadders, ...culledOrangeLadders];
-
-  // Yellow ladders vs red + orange
   const yellowDropSet = new Set();
   for (let i = 0; i < ladders.length; i++) {
     if (yellowDropSet.has(i)) continue;
     for (const other of allRedOrange) {
+      if (Math.abs(ladders[i].y0 - other.y0) > 0.5) continue;
       if (isClose(ladders[i], other, PROXIMITY)) {
         yellowDropSet.add(i);
         break;
@@ -575,17 +574,19 @@ export function generateConnectivity(data, config, rng) {
   }
   const finalYellow = ladders.filter((_, i) => !yellowDropSet.has(i));
 
-  // Red ladders vs red + orange
+  // Red ladders vs red + orange (same start tier only)
   const redDropSet = new Set();
   for (let i = 0; i < culledGroundLadders.length; i++) {
     if (redDropSet.has(i)) continue;
     for (let j = i + 1; j < culledGroundLadders.length; j++) {
       if (redDropSet.has(j)) continue;
+      if (Math.abs(culledGroundLadders[i].y0 - culledGroundLadders[j].y0) > 0.5) continue;
       if (isClose(culledGroundLadders[i], culledGroundLadders[j], PROXIMITY)) {
         redDropSet.add(j);
       }
     }
     for (const ol of culledOrangeLadders) {
+      if (Math.abs(culledGroundLadders[i].y0 - ol.y0) > 0.5) continue;
       if (isClose(culledGroundLadders[i], ol, PROXIMITY)) {
         redDropSet.add(i);
         break;
@@ -594,12 +595,13 @@ export function generateConnectivity(data, config, rng) {
   }
   const finalRed = culledGroundLadders.filter((_, i) => !redDropSet.has(i));
 
-  // Orange ladders vs other orange
+  // Orange ladders vs other orange (same start tier only)
   const orangeDropSet = new Set();
   for (let i = 0; i < culledOrangeLadders.length; i++) {
     if (orangeDropSet.has(i)) continue;
     for (let j = i + 1; j < culledOrangeLadders.length; j++) {
       if (orangeDropSet.has(j)) continue;
+      if (Math.abs(culledOrangeLadders[i].y0 - culledOrangeLadders[j].y0) > 0.5) continue;
       if (isClose(culledOrangeLadders[i], culledOrangeLadders[j], PROXIMITY)) {
         orangeDropSet.add(j);
       }
