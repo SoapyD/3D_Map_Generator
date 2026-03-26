@@ -20,6 +20,9 @@ const MATERIALS = {
   ramp: new THREE.MeshStandardMaterial({ color: 0x44aa44, roughness: 0.7 }),     // green
   groundLadder: new THREE.MeshStandardMaterial({ color: 0xcc4444, roughness: 0.7 }), // red
   orangeLadder: new THREE.MeshStandardMaterial({ color: 0xee8822, roughness: 0.7 }), // orange
+  cover: new THREE.MeshStandardMaterial({ color: 0x8844cc, roughness: 0.7 }),       // purple
+  interiorCover: new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.7 }),  // grey
+  deletedFootprint: new THREE.MeshStandardMaterial({ color: 0xff66aa, roughness: 0.7 }), // pink (debug)
 };
 
 /**
@@ -116,6 +119,53 @@ export function buildScene(data, config) {
         MATERIALS.orangeLadder,
       );
       mesh.name = `orange_ladder_${i}`;
+      scene.add(mesh);
+    }
+  }
+
+  // Cover pieces — purple boxes
+  if (data.cover) {
+    for (let i = 0; i < data.cover.length; i++) {
+      const c = data.cover[i];
+      const mesh = createSlab(
+        c.x + c.w / 2,
+        c.y + c.height / 2,
+        c.z + c.d / 2,
+        c.w, c.height, c.d,
+        MATERIALS.cover,
+      );
+      mesh.name = `cover_${i}`;
+      scene.add(mesh);
+    }
+  }
+
+  // Interior cover — grey boxes
+  if (data.interiorCover) {
+    for (let i = 0; i < data.interiorCover.length; i++) {
+      const c = data.interiorCover[i];
+      const mesh = createSlab(
+        c.x + c.w / 2,
+        c.y + c.height / 2,
+        c.z + c.d / 2,
+        c.w, c.height, c.d,
+        MATERIALS.interiorCover,
+      );
+      mesh.name = `interior_cover_${i}`;
+      scene.add(mesh);
+    }
+  }
+
+  // Debug: pink footprints for deleted building positions
+  if (data.deletedFootprints) {
+    for (let i = 0; i < data.deletedFootprints.length; i++) {
+      const df = data.deletedFootprints[i];
+      const mesh = createFloorSlab(
+        { x: df.x, z: df.z, w: df.w, d: df.d },
+        0.55, // above the base slab (0.5 thick)
+        0.1,
+        MATERIALS.deletedFootprint,
+      );
+      mesh.name = `deleted_${i}`;
       scene.add(mesh);
     }
   }
