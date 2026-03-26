@@ -17,6 +17,7 @@ import { generateCover } from './generators/cover.js';
 import { buildScene } from './generators/scene-builder.js';
 import { exportToGlb, getOutputPath } from './export/glb-exporter.js';
 import { exportToObj, getObjOutputPath } from './export/obj-exporter.js';
+import { exportCollisionObj } from './export/collision-exporter.js';
 
 async function main() {
   const config = parseArgs(process.argv);
@@ -74,11 +75,13 @@ async function main() {
 
   const { dir, baseName } = getObjOutputPath(config);
   const objPath = await exportToObj(scene, dir, baseName);
+  const collisionPath = await exportCollisionObj(scene, dir, baseName);
 
   console.log(`\nDone!`);
   console.log(`  GLB: ${outputPath}`);
   console.log(`  OBJ: ${objPath}`);
   console.log(`  Texture: ${path.join(dir, baseName + '.png')}`);
+  console.log(`  Collision: ${collisionPath}`);
 
   if (config.preview) {
     console.log('\nStarting preview server...');
