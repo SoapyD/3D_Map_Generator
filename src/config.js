@@ -72,6 +72,10 @@ export const CONNECTIVITY = {
   orangeMinSpan: 2,        // minimum tiers an orange ladder must span
   // Ground ladder wall check margin
   wallCheckMargin: 0.3,
+  // Cyan (interior) ladder cull ratio
+  cyanLadderCullRatio: 0.4,
+  // Distance for ladder-top near walkway check
+  ladderTopWalkwayDist: 2,
 };
 
 // --- Cover ---
@@ -122,6 +126,13 @@ export const DELETIONS = {
   orangeLadderRedOverlap: true,    // drop orange ladders touching red ladders
   orangeLadderCull: true,          // cull orange ladders to ladderCullRatio
   orangeLadderProximityCull: true, // drop orange ladders too close to other orange
+
+  // Cyan ladders (interior)
+  cyanLadderCull: true,            // cull cyan ladders to cyanLadderCullRatio
+  cyanLadderProximityCull: true,   // drop cyan ladders too close to other cyan
+  cyanLadderOrangeOverlap: true,   // drop cyan ladders touching orange ladders
+  cyanLadderTopNearWalkway: true,  // drop cyan ladders whose top is near a walkway
+  orangeLadderTopNearWalkway: true,// drop orange ladders whose top is near a walkway
 };
 
 // --- CLI parser ---

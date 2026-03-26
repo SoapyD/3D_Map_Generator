@@ -27,6 +27,7 @@ const DEBUG_MATERIALS = {
   interiorCover: new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.7 }),
   deletedFootprint: new THREE.MeshStandardMaterial({ color: 0xff66aa, roughness: 0.7 }),
   badLadder: new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.7 }),
+  interiorLadder: new THREE.MeshStandardMaterial({ color: 0x22cccc, roughness: 0.7 }),
 };
 
 /**
@@ -152,6 +153,17 @@ export function buildScene(data, config) {
       const material = l.bad ? DEBUG_MATERIALS.badLadder : (debug ? DEBUG_MATERIALS.orangeLadder : pickFromPool(pools.ladders, i + 20));
       const mesh = createSlab(l.x + l.w / 2, l.y0 + height / 2, l.z + l.d / 2, l.w, height, l.d, material);
       mesh.name = l.bad ? `orange_ladder_BAD_${i}` : `orange_ladder_${i}`;
+      scene.add(mesh);
+    }
+
+    // Interior ladders — cyan
+    const interiorLadders = data.connections.interiorLadders || [];
+    for (let i = 0; i < interiorLadders.length; i++) {
+      const l = interiorLadders[i];
+      const height = l.y1 - l.y0;
+      const material = debug ? DEBUG_MATERIALS.interiorLadder : pickFromPool(pools.ladders, i + 30);
+      const mesh = createSlab(l.x + l.w / 2, l.y0 + height / 2, l.z + l.d / 2, l.w, height, l.d, material);
+      mesh.name = `interior_ladder_${i}`;
       scene.add(mesh);
     }
   }
