@@ -469,11 +469,11 @@ export function generateConnectivity(data, config, rng) {
           if (edge.side === 'west' && edge.x < MAP_BOUNDARY_MARGIN) continue;
           if (edge.side === 'east' && edge.x > config.mapWidth - MAP_BOUNDARY_MARGIN) continue;
 
-          // Spawn chance: 15% on ground floor, 50% on tier 1, 70% on tier 2+
-          const spawnChance = tier === 0 ? 0.15 : tier === 1 ? 0.5 : 0.7;
+          // Spawn chance: 10% on ground floor, 20% on tier 1, 30% on tier 2+
+          const spawnChance = tier === 0 ? 0.10 : tier === 1 ? 0.20 : 0.30;
           if (!rng.chance(spawnChance)) continue;
 
-          // Position: centred on edge, outside building
+          // Position: centred on edge, outside building, walkway width
           const wallOffset = 0.3;
           let lx, lz, lw, ld;
           if (edge.axis === 'x') {
@@ -488,17 +488,24 @@ export function generateConnectivity(data, config, rng) {
             ld = WALKWAY_WIDTH;
           }
 
+          // Climb upward through multiple tiers until no floor exists
           const y0 = tier * tierHeight;
-          const y1 = (tier + 1) * tierHeight;
+          let topTier = tier;
+          for (let t = tier + 1; t <= config.tiers; t++) {
+            const floorAtT = data.floors.find((f) => f.tier === t);
+            if (floorAtT && floorAtT.sections.some((s) =>
+              s.x < qr.x + qr.w - 0.1 && s.x + s.w > qr.x + 0.1 &&
+              s.z < qr.z + qr.d - 0.1 && s.z + s.d > qr.z + 0.1
+            )) {
+              topTier = t;
+            } else {
+              break;
+            }
+          }
 
-          // Only keep if there's a floor at tier+1 near this quadrant
-          const floorAbove = data.floors.find((f) => f.tier === tier + 1);
-          if (!floorAbove) continue;
-          const hasFloor = floorAbove.sections.some((s) =>
-            s.x < qr.x + qr.w - 0.1 && s.x + s.w > qr.x + 0.1 &&
-            s.z < qr.z + qr.d - 0.1 && s.z + s.d > qr.z + 0.1
-          );
-          if (!hasFloor) continue;
+          // Must span at least 3 tiers
+          if (topTier - tier < 3) continue;
+          const y1 = topTier * tierHeight;
 
           orangeLadders.push({
             type: 'orange_ladder',
@@ -535,8 +542,84 @@ export function generateConnectivity(data, config, rng) {
   rng.shuffle(filteredOrangeLadders);
   const culledOrangeLadders = filteredOrangeLadders.slice(0, Math.max(1, Math.ceil(filteredOrangeLadders.length * 0.4)));
 
-  const connections = { ladders, walkways: culledWalkways, groundLadders: culledGroundLadders, orangeLadders: culledOrangeLadders };
+  // Proximity culling — remove walkways/ladders that are too close to their own kind
+  const PROXIMITY = 3; // inches
+
+  // Walkways: cull those close to other walkways
+  const walkwayDropSet = new Set();
+  for (let i = 0; i < culledWalkways.length; i++) {
+    if (walkwayDropSet.has(i)) continue;
+    for (let j = i + 1; j < culledWalkways.length; j++) {
+      if (walkwayDropSet.has(j)) continue;
+      if (isClose(culledWalkways[i], culledWalkways[j], PROXIMITY)) {
+        walkwayDropSet.add(j);
+      }
+    }
+  }
+  const finalWalkways = culledWalkways.filter((_, i) => !walkwayDropSet.has(i));
+
+  // Ladders: yellow checked against red + orange, red against red + orange, orange against orange
+  // Build combined list for checking against
+  const allRedOrange = [...culledGroundLadders, ...culledOrangeLadders];
+
+  // Yellow ladders vs red + orange
+  const yellowDropSet = new Set();
+  for (let i = 0; i < ladders.length; i++) {
+    if (yellowDropSet.has(i)) continue;
+    for (const other of allRedOrange) {
+      if (isClose(ladders[i], other, PROXIMITY)) {
+        yellowDropSet.add(i);
+        break;
+      }
+    }
+  }
+  const finalYellow = ladders.filter((_, i) => !yellowDropSet.has(i));
+
+  // Red ladders vs red + orange
+  const redDropSet = new Set();
+  for (let i = 0; i < culledGroundLadders.length; i++) {
+    if (redDropSet.has(i)) continue;
+    for (let j = i + 1; j < culledGroundLadders.length; j++) {
+      if (redDropSet.has(j)) continue;
+      if (isClose(culledGroundLadders[i], culledGroundLadders[j], PROXIMITY)) {
+        redDropSet.add(j);
+      }
+    }
+    for (const ol of culledOrangeLadders) {
+      if (isClose(culledGroundLadders[i], ol, PROXIMITY)) {
+        redDropSet.add(i);
+        break;
+      }
+    }
+  }
+  const finalRed = culledGroundLadders.filter((_, i) => !redDropSet.has(i));
+
+  // Orange ladders vs other orange
+  const orangeDropSet = new Set();
+  for (let i = 0; i < culledOrangeLadders.length; i++) {
+    if (orangeDropSet.has(i)) continue;
+    for (let j = i + 1; j < culledOrangeLadders.length; j++) {
+      if (orangeDropSet.has(j)) continue;
+      if (isClose(culledOrangeLadders[i], culledOrangeLadders[j], PROXIMITY)) {
+        orangeDropSet.add(j);
+      }
+    }
+  }
+  const finalOrange = culledOrangeLadders.filter((_, i) => !orangeDropSet.has(i));
+
+  const connections = { ladders: finalYellow, walkways: finalWalkways, groundLadders: finalRed, orangeLadders: finalOrange };
   return { ...data, connections };
+}
+
+/**
+ * Check if two objects are within a given distance (centre-to-centre).
+ */
+function isClose(a, b, dist) {
+  const acx = a.x + (a.w || 0) / 2;
+  const acz = a.z + (a.d || 0) / 2;
+  const bcx = b.x + (b.w || 0) / 2;
+  const bcz = b.z + (b.d || 0) / 2;
+  return Math.abs(acx - bcx) < dist && Math.abs(acz - bcz) < dist;
 }
 
 /**

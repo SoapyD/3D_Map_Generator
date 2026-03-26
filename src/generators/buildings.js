@@ -65,7 +65,28 @@ export function generateBuildings(gridData, config, rng) {
     }
   }
 
-  return { ...gridData, buildings };
+  // Place a large building in the centre of the map
+  const fp = FOOTPRINTS.large;
+  const bigW = rng.float(fp.min, fp.max);
+  const bigD = rng.float(fp.min, fp.max);
+  const bigX = (config.mapWidth - bigW) / 2;
+  const bigZ = (config.mapDepth - bigD) / 2;
+  const bigTier = rng.int(3, 5);
+  const bigBuilding = { x: bigX, z: bigZ, w: bigW, d: bigD, maxTier: bigTier, size: 'large', height: 'tall', blockIndex: 0 };
+
+  // Remove small buildings that touch the big one
+  const surviving = buildings.filter((b) => {
+    return !(b.x < bigBuilding.x + bigBuilding.w + BUILDING_GAP && b.x + b.w > bigBuilding.x - BUILDING_GAP &&
+             b.z < bigBuilding.z + bigBuilding.d + BUILDING_GAP && b.z + b.d > bigBuilding.z - BUILDING_GAP);
+  });
+
+  // Delete 20-30% of remaining small buildings
+  const deleteRatio = 0.15;
+  rng.shuffle(surviving);
+  const keepCount = Math.ceil(surviving.length * (1 - deleteRatio));
+  const culled = surviving.slice(0, keepCount);
+
+  return { ...gridData, buildings: [bigBuilding, ...culled] };
 }
 
 /**
