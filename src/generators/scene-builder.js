@@ -18,6 +18,7 @@ const MATERIALS = {
   ladder: new THREE.MeshStandardMaterial({ color: 0xcccc22, roughness: 0.7 }),   // yellow
   walkway: new THREE.MeshStandardMaterial({ color: 0x4488cc, roughness: 0.7 }),  // blue
   ramp: new THREE.MeshStandardMaterial({ color: 0x44aa44, roughness: 0.7 }),     // green
+  groundLadder: new THREE.MeshStandardMaterial({ color: 0xcc4444, roughness: 0.7 }), // red
 };
 
 /**
@@ -82,6 +83,22 @@ export function buildScene(data, config) {
         mat,
       );
       mesh.name = w.blocked ? `walkway_BLOCKED_${i}` : `walkway_${i}`;
+      scene.add(mesh);
+    }
+
+    // Ground ladders — thin vertical slabs (red)
+    const groundLadders = data.connections.groundLadders || [];
+    for (let i = 0; i < groundLadders.length; i++) {
+      const l = groundLadders[i];
+      const height = l.y1 - l.y0;
+      const mesh = createSlab(
+        l.x + l.w / 2,
+        l.y0 + height / 2,
+        l.z + l.d / 2,
+        l.w, height, l.d,
+        MATERIALS.groundLadder,
+      );
+      mesh.name = `ground_ladder_${i}`;
       scene.add(mesh);
     }
   }
