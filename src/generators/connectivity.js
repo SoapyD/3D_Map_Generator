@@ -221,7 +221,8 @@ export function generateConnectivity(data, config, rng) {
   const LADDER_WIDTH = 1.0;
   const LADDER_DEPTH = 0.5;
 
-  for (const w of culledWalkways) {
+  for (let wi = 0; wi < culledWalkways.length; wi++) {
+    const w = culledWalkways[wi];
     if (!w.blocked) continue;
 
     const tier = Math.round(w.y / tierHeight);
@@ -299,6 +300,7 @@ export function generateConnectivity(data, config, rng) {
       if (ladderY1 > ladderY0) {
         ladders.push({
           type: 'ladder',
+          parentWalkway: w, // link to source walkway
           x: ladderX, z: ladderZ,
           w: ladderW, d: ladderD,
           y0: ladderY0, y1: ladderY1,
@@ -657,7 +659,12 @@ export function generateConnectivity(data, config, rng) {
     if (!hasFloor) ol.bad = true;
   }
 
-  const connections = { ladders: finalYellow, walkways: finalWalkways, groundLadders: finalRed, orangeLadders: finalOrange };
+  // Remove yellow ladders whose parent walkway was deleted
+  const survivingYellow = finalYellow.filter((l) =>
+    finalWalkways.includes(l.parentWalkway)
+  );
+
+  const connections = { ladders: survivingYellow, walkways: finalWalkways, groundLadders: finalRed, orangeLadders: finalOrange };
   return { ...data, connections };
 }
 
