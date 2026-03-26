@@ -18,9 +18,9 @@
  *   3: south, east
  */
 
-const WALL_QUAD_SIZE = 3; // inches — matches small building floor quadrant scale
-const UPPER_REMOVAL_RATIO = 0.5;
-const LOWER_REMOVAL_RATIO = 0.3;
+const WALL_QUAD_SIZE = 1.5;
+const UPPER_REMOVAL_RATIO = 0.7;
+const LOWER_REMOVAL_RATIO = 0.5;
 
 export function generateWalls(data, config, rng) {
   const { tierHeight, wallThickness, slabThickness } = config;
@@ -52,19 +52,127 @@ export function generateWalls(data, config, rng) {
       const chosen = allEdges.slice(0, 2);
 
       for (const edgeLabel of chosen) {
-        const wallDef = getWallDimensions(building, edgeLabel, aboveQuadrants, wallThickness);
+        const wallDef = buildWall(building, edgeLabel, aboveQuadrants, baseY, wallHeight, wallThickness);
         if (!wallDef) continue;
 
-        // Divide wall into quadrants and apply damage
-        const segments = buildDamagedWall(
-          wallDef.x, wallDef.z, wallDef.length, wallHeight, baseY, wallThickness, wallDef.axis, rng,
-        );
+        // Apply wall quadrant damage
+        const segments = applyWallDamage(wallDef, rng);
         walls.push(...segments);
       }
     }
   }
 
   return { ...data, walls };
+}
+
+/**
+ * Divide wall into upper/lower quadrant grid and remove some.
+ * Upper row: up to 50% removed. Lower row: up to 30% removed.
+ * Removals spread from first removal adjacently.
+ */
+function applyWallDamage(wallDef, rng) {
+  const { x, z, length, height, baseY, thickness, axis } = wallDef;
+  const cols = Math.max(1, Math.round(length / WALL_QUAD_SIZE));
+  const rows = 2;
+  const quadW = length / cols;
+  const quadH = height / rows;
+
+  const grid = Array.from({ length: cols }, () => [true, true]);
+
+  // Upper row removal
+  const maxUpperRemove = Math.floor(cols * UPPER_REMOVAL_RATIO);
+  const upperToRemove = maxUpperRemove > 0 ? rng.int(0, maxUpperRemove) : 0;
+  const removed = [];
+
+  for (let r = 0; r < upperToRemove; r++) {
+    if (r === 0) {
+      const col = rng.int(0, cols - 1);
+      grid[col][1] = false;
+      removed.push({ col, row: 1 });
+    } else {
+      const candidates = [];
+      for (const prev of removed) {
+        if (prev.row !== 1) continue;
+        if (prev.col > 0 && grid[prev.col - 1][1]) candidates.push(prev.col - 1);
+        if (prev.col < cols - 1 && grid[prev.col + 1][1]) candidates.push(prev.col + 1);
+      }
+      if (candidates.length === 0) break;
+      const col = rng.pick(candidates);
+      grid[col][1] = false;
+      removed.push({ col, row: 1 });
+    }
+  }
+
+  // Lower row removal
+  const maxLowerRemove = Math.floor(cols * LOWER_REMOVAL_RATIO);
+  const lowerToRemove = maxLowerRemove > 0 ? rng.int(0, maxLowerRemove) : 0;
+
+  for (let r = 0; r < lowerToRemove; r++) {
+    const candidates = [];
+    for (const prev of removed) {
+      if (prev.row === 1 && grid[prev.col][0]) candidates.push(prev.col);
+      if (prev.row === 0) {
+        if (prev.col > 0 && grid[prev.col - 1][0]) candidates.push(prev.col - 1);
+        if (prev.col < cols - 1 && grid[prev.col + 1][0]) candidates.push(prev.col + 1);
+      }
+    }
+    if (candidates.length === 0) break;
+    const col = rng.pick(candidates);
+    grid[col][0] = false;
+    removed.push({ col, row: 0 });
+  }
+
+  // Convert to segments
+  const segments = [];
+  for (let col = 0; col < cols; col++) {
+    for (let row = 0; row < rows; row++) {
+      if (!grid[col][row]) continue;
+      const segBaseY = baseY + row * quadH;
+      const offset = col * quadW;
+      segments.push({
+        x: axis === 'x' ? x + offset : x,
+        z: axis === 'z' ? z + offset : z,
+        length: quadW,
+        height: quadH,
+        baseY: segBaseY,
+        thickness,
+        axis,
+      });
+    }
+  }
+
+  return mergeSegments(segments);
+}
+
+/**
+ * Merge adjacent segments with same height and baseY.
+ */
+function mergeSegments(segments) {
+  if (segments.length <= 1) return segments;
+  const byRow = new Map();
+  for (const s of segments) {
+    const key = s.baseY.toFixed(2);
+    if (!byRow.has(key)) byRow.set(key, []);
+    byRow.get(key).push(s);
+  }
+  const merged = [];
+  for (const [, rowSegs] of byRow) {
+    rowSegs.sort((a, b) => (a.axis === 'x' ? a.x - b.x : a.z - b.z));
+    let current = { ...rowSegs[0] };
+    for (let i = 1; i < rowSegs.length; i++) {
+      const next = rowSegs[i];
+      const currEnd = current.axis === 'x' ? current.x + current.length : current.z + current.length;
+      const nextStart = next.axis === 'x' ? next.x : next.z;
+      if (Math.abs(currEnd - nextStart) < 0.01 && Math.abs(current.height - next.height) < 0.01) {
+        current.length += next.length;
+      } else {
+        merged.push(current);
+        current = { ...next };
+      }
+    }
+    merged.push(current);
+  }
+  return merged;
 }
 
 const QUADRANT_EDGES = {

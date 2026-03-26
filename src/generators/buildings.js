@@ -8,15 +8,22 @@
  * Output: Array of buildings { x, z, w, d, maxTier, size, blockIndex }
  */
 
-// Size categories with dimension ranges (inches)
-const SIZES = {
-  small:  { min: 4, max: 7, tierMin: 1, tierMax: 2 },
-  medium: { min: 7, max: 12, tierMin: 2, tierMax: 3 },
-  large:  { min: 11, max: 18, tierMin: 3, tierMax: 4 },
+// Footprint sizes (width/depth in inches)
+const FOOTPRINTS = {
+  small:  { min: 4, max: 7 },
+  medium: { min: 7, max: 12 },
+  large:  { min: 11, max: 18 },
 };
 
-const BUILDING_GAP = 0.75; // minimum gap between buildings (inches)
-const TARGET_COVERAGE = 0.70; // target 70% of block area covered
+// Height is independent of footprint — any footprint can be any height
+const HEIGHTS = {
+  short: { tierMin: 2, tierMax: 2 },
+  medium: { tierMin: 2, tierMax: 3 },
+  tall:  { tierMin: 3, tierMax: 4 },
+};
+
+const BUILDING_GAP = 0.5; // minimum gap between buildings (inches)
+const TARGET_COVERAGE = 0.85; // target higher to compensate for small buildings
 
 /**
  * @param {{ blocks: Array<{x,z,w,d}> }} gridData
@@ -28,125 +35,144 @@ export function generateBuildings(gridData, config, rng) {
   const { tiers } = config;
   const buildings = [];
 
-  for (let i = 0; i < gridData.blocks.length; i++) {
-    const block = gridData.blocks[i];
-    const placed = fillBlock(block, tiers, rng);
-    for (const b of placed) {
-      b.blockIndex = i;
-      buildings.push(b);
+  // Use the average small footprint size to determine grid count
+  const avgSize = (FOOTPRINTS.small.min + FOOTPRINTS.small.max) / 2;
+  const minCellSize = avgSize * 1.25;
+
+  // Figure out how many fit, then stretch the cell size to fill the map
+  const cols = Math.floor(config.mapWidth / minCellSize);
+  const rows = Math.floor(config.mapDepth / minCellSize);
+  const cellW = config.mapWidth / cols;
+  const cellD = config.mapDepth / rows;
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const cellX = col * cellW;
+      const cellZ = row * cellD;
+
+      // Building fills most of the cell, centred
+      const w = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
+      const d = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
+      const x = cellX + (cellW - w) / 2;
+      const z = cellZ + (cellD - d) / 2;
+
+      // Random height
+      const heightKey = rng.pick(['short', 'medium', 'tall']);
+      const height = HEIGHTS[heightKey];
+      const maxTier = rng.int(Math.min(height.tierMin, tiers), Math.min(height.tierMax, tiers));
+
+      buildings.push({ x, z, w, d, maxTier, size: 'small', height: heightKey, blockIndex: 0 });
     }
   }
 
-  return { ...gridData, buildings };
+  // Pick a layout for larger buildings
+  const layout = rng.int(0, 4);
+  const bigBuildings = placeBigLayout(layout, config, tiers, rng);
+
+  // Remove small buildings that touch any big building
+  const surviving = buildings.filter((b) => {
+    for (const big of bigBuildings) {
+      if (b.x < big.x + big.w + BUILDING_GAP && b.x + b.w > big.x - BUILDING_GAP &&
+          b.z < big.z + big.d + BUILDING_GAP && b.z + b.d > big.z - BUILDING_GAP) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  // Delete 15% of remaining small buildings
+  const deleteRatio = 0.15;
+  rng.shuffle(surviving);
+  const keepCount = Math.ceil(surviving.length * (1 - deleteRatio));
+  const culled = surviving.slice(0, keepCount);
+
+  return { ...gridData, buildings: [...bigBuildings, ...culled] };
 }
 
 /**
- * Fill a block with buildings targeting 70% coverage.
- * Places large buildings first, then fills gaps with medium and small.
+ * Place larger buildings according to one of 5 layout options.
+ *
+ * 0: 1 large in centre
+ * 1: 2 large — top-left + bottom-right
+ * 2: 3 medium — top-left + bottom-right + top-right
+ * 3: 3 medium — top-left + bottom-left + top-right
+ * 4: 4 medium — 2 in top-left + bottom-right + top-right
  */
-function fillBlock(block, maxTiers, rng) {
-  const results = [];
-  const blockArea = block.w * block.d;
-  const targetArea = blockArea * TARGET_COVERAGE;
+function placeBigLayout(layout, config, maxTiers, rng) {
+  const mw = config.mapWidth;
+  const md = config.mapDepth;
+  const margin = 2; // keep away from map edge
 
-  // Decide the mix — large first so they get placed before space runs out
-  const mix = chooseMix(block, rng);
+  // Quadrant centres
+  const TL = { x: mw * 0.25, z: md * 0.25 };
+  const TR = { x: mw * 0.75, z: md * 0.25 };
+  const BL = { x: mw * 0.25, z: md * 0.75 };
+  const BR = { x: mw * 0.75, z: md * 0.75 };
+  const C  = { x: mw * 0.5, z: md * 0.5 };
 
-  let coveredArea = 0;
-
-  for (const sizeKey of mix) {
-    if (coveredArea >= targetArea) break;
-
-    const size = SIZES[sizeKey];
-    const cappedTierMin = Math.min(size.tierMin, maxTiers);
-    const cappedTierMax = Math.min(size.tierMax, maxTiers);
-
-    // Generate dimensions
-    let w = rng.float(size.min, size.max);
-    let d = rng.float(size.min, size.max);
-
-    // Occasionally make non-square aspect ratios
-    if (rng.chance(0.4)) {
-      const stretch = rng.float(1.2, 1.6);
-      if (rng.chance(0.5)) w *= stretch; else d *= stretch;
-    }
-
-    // Clamp to block bounds
-    w = Math.min(w, block.w);
-    d = Math.min(d, block.d);
-    if (w < SIZES.small.min || d < SIZES.small.min) continue;
-
-    // Try to place — many attempts for dense packing
-    let placed = false;
-    for (let attempt = 0; attempt < 20; attempt++) {
-      // Compute valid placement range — building must be fully inside block
-      const maxX = block.x + block.w - w;
-      const maxZ = block.z + block.d - d;
-      if (maxX < block.x || maxZ < block.z) break; // doesn't fit
-
-      const x = rng.float(block.x, maxX);
-      const z = rng.float(block.z, maxZ);
-      const candidate = { x, z, w, d };
-
-      if (!collides(candidate, results)) {
-        const maxTier = rng.int(cappedTierMin, cappedTierMax);
-        results.push({ x, z, w, d, maxTier, size: sizeKey });
-        coveredArea += w * d;
-        placed = true;
-        break;
-      }
-    }
-
-    // If we couldn't place it, try shrinking
-    if (!placed) {
-      const shrunkW = Math.min(w * 0.6, block.w);
-      const shrunkD = Math.min(d * 0.6, block.d);
-      if (shrunkW >= SIZES.small.min && shrunkD >= SIZES.small.min) {
-        for (let attempt = 0; attempt < 10; attempt++) {
-          const maxX = block.x + block.w - shrunkW;
-          const maxZ = block.z + block.d - shrunkD;
-          if (maxX < block.x || maxZ < block.z) break;
-
-          const x = rng.float(block.x, maxX);
-          const z = rng.float(block.z, maxZ);
-          const candidate = { x, z, w: shrunkW, d: shrunkD };
-
-          if (!collides(candidate, results)) {
-            results.push({
-              x, z, w: shrunkW, d: shrunkD,
-              maxTier: rng.int(cappedTierMin, Math.min(cappedTierMax, SIZES.small.tierMax)),
-              size: 'small',
-            });
-            coveredArea += shrunkW * shrunkD;
-            break;
-          }
-        }
-      }
-    }
+  function makeBig(sizeKey, pos) {
+    const fp = FOOTPRINTS[sizeKey];
+    const w = rng.float(fp.min, fp.max);
+    const d = rng.float(fp.min, fp.max);
+    const x = Math.max(margin, Math.min(pos.x - w / 2, mw - w - margin));
+    const z = Math.max(margin, Math.min(pos.z - d / 2, md - d - margin));
+    const maxTier = rng.int(3, Math.min(5, maxTiers));
+    return { x, z, w, d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0 };
   }
 
-  // If still under target, try filling remaining gaps with small buildings
-  let fillAttempts = 0;
-  while (coveredArea < targetArea && fillAttempts < 30) {
-    fillAttempts++;
-    const w = rng.float(SIZES.small.min, SIZES.small.max);
-    const d = rng.float(SIZES.small.min, SIZES.small.max);
+  switch (layout) {
+    case 0: return [makeBig('large', C)];
+    case 1: return [makeBig('large', TL), makeBig('large', BR)];
+    case 2: return [makeBig('medium', TL), makeBig('medium', BR), makeBig('medium', TR)];
+    case 3: return [makeBig('medium', TL), makeBig('medium', BL), makeBig('medium', TR)];
+    case 4: {
+      // 2 in top-left quadrant (offset slightly), 1 BR, 1 TR
+      const TL1 = { x: mw * 0.15, z: md * 0.15 };
+      const TL2 = { x: mw * 0.35, z: md * 0.35 };
+      return [makeBig('medium', TL1), makeBig('medium', TL2), makeBig('medium', BR), makeBig('medium', TR)];
+    }
+  }
+  return [];
+}
 
-    const maxX = block.x + block.w - w;
-    const maxZ = block.z + block.d - d;
-    if (maxX < block.x || maxZ < block.z) continue;
+/**
+ * Fill a block with buildings on a grid.
+ * Each cell gets a small building with a gap between them.
+ */
+function fillBlock(block, maxTiers, rng, allowLarge = true) {
+  const results = [];
+  const fp = FOOTPRINTS.small;
 
-    const x = rng.float(block.x, maxX);
-    const z = rng.float(block.z, maxZ);
-    const candidate = { x, z, w, d };
+  // Pick a consistent building size for this block (with some variance)
+  const cellW = rng.float(fp.min, fp.max);
+  const cellD = rng.float(fp.min, fp.max);
+  const stepW = cellW + BUILDING_GAP;
+  const stepD = cellD + BUILDING_GAP;
 
-    if (!collides(candidate, results)) {
-      results.push({
-        x, z, w, d,
-        maxTier: rng.int(SIZES.small.tierMin, Math.min(SIZES.small.tierMax, maxTiers)),
-        size: 'small',
-      });
-      coveredArea += w * d;
+  // How many fit in this block?
+  const cols = Math.floor(block.w / stepW);
+  const rows = Math.floor(block.d / stepD);
+  if (cols < 1 || rows < 1) return results;
+
+  // Centre the grid within the block
+  const offsetX = block.x + (block.w - cols * stepW + BUILDING_GAP) / 2;
+  const offsetZ = block.z + (block.d - rows * stepD + BUILDING_GAP) / 2;
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const x = offsetX + col * stepW;
+      const z = offsetZ + row * stepD;
+
+      // Slight size variance per building
+      const w = cellW + rng.float(-0.5, 0.5);
+      const d = cellD + rng.float(-0.5, 0.5);
+
+      // Random height
+      const heightKey = rng.pick(['short', 'medium', 'tall']);
+      const height = HEIGHTS[heightKey];
+      const maxTier = rng.int(Math.min(height.tierMin, maxTiers), Math.min(height.tierMax, maxTiers));
+
+      results.push({ x, z, w, d, maxTier, size: 'small', height: heightKey });
     }
   }
 
@@ -157,32 +183,18 @@ function fillBlock(block, maxTiers, rng) {
  * Choose a mix of building sizes for a block.
  * Large buildings placed first so they get priority for space.
  */
-function chooseMix(block, rng) {
+function chooseMix(block, rng, allowLarge = true) {
   const area = block.w * block.d;
   const mix = [];
 
-  if (area > 400) {
-    mix.push(...Array(rng.int(1, 2)).fill('large'));
-    mix.push(...Array(rng.int(2, 3)).fill('medium'));
-    mix.push(...Array(rng.int(2, 4)).fill('small'));
-  } else if (area > 250) {
-    mix.push('large');
-    mix.push(...Array(rng.int(1, 2)).fill('medium'));
-    mix.push(...Array(rng.int(2, 3)).fill('small'));
-  } else if (area > 150) {
-    if (rng.chance(0.6)) mix.push('large');
-    mix.push(...Array(rng.int(1, 2)).fill('medium'));
-    mix.push(...Array(rng.int(1, 3)).fill('small'));
-  } else if (area > 80) {
-    mix.push('medium');
-    mix.push(...Array(rng.int(1, 3)).fill('small'));
-  } else {
-    mix.push(...Array(rng.int(1, 2)).fill('small'));
+  // Number of buildings to attempt based on block area — high count for dense packing
+  const count = area > 400 ? rng.int(12, 18) : area > 250 ? rng.int(8, 14) : area > 150 ? rng.int(6, 10) : rng.int(4, 6);
+
+  // All small footprint for now
+  for (let i = 0; i < count; i++) {
+    mix.push('small');
   }
 
-  // Place large first, then medium, then small — priority ordering
-  const order = { large: 0, medium: 1, small: 2 };
-  mix.sort((a, b) => order[a] - order[b]);
   return mix;
 }
 

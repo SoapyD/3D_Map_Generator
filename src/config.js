@@ -7,7 +7,7 @@ const DEFAULTS = {
   mapWidth: 48,       // inches
   mapDepth: 48,       // inches
   tiers: 4,           // number of elevated tiers (+ base tier 0)
-  tierHeight: 6,      // vertical spacing between tiers (inches)
+  tierHeight: 3,      // vertical spacing between tiers (inches)
   slabThickness: 0.5, // thickness of floor slabs (inches)
   wallThickness: 0.25,// thickness of wall slabs (inches)
   streetWidth: 3.5,   // minimum street width (inches)
