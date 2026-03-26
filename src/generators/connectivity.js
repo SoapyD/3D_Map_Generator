@@ -72,13 +72,21 @@ export function generateConnectivity(data, config, rng) {
       for (const q of present) {
         const srcRect = getQuadrantRect(building, q);
 
-        // Try connecting from each of the quadrant's 4 edges
-        const edges = [
-          { side: 'north', x: srcRect.x + srcRect.w / 2, z: srcRect.z },
-          { side: 'south', x: srcRect.x + srcRect.w / 2, z: srcRect.z + srcRect.d },
-          { side: 'west',  x: srcRect.x, z: srcRect.z + srcRect.d / 2 },
-          { side: 'east',  x: srcRect.x + srcRect.w, z: srcRect.z + srcRect.d / 2 },
-        ];
+        // Only external edges — skip edges shared with another present quadrant
+        const neighborN = (q === 2) ? 0 : (q === 3) ? 1 : -1;
+        const neighborS = (q === 0) ? 2 : (q === 1) ? 3 : -1;
+        const neighborW = (q === 1) ? 0 : (q === 3) ? 2 : -1;
+        const neighborE = (q === 0) ? 1 : (q === 2) ? 3 : -1;
+
+        const edges = [];
+        if (neighborN < 0 || !present.has(neighborN))
+          edges.push({ side: 'north', x: srcRect.x + srcRect.w / 2, z: srcRect.z });
+        if (neighborS < 0 || !present.has(neighborS))
+          edges.push({ side: 'south', x: srcRect.x + srcRect.w / 2, z: srcRect.z + srcRect.d });
+        if (neighborW < 0 || !present.has(neighborW))
+          edges.push({ side: 'west', x: srcRect.x, z: srcRect.z + srcRect.d / 2 });
+        if (neighborE < 0 || !present.has(neighborE))
+          edges.push({ side: 'east', x: srcRect.x + srcRect.w, z: srcRect.z + srcRect.d / 2 });
 
         for (const edge of edges) {
           // Find nearest floor section in a different building to this edge point
@@ -502,13 +510,14 @@ export function generateConnectivity(data, config, rng) {
           }
 
           // Climb upward through multiple tiers until no floor exists
+          // Use the ladder's visual position, not the source quadrant
           const y0 = tier * tierHeight;
           let topTier = tier;
           for (let t = tier + 1; t <= config.tiers; t++) {
             const floorAtT = data.floors.find((f) => f.tier === t);
             if (floorAtT && floorAtT.sections.some((s) =>
-              s.x < qr.x + qr.w - 0.1 && s.x + s.w > qr.x + 0.1 &&
-              s.z < qr.z + qr.d - 0.1 && s.z + s.d > qr.z + 0.1
+              lx < s.x + s.w + 0.5 && lx + lw > s.x - 0.5 &&
+              lz < s.z + s.d + 0.5 && lz + ld > s.z - 0.5
             )) {
               topTier = t;
             } else {
