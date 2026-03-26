@@ -91,7 +91,7 @@ export const COVER = {
   maxHeightUnderBuilding: 3.0, // cap for cover under big buildings
   // Interior cover
   interiorMaxMedium: 1,    // max objects per mid-floor for medium buildings
-  interiorMaxLarge: 2,     // max objects per mid-floor for large buildings
+  interiorMaxLarge: 3,     // max objects per mid-floor for large buildings
 };
 
 // --- Geometry ---

@@ -77,13 +77,16 @@ export function generateCover(data, config, rng) {
     const mx = b.x + b.w / 2;
     const mz = b.z + b.d / 2;
 
-    for (let tier = 2; tier < b.maxTier; tier++) {
+    for (let tier = 1; tier < b.maxTier; tier++) {
       const present = bq.tiers[tier];
       if (!present) continue;
 
       const y = tier * tierHeight + slabThickness;
-      // Bias toward placing objects — roll twice and take the higher value
-      const count = Math.max(rng.int(0, maxObjects), rng.int(0, maxObjects));
+      // Large: 2-3, Medium: biased 0-1 (roll twice, take higher)
+      const minObjects = b.size === 'large' ? 2 : 0;
+      const count = b.size === 'large'
+        ? rng.int(minObjects, maxObjects)
+        : Math.max(rng.int(0, maxObjects), rng.int(0, maxObjects));
 
       for (let i = 0; i < count; i++) {
         // Pick a random present quadrant
@@ -103,6 +106,18 @@ export function generateCover(data, config, rng) {
 
         const px = rng.float(qr.x + 0.25, qr.x + qr.w - w - 0.25);
         const pz = rng.float(qr.z + 0.25, qr.z + qr.d - d - 0.25);
+
+        // Check doesn't overlap existing interior cover on same tier
+        let overlaps = false;
+        for (const existing of interiorCover) {
+          if (Math.abs(existing.y - y) > 1) continue;
+          if (px < existing.x + existing.w && px + w > existing.x &&
+              pz < existing.z + existing.d && pz + d > existing.z) {
+            overlaps = true;
+            break;
+          }
+        }
+        if (overlaps) continue;
 
         interiorCover.push({ x: px, z: pz, w, d, height: COVER_THIN, y, interior: true });
       }

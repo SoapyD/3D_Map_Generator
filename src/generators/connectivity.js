@@ -302,8 +302,21 @@ export function generateConnectivity(data, config, rng) {
         else break;
       }
 
+      // Trim to highest tier that has a floor near the ladder
+      let ladderTopTier = topTier + 1;
+      while (ladderTopTier > tier) {
+        const fd = data.floors.find((f) => f.tier === ladderTopTier);
+        if (fd && fd.sections.some((s) =>
+          ladderX < s.x + s.w + 0.5 && ladderX + ladderW > s.x - 0.5 &&
+          ladderZ < s.z + s.d + 0.5 && ladderZ + ladderD > s.z - 0.5
+        )) {
+          break;
+        }
+        ladderTopTier--;
+      }
+
       const ladderY0 = w.y; // start at walkway level
-      const ladderY1 = (topTier + 1) * tierHeight;
+      const ladderY1 = ladderTopTier * tierHeight;
 
       if (ladderY1 > ladderY0) {
         ladders.push({
@@ -408,12 +421,13 @@ export function generateConnectivity(data, config, rng) {
 
         // Ladder reaches the floor above the last walled tier,
         // but only if that floor actually exists near this quadrant
+        // Trim to highest tier that has a floor near the ladder's visual position
         let ladderTopTier = topTier + 1;
         while (ladderTopTier > 0) {
           const floorData2 = data.floors.find((f) => f.tier === ladderTopTier);
           if (floorData2 && floorData2.sections.some((s) =>
-            s.x < qr.x + qr.w - 0.1 && s.x + s.w > qr.x + 0.1 &&
-            s.z < qr.z + qr.d - 0.1 && s.z + s.d > qr.z + 0.1
+            lx < s.x + s.w + 0.5 && lx + lw > s.x - 0.5 &&
+            lz < s.z + s.d + 0.5 && lz + ld > s.z - 0.5
           )) {
             break;
           }
@@ -618,8 +632,22 @@ export function generateConnectivity(data, config, rng) {
             lw = LADDER_WIDTH; ld = LADDER_DEPTH;
           }
 
+          // Trim to highest tier that has a floor near the ladder
+          let trimmedTop = topTier;
+          while (trimmedTop > baseTier) {
+            const fd = data.floors.find((f) => f.tier === trimmedTop);
+            if (fd && fd.sections.some((s) =>
+              lx < s.x + s.w + 0.5 && lx + lw > s.x - 0.5 &&
+              lz < s.z + s.d + 0.5 && lz + ld > s.z - 0.5
+            )) {
+              break;
+            }
+            trimmedTop--;
+          }
+          if (trimmedTop <= baseTier) continue;
+
           const y0 = baseTier * tierHeight;
-          const y1 = topTier * tierHeight;
+          const y1 = trimmedTop * tierHeight;
 
           interiorLadders.push({
             type: 'interior_ladder',
