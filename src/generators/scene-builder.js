@@ -54,7 +54,7 @@ export function buildScene(data, config) {
 
   // Build connections
   if (data.connections) {
-    const { ladders, walkways, ramps } = data.connections;
+    const { ladders, walkways } = data.connections;
 
     // Ladders — thin vertical slabs (yellow)
     for (let i = 0; i < ladders.length; i++) {
@@ -81,14 +81,6 @@ export function buildScene(data, config) {
         MATERIALS.walkway,
       );
       mesh.name = `walkway_${i}`;
-      scene.add(mesh);
-    }
-
-    // Ramps — angled slabs (green)
-    for (let i = 0; i < ramps.length; i++) {
-      const r = ramps[i];
-      const mesh = buildRampMesh(r, MATERIALS.ramp);
-      mesh.name = `ramp_${i}`;
       scene.add(mesh);
     }
   }

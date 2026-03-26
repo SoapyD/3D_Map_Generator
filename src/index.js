@@ -51,7 +51,7 @@ async function main() {
   console.log('[5/6] Connecting levels...');
   const connData = generateConnectivity(wallData, config, rng);
   const c = connData.connections;
-  console.log(`  ${c.ramps.length} ramps, ${c.ladders.length} ladders, ${c.walkways.length} walkways`);
+  console.log(`  ${c.ladders.length} ladders, ${c.walkways.length} walkways`);
 
   // Build 3D scene
   console.log('[6/6] Building scene and exporting...');

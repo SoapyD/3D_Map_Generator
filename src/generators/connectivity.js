@@ -51,55 +51,131 @@ export function generateConnectivity(data, config, rng) {
   // Build adjacency: same-tier sections that share an edge
   const adjacency = buildAdjacency(nodes);
 
-  // TODO: Ramps and ladders disabled for now — focusing on walkways
+  // For each building, each tier, each floor quadrant:
+  // try to connect quadrant centre to nearest floor on another building.
+  // Drop if it hits a wall.
+  for (let bi = 0; bi < data.buildings.length; bi++) {
+    const building = data.buildings[bi];
+    const bq = data.buildingQuadrants[bi];
 
-  // Phase 3: Place walkways between nearby buildings at the same tier
-  // These are proactive — add bridges for gameplay even if already reachable
-  for (let tier = 1; tier <= config.tiers; tier++) {
-    const tierNodes = nodes.filter((n) => n.tier === tier);
-    const connected = new Set(); // track building pairs already connected at this tier
+    for (let tier = 1; tier <= building.maxTier; tier++) {
+      const present = bq.tiers[tier];
+      if (!present) continue;
 
-    for (const node of tierNodes) {
-      if (node.buildingIndex < 0) continue;
+      const y = tier * tierHeight;
+      const mx = building.x + building.w / 2;
+      const mz = building.z + building.d / 2;
 
-      // Find nearest node at same tier in a different building
-      for (const other of tierNodes) {
-        if (other.buildingIndex <= node.buildingIndex) continue; // avoid duplicates
-        if (other.buildingIndex === node.buildingIndex) continue;
+      const floorData = data.floors.find((f) => f.tier === tier);
+      if (!floorData) continue;
 
-        const pairKey = `${node.buildingIndex}-${other.buildingIndex}`;
-        if (connected.has(pairKey)) continue;
+      for (const q of present) {
+        const srcRect = getQuadrantRect(building, q);
 
-        // Check distance — only bridge nearby buildings (within 15")
-        const cx = node.section.x + node.section.w / 2;
-        const cz = node.section.z + node.section.d / 2;
-        const ox = other.section.x + other.section.w / 2;
-        const oz = other.section.z + other.section.d / 2;
-        const dist = Math.sqrt((cx - ox) ** 2 + (cz - oz) ** 2);
+        // Try connecting from each of the quadrant's 4 edges
+        const edges = [
+          { side: 'north', x: srcRect.x + srcRect.w / 2, z: srcRect.z },
+          { side: 'south', x: srcRect.x + srcRect.w / 2, z: srcRect.z + srcRect.d },
+          { side: 'west',  x: srcRect.x, z: srcRect.z + srcRect.d / 2 },
+          { side: 'east',  x: srcRect.x + srcRect.w, z: srcRect.z + srcRect.d / 2 },
+        ];
 
-        if (dist < 15 && rng.chance(0.5)) {
-          const walkway = placeWalkway(node, other, config, rng);
-          if (walkway && !walkwayHitsWall(walkway, node, other, data.walls, config)) {
-            walkways.push(walkway);
-            connected.add(pairKey);
-            // If either was unreachable, mark it now
-            if (!other.reachable && node.reachable) {
-              other.reachable = true;
-              propagateReachability(other, nodes, adjacency);
-            } else if (!node.reachable && other.reachable) {
-              node.reachable = true;
-              propagateReachability(node, nodes, adjacency);
+        for (const edge of edges) {
+          // Find nearest floor section in a different building to this edge point
+          let bestSection = null;
+          let bestDist = Infinity;
+
+          for (const section of floorData.sections) {
+            const sbi = findBuildingIndex(section, data.buildings);
+            if (sbi === bi) continue;
+
+            // Distance from edge midpoint to nearest point on target section
+            const nearX = Math.max(section.x, Math.min(edge.x, section.x + section.w));
+            const nearZ = Math.max(section.z, Math.min(edge.z, section.z + section.d));
+            const dist = Math.sqrt((edge.x - nearX) ** 2 + (edge.z - nearZ) ** 2);
+
+            if (dist < bestDist) {
+              bestDist = dist;
+              bestSection = section;
             }
           }
+
+          if (!bestSection || bestDist > 20) continue;
+
+          const tgtRect = bestSection;
+
+          // Build walkway from source edge midpoint to nearest point on target edge
+          // Target must be in the direction this edge faces
+          const tgtCx = tgtRect.x + tgtRect.w / 2;
+          const tgtCz = tgtRect.z + tgtRect.d / 2;
+          if (edge.side === 'east' && tgtCx < srcRect.x + srcRect.w) continue;
+          if (edge.side === 'west' && tgtCx > srcRect.x) continue;
+          if (edge.side === 'south' && tgtCz < srcRect.z + srcRect.d) continue;
+          if (edge.side === 'north' && tgtCz > srcRect.z) continue;
+
+          let walkway;
+
+          if (edge.side === 'east' || edge.side === 'west') {
+            // Walkway runs along X
+            const gs = edge.side === 'east' ? srcRect.x + srcRect.w : tgtRect.x + tgtRect.w;
+            const ge = edge.side === 'east' ? tgtRect.x : srcRect.x;
+            if (ge <= gs) continue; // target overlaps or is behind us
+            const len = ge - gs;
+            if (len < 3 || len > 15) continue;
+
+            // Z position: middle of source edge, clamped to target's Z range
+            const clampedZ = Math.max(tgtRect.z + WALKWAY_WIDTH / 2, Math.min(edge.z, tgtRect.z + tgtRect.d - WALKWAY_WIDTH / 2));
+            walkway = { type: 'walkway', x: gs, z: clampedZ - WALKWAY_WIDTH / 2, w: len, d: WALKWAY_WIDTH, y, axis: 'x' };
+          } else {
+            // Walkway runs along Z
+            const gs = edge.side === 'south' ? srcRect.z + srcRect.d : tgtRect.z + tgtRect.d;
+            const ge = edge.side === 'south' ? tgtRect.z : srcRect.z;
+            if (ge <= gs) continue;
+            const len = ge - gs;
+            if (len < 3 || len > 15) continue;
+
+            // X position: middle of source edge, clamped to target's X range
+            const clampedX = Math.max(tgtRect.x + WALKWAY_WIDTH / 2, Math.min(edge.x, tgtRect.x + tgtRect.w - WALKWAY_WIDTH / 2));
+            walkway = { type: 'walkway', x: clampedX - WALKWAY_WIDTH / 2, z: gs, w: WALKWAY_WIDTH, d: len, y, axis: 'z' };
+          }
+
+          // Drop if it hits a wall on this tier
+          const tierY = (tier - 1) * tierHeight + slabThickness;
+          let hitsWall = false;
+          for (const wall of data.walls) {
+            if (Math.abs(wall.baseY - tierY) > 0.5) continue;
+            const wallX1 = wall.axis === 'x' ? wall.x + wall.length : wall.x + wall.thickness;
+            const wallZ1 = wall.axis === 'z' ? wall.z + wall.length : wall.z + wall.thickness;
+            if (walkway.x < wallX1 && walkway.x + walkway.w > wall.x &&
+                walkway.z < wallZ1 && walkway.z + walkway.d > wall.z) {
+              hitsWall = true;
+              break;
+            }
+          }
+          if (hitsWall) continue;
+
+          walkways.push(walkway);
         }
       }
     }
   }
 
-  // Phase 4: Fallback — disabled for now
-
-  const connections = { ladders, walkways, ramps };
+  const connections = { ladders, walkways };
   return { ...data, connections };
+}
+
+/**
+ * Get the rectangle for a specific quadrant of a building.
+ */
+function getQuadrantRect(building, q) {
+  const mx = building.x + building.w / 2;
+  const mz = building.z + building.d / 2;
+  switch (q) {
+    case 0: return { x: building.x, z: building.z, w: building.w / 2, d: building.d / 2 };
+    case 1: return { x: mx, z: building.z, w: building.w / 2, d: building.d / 2 };
+    case 2: return { x: building.x, z: mz, w: building.w / 2, d: building.d / 2 };
+    case 3: return { x: mx, z: mz, w: building.w / 2, d: building.d / 2 };
+  }
 }
 
 /**

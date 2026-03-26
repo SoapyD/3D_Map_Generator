@@ -8,11 +8,11 @@
  * Output: Array of buildings { x, z, w, d, maxTier, size, blockIndex }
  */
 
-// Size categories with dimension ranges (inches)
+// DEBUG: All buildings same size for walkway debugging
 const SIZES = {
-  small:  { min: 4, max: 7, tierMin: 1, tierMax: 2 },
-  medium: { min: 7, max: 12, tierMin: 2, tierMax: 3 },
-  large:  { min: 11, max: 18, tierMin: 3, tierMax: 4 },
+  small:  { min: 10, max: 10, tierMin: 3, tierMax: 3 },
+  medium: { min: 10, max: 10, tierMin: 3, tierMax: 3 },
+  large:  { min: 10, max: 10, tierMin: 3, tierMax: 3 },
 };
 
 const BUILDING_GAP = 0.75; // minimum gap between buildings (inches)
