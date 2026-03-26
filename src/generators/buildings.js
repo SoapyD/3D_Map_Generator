@@ -8,22 +8,11 @@
  * Output: Array of buildings { x, z, w, d, maxTier, size, blockIndex }
  */
 
-// Footprint sizes (width/depth in inches)
-const FOOTPRINTS = {
-  small:  { min: 4, max: 7 },
-  medium: { min: 7, max: 12 },
-  large:  { min: 11, max: 18 },
-};
+import { BUILDING } from '../config.js';
 
-// Height is independent of footprint — any footprint can be any height
-const HEIGHTS = {
-  short: { tierMin: 2, tierMax: 2 },
-  medium: { tierMin: 2, tierMax: 3 },
-  tall:  { tierMin: 3, tierMax: 4 },
-};
-
-const BUILDING_GAP = 0.5; // minimum gap between buildings (inches)
-const TARGET_COVERAGE = 0.85; // target higher to compensate for small buildings
+const FOOTPRINTS = BUILDING.footprints;
+const HEIGHTS = BUILDING.heights;
+const BUILDING_GAP = BUILDING.gap;
 
 /**
  * @param {{ blocks: Array<{x,z,w,d}> }} gridData
@@ -37,7 +26,7 @@ export function generateBuildings(gridData, config, rng) {
 
   // Use the average small footprint size to determine grid count
   const avgSize = (FOOTPRINTS.small.min + FOOTPRINTS.small.max) / 2;
-  const minCellSize = avgSize * 1.25;
+  const minCellSize = avgSize * BUILDING.cellSizeMultiplier;
 
   // Figure out how many fit, then stretch the cell size to fill the map
   const cols = Math.floor(config.mapWidth / minCellSize);
@@ -86,7 +75,7 @@ export function generateBuildings(gridData, config, rng) {
   }
 
   // Delete 15% of remaining small buildings — track deleted positions for cover placement
-  const deleteRatio = 0.15;
+  const deleteRatio = BUILDING.deleteRatio;
   rng.shuffle(surviving);
   const keepCount = Math.ceil(surviving.length * (1 - deleteRatio));
   const culled = surviving.slice(0, keepCount);

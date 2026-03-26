@@ -19,11 +19,11 @@
  * Output: { ...data, connections: { ladders: [], walkways: [], ramps: [] } }
  */
 
-const LADDER_WIDTH = 1.0;   // inches
-const LADDER_DEPTH = 0.5;   // inches
-const WALKWAY_WIDTH = 2.0;  // inches
-const WALKWAY_THICKNESS = 0.3;
-const RAMP_WIDTH = 2.5;     // inches
+import { CONNECTIVITY } from '../config.js';
+
+const LADDER_WIDTH = CONNECTIVITY.ladderWidth;
+const LADDER_DEPTH = CONNECTIVITY.ladderDepth;
+const WALKWAY_WIDTH = CONNECTIVITY.walkwayWidth;
 const RAMP_DEPTH = 4.0;     // length of the ramp along ground
 const RAMP_THICKNESS = 0.3;
 
@@ -121,7 +121,7 @@ export function generateConnectivity(data, config, rng) {
             const ge = edge.side === 'east' ? tgtRect.x : srcRect.x;
             if (ge <= gs) continue; // target overlaps or is behind us
             const len = ge - gs;
-            if (len < 3 || len > 15) continue;
+            if (len < CONNECTIVITY.minWalkwayLength || len > CONNECTIVITY.maxWalkwayLength) continue;
 
             // Z position: middle of source edge, clamped to target's Z range
             const clampedZ = Math.max(tgtRect.z + WALKWAY_WIDTH / 2, Math.min(edge.z, tgtRect.z + tgtRect.d - WALKWAY_WIDTH / 2));
@@ -132,7 +132,7 @@ export function generateConnectivity(data, config, rng) {
             const ge = edge.side === 'south' ? tgtRect.z : srcRect.z;
             if (ge <= gs) continue;
             const len = ge - gs;
-            if (len < 3 || len > 15) continue;
+            if (len < CONNECTIVITY.minWalkwayLength || len > CONNECTIVITY.maxWalkwayLength) continue;
 
             // X position: middle of source edge, clamped to target's X range
             const clampedX = Math.max(tgtRect.x + WALKWAY_WIDTH / 2, Math.min(edge.x, tgtRect.x + tgtRect.w - WALKWAY_WIDTH / 2));
@@ -202,7 +202,7 @@ export function generateConnectivity(data, config, rng) {
   const culledWalkways = [];
   for (const [, tierWalkways] of byTier) {
     rng.shuffle(tierWalkways);
-    const keep = Math.max(1, Math.ceil(tierWalkways.length * 0.3));
+    const keep = Math.max(1, Math.ceil(tierWalkways.length * CONNECTIVITY.walkwayKeepRatio));
     culledWalkways.push(...tierWalkways.slice(0, keep));
   }
 
@@ -301,7 +301,7 @@ export function generateConnectivity(data, config, rng) {
   // check if there's a wall. If so, place a red ladder from ground up to the
   // first tier with no wall. Skip edges near map boundary.
   const groundLadders = [];
-  const MAP_BOUNDARY_MARGIN = 2;
+  const MAP_BOUNDARY_MARGIN = CONNECTIVITY.mapBoundaryMargin;
 
   for (let bi = 0; bi < data.buildings.length; bi++) {
     const b = data.buildings[bi];
@@ -469,7 +469,7 @@ export function generateConnectivity(data, config, rng) {
           if (edge.side === 'east' && edge.x > config.mapWidth - MAP_BOUNDARY_MARGIN) continue;
 
           // Spawn chance: 10% on ground floor, 20% on tier 1, 30% on tier 2+
-          const spawnChance = tier === 0 ? 0.10 : tier === 1 ? 0.20 : 0.30;
+          const spawnChance = tier === 0 ? CONNECTIVITY.orangeSpawnChance.ground : tier === 1 ? CONNECTIVITY.orangeSpawnChance.tier1 : CONNECTIVITY.orangeSpawnChance.tier2Plus;
           if (!rng.chance(spawnChance)) continue;
 
           // Position: centred on edge, outside building, ladder width
@@ -503,7 +503,7 @@ export function generateConnectivity(data, config, rng) {
           }
 
           // Must span at least 2 tiers
-          if (topTier - tier < 2) continue;
+          if (topTier - tier < CONNECTIVITY.orangeMinSpan) continue;
           const y1 = topTier * tierHeight;
 
           orangeLadders.push({
@@ -536,13 +536,13 @@ export function generateConnectivity(data, config, rng) {
 
   // Cull red and orange ladders to 40% each
   rng.shuffle(filteredGroundLadders);
-  const culledGroundLadders = filteredGroundLadders.slice(0, Math.max(1, Math.ceil(filteredGroundLadders.length * 0.4)));
+  const culledGroundLadders = filteredGroundLadders.slice(0, Math.max(1, Math.ceil(filteredGroundLadders.length * CONNECTIVITY.ladderCullRatio)));
 
   rng.shuffle(filteredOrangeLadders);
-  const culledOrangeLadders = filteredOrangeLadders.slice(0, Math.max(1, Math.ceil(filteredOrangeLadders.length * 0.4)));
+  const culledOrangeLadders = filteredOrangeLadders.slice(0, Math.max(1, Math.ceil(filteredOrangeLadders.length * CONNECTIVITY.ladderCullRatio)));
 
   // Proximity culling — only delete if same tier start point
-  const PROXIMITY = 3;
+  const PROXIMITY = CONNECTIVITY.proximity;
 
   // Walkways
   const walkwayDropSet = new Set();

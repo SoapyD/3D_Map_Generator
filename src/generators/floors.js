@@ -16,6 +16,8 @@
  * Max 2 floors at removal tier 0.
  */
 
+import { FLOOR } from '../config.js';
+
 const ADJACENT = {
   0: [1, 2],
   1: [0, 3],
@@ -49,20 +51,20 @@ export function generateFloors(data, config, rng) {
       if (removalCount === 0) {
         // Currently at removal tier 0
         tier0Count++;
-        if (tier0Count > 2 || (tier > 1 && rng.chance(0.5))) {
+        if (tier0Count > FLOOR.maxTier0Floors || (tier > 1 && rng.chance(FLOOR.tier1EscalateChance))) {
           // Escalate to removal tier 1: remove 1 random quadrant
           const available = [0, 1, 2, 3].filter((q) => !removed.has(q));
           removed.add(rng.pick(available));
         }
       } else if (removalCount === 1) {
         // Currently at removal tier 1, may escalate to tier 2
-        if (rng.chance(0.6)) {
+        if (rng.chance(FLOOR.tier2EscalateChance)) {
           const adj = pickAdjacentToRemoved(removed, rng);
           if (adj !== null) removed.add(adj);
         }
       } else if (removalCount === 2) {
         // Currently at removal tier 2, may escalate to tier 3
-        if (rng.chance(0.5)) {
+        if (rng.chance(FLOOR.tier3EscalateChance)) {
           const adj = pickAdjacentToRemoved(removed, rng);
           if (adj !== null) removed.add(adj);
         }

@@ -13,7 +13,9 @@ import * as THREE from 'three';
  * @param {THREE.Material} material
  * @returns {THREE.Mesh}
  */
-const TILE_SIZE = 3; // inches per texture repeat
+import { GEOMETRY } from '../config.js';
+
+const TILE_SIZE = GEOMETRY.tileSize;
 
 export function createSlab(x, y, z, width, height, depth, material) {
   const geometry = new THREE.BoxGeometry(width, height, depth);

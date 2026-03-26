@@ -10,14 +10,10 @@
  * - Long: random width (2-4") × 1.5" tall × 1.5" deep
  */
 
-const COVER_THIN = 1.5;
+import { COVER } from '../config.js';
 
-// Cover types: { height, spawnChance }
-const COVER_TYPES = [
-  { height: 1.5, chance: 0.8 },  // low wall
-  { height: 3.0, chance: 0.1 },  // pillar
-  { height: 6.0, chance: 0.1 },  // tall pillar
-];
+const COVER_THIN = COVER.thin;
+const COVER_TYPES = COVER.types;
 
 export function generateCover(data, config, rng) {
   const { tierHeight, slabThickness } = config;
@@ -25,7 +21,7 @@ export function generateCover(data, config, rng) {
 
   // Track tall cover counts (max 3 total across both types)
   let tallTotal = 0;
-  const MAX_TALL = 3;
+  const MAX_TALL = COVER.maxTall;
 
   // Rooftop cover: place on each top-tier quadrant with a chance
   for (let bi = 0; bi < data.buildings.length; bi++) {
@@ -41,7 +37,7 @@ export function generateCover(data, config, rng) {
 
     for (const q of present) {
       // 50% chance per quadrant
-      if (!rng.chance(0.5)) continue;
+      if (!rng.chance(COVER.rooftopChance)) continue;
 
       const qr = {
         0: { x: b.x, z: b.z, w: b.w / 2, d: b.d / 2 },
@@ -76,7 +72,7 @@ export function generateCover(data, config, rng) {
     const b = data.buildings[bi];
     if (b.size !== 'medium' && b.size !== 'large') continue;
     const bq = data.buildingQuadrants[bi];
-    const maxObjects = b.size === 'large' ? 2 : 1;
+    const maxObjects = b.size === 'large' ? COVER.interiorMaxLarge : COVER.interiorMaxMedium;
 
     const mx = b.x + b.w / 2;
     const mz = b.z + b.d / 2;
@@ -124,7 +120,7 @@ export function generateCover(data, config, rng) {
       db.x < b.x + b.w && db.x + db.w > b.x &&
       db.z < b.z + b.d && db.z + db.d > b.z
     );
-    const maxHeight = underBigBuilding ? 3.0 : Infinity;
+    const maxHeight = underBigBuilding ? COVER.maxHeightUnderBuilding : Infinity;
 
     const count = rng.int(1, 3);
     for (let i = 0; i < count; i++) {
