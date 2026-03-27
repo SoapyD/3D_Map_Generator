@@ -1,61 +1,61 @@
 /**
- * Test: export a single small building as a subdivided OBJ with texture atlas.
- * Run: node src/export/test-building-export.js
+ * Test: export a large building with subdivided geometry + flowing UVs.
+ * Run: node src/export/test-large-building.js
  */
 
 import { readFileSync, writeFileSync } from 'fs';
 import { PNG } from 'pngjs';
 
 const SEG_SIZE = 3;
+const SEGS_PER_TILE = 4;
 
-// Building: 6x6 footprint, 2 tiers (6" tall), 0.5" thick floors, 0.25" thick walls
-const building = { x: 0, z: 0, w: 6, d: 6, tiers: 2, tierHeight: 3, slabThickness: 0.5, wallThickness: 0.25 };
+// Large building: 14x12 footprint, 3 tiers, with floor quadrant removal
+const building = {
+  x: 0, z: 0, w: 14, d: 12,
+  tiers: 3, tierHeight: 3, slabThickness: 0.5, wallThickness: 0.25,
+};
 
 // Load textures
-const wallTex = readFileSync('assets/textures/loaded/walls/Bricks_02_Grey_3.png');
-const floorTex = readFileSync('assets/textures/loaded/floors/Wood_Planks_02_Brown_1.png');
+const wallTex = readFileSync('assets/textures/loaded/walls/Bricks_04_Brown_2.png');
+const landmarkTex = readFileSync('assets/textures/loaded/landmark_walls/Bricks_02_Grey_1.png');
+const floorTex = readFileSync('assets/textures/loaded/floors/Wood_Planks_03_Brown_1.png');
+const baseTex = readFileSync('assets/textures/loaded/base_map/Dirt_Cracked_01_Grey_1.png');
 
-// Build atlas: 2 tiles side by side (wall + floor)
-const srcWall = PNG.sync.read(wallTex);
-const srcFloor = PNG.sync.read(floorTex);
+// Build atlas: 2x2 grid = 4 tiles
+const srcTextures = [wallTex, floorTex, landmarkTex, baseTex].map(b => PNG.sync.read(b));
 const TILE = 256;
-const atlas = new PNG({ width: TILE * 2, height: TILE });
+const atlas = new PNG({ width: TILE * 2, height: TILE * 2 });
 
-// Tile 0: wall
-for (let y = 0; y < TILE; y++) {
-  for (let x = 0; x < TILE; x++) {
-    const si = (y % srcWall.height * srcWall.width + x % srcWall.width) * 4;
-    const di = (y * TILE * 2 + x) * 4;
-    atlas.data[di] = srcWall.data[si];
-    atlas.data[di + 1] = srcWall.data[si + 1];
-    atlas.data[di + 2] = srcWall.data[si + 2];
-    atlas.data[di + 3] = 255;
-  }
-}
-// Tile 1: floor
-for (let y = 0; y < TILE; y++) {
-  for (let x = 0; x < TILE; x++) {
-    const si = (y % srcFloor.height * srcFloor.width + x % srcFloor.width) * 4;
-    const di = (y * TILE * 2 + (x + TILE)) * 4;
-    atlas.data[di] = srcFloor.data[si];
-    atlas.data[di + 1] = srcFloor.data[si + 1];
-    atlas.data[di + 2] = srcFloor.data[si + 2];
-    atlas.data[di + 3] = 255;
+for (let ti = 0; ti < 4; ti++) {
+  const col = ti % 2;
+  const row = Math.floor(ti / 2);
+  const src = srcTextures[ti];
+  for (let y = 0; y < TILE; y++) {
+    for (let x = 0; x < TILE; x++) {
+      const si = ((y % src.height) * src.width + (x % src.width)) * 4;
+      const di = ((row * TILE + y) * TILE * 2 + (col * TILE + x)) * 4;
+      atlas.data[di] = src.data[si];
+      atlas.data[di + 1] = src.data[si + 1];
+      atlas.data[di + 2] = src.data[si + 2];
+      atlas.data[di + 3] = 255;
+    }
   }
 }
 
-writeFileSync('output/test_building.png', PNG.sync.write(atlas));
+writeFileSync('output/test_large.png', PNG.sync.write(atlas));
 
-// UV regions for each material
-const wallUV = { uMin: 0, uMax: 0.5, vMin: 0, vMax: 1 };
-const floorUV = { uMin: 0.5, uMax: 1, vMin: 0, vMax: 1 };
+// UV regions: 2x2 grid
+const wallUV =     { uMin: 0.0, uMax: 0.5, vMin: 0.5, vMax: 1.0 };
+const floorUV =    { uMin: 0.5, uMax: 1.0, vMin: 0.5, vMax: 1.0 };
+const landmarkUV = { uMin: 0.0, uMax: 0.5, vMin: 0.0, vMax: 0.5 };
+const baseUV =     { uMin: 0.5, uMax: 1.0, vMin: 0.0, vMax: 0.5 };
 
 const lines = [];
 let vertOff = 1;
 let uvOff = 1;
 let normOff = 1;
 
-lines.push('# Test building - subdivided');
+lines.push('# Test large building');
 lines.push('');
 
 function addSubdividedBox(name, x0, y0, z0, sizeX, sizeY, sizeZ, uv) {
@@ -66,9 +66,6 @@ function addSubdividedBox(name, x0, y0, z0, sizeX, sizeY, sizeZ, uv) {
   const stepY = sizeY / segsY;
   const stepZ = sizeZ / segsZ;
 
-  // UV step per segment: each segment uses 1/16th of the tile width
-  // so 16 segments = one full texture, then it wraps
-  const SEGS_PER_TILE = 4;
   const tileW = uv.uMax - uv.uMin;
   const tileH = uv.vMax - uv.vMin;
   const uvStep = tileW / SEGS_PER_TILE;
@@ -94,28 +91,17 @@ function addSubdividedBox(name, x0, y0, z0, sizeX, sizeY, sizeZ, uv) {
           lines.push(`v ${v[0].toFixed(6)} ${v[1].toFixed(6)} ${v[2].toFixed(6)}`);
         }
 
-        // Position-based UV offsets — each segment gets a slice of the tile
-        // that flows continuously along the surface
         const uOffX = ((sx % SEGS_PER_TILE) * uvStep);
         const uOffZ = ((sz % SEGS_PER_TILE) * uvStep);
         const vOffY = ((sy % SEGS_PER_TILE) * uvStepV);
         const vOffZ = ((sz % SEGS_PER_TILE) * uvStepV);
 
-        // Per-face UV regions based on segment position
-        // Vertical faces: U flows along wall length, V flows up wall height
-        // Horizontal faces: U flows along X, V flows along Z
         const faceUVs = [
-          // -Z face: verts [0,3,2,1] — wall, U=X offset, V=Y offset
           [[uv.uMin + uOffX, uv.vMin + vOffY], [uv.uMin + uOffX, uv.vMin + vOffY + uvStepV], [uv.uMin + uOffX + uvStep, uv.vMin + vOffY + uvStepV], [uv.uMin + uOffX + uvStep, uv.vMin + vOffY]],
-          // +Z face: verts [4,5,6,7] — wall
           [[uv.uMin + uOffX + uvStep, uv.vMin + vOffY], [uv.uMin + uOffX, uv.vMin + vOffY], [uv.uMin + uOffX, uv.vMin + vOffY + uvStepV], [uv.uMin + uOffX + uvStep, uv.vMin + vOffY + uvStepV]],
-          // -Y face: verts [0,1,5,4] — floor/ceiling, U=X offset, V=Z offset
           [[uv.uMin + uOffX, uv.vMin + vOffZ], [uv.uMin + uOffX + uvStep, uv.vMin + vOffZ], [uv.uMin + uOffX + uvStep, uv.vMin + vOffZ + uvStepV], [uv.uMin + uOffX, uv.vMin + vOffZ + uvStepV]],
-          // +Y face: verts [2,3,7,6] — floor/ceiling
           [[uv.uMin + uOffX + uvStep, uv.vMin + vOffZ], [uv.uMin + uOffX, uv.vMin + vOffZ], [uv.uMin + uOffX, uv.vMin + vOffZ + uvStepV], [uv.uMin + uOffX + uvStep, uv.vMin + vOffZ + uvStepV]],
-          // -X face: verts [0,4,7,3] — wall, U=Z offset, V=Y offset
           [[uv.uMin + uOffZ + uvStep, uv.vMin + vOffY], [uv.uMin + uOffZ, uv.vMin + vOffY], [uv.uMin + uOffZ, uv.vMin + vOffY + uvStepV], [uv.uMin + uOffZ + uvStep, uv.vMin + vOffY + uvStepV]],
-          // +X face: verts [1,2,6,5] — wall
           [[uv.uMin + uOffZ, uv.vMin + vOffY], [uv.uMin + uOffZ, uv.vMin + vOffY + uvStepV], [uv.uMin + uOffZ + uvStep, uv.vMin + vOffY + uvStepV], [uv.uMin + uOffZ + uvStep, uv.vMin + vOffY]],
         ];
         for (const uvSet of faceUVs) {
@@ -160,32 +146,41 @@ function addSubdividedBox(name, x0, y0, z0, sizeX, sizeY, sizeZ, uv) {
 }
 
 const { x, z, w, d, tiers, tierHeight, slabThickness, wallThickness } = building;
+const mx = w / 2;
+const mz = d / 2;
 
-// Ground floor slab
-addSubdividedBox('floor_t0', x, 0, z, w, slabThickness, d, floorUV);
+// Ground floor slab (base texture)
+addSubdividedBox('base_floor', x, 0, z, w, slabThickness, d, baseUV);
 
-// Tier 1 floor slab
+// Tier 1: full floor
 addSubdividedBox('floor_t1', x, tierHeight, z, w, slabThickness, d, floorUV);
 
-// Tier 2 floor slab
-addSubdividedBox('floor_t2', x, tierHeight * 2, z, w, slabThickness, d, floorUV);
+// Tier 2: floor with quadrant 1 (top-right) removed
+addSubdividedBox('floor_t2_q0', x, tierHeight * 2, z, mx, slabThickness, mz, floorUV);
+addSubdividedBox('floor_t2_q2', x, tierHeight * 2, z + mz, mx, slabThickness, mz, floorUV);
+addSubdividedBox('floor_t2_q3', x + mx, tierHeight * 2, z + mz, mx, slabThickness, mz, floorUV);
 
-// Walls: 2 walls per tier (north + east)
+// Tier 3: floor with quadrants 1 and 3 removed (only left column)
+addSubdividedBox('floor_t3_q0', x, tierHeight * 3, z, mx, slabThickness, mz, floorUV);
+addSubdividedBox('floor_t3_q2', x, tierHeight * 3, z + mz, mx, slabThickness, mz, floorUV);
+
+// Walls: north + west on all tiers (landmark texture for this large building)
 for (let tier = 0; tier < tiers; tier++) {
   const baseY = tier * tierHeight + slabThickness;
   const wallH = tierHeight - slabThickness;
 
   // North wall (along X at z=0)
-  addSubdividedBox(`wall_north_t${tier}`, x, baseY, z, w, wallH, wallThickness, wallUV);
+  addSubdividedBox(`wall_north_t${tier}`, x, baseY, z, w, wallH, wallThickness, landmarkUV);
 
-  // East wall (along Z at x+w)
-  addSubdividedBox(`wall_east_t${tier}`, x + w - wallThickness, baseY, z, wallThickness, wallH, d, wallUV);
+  // West wall (along Z at x=0)
+  addSubdividedBox(`wall_west_t${tier}`, x, baseY, z, wallThickness, wallH, d, landmarkUV);
 }
 
-writeFileSync('output/test_building.obj', lines.join('\n'));
+writeFileSync('output/test_large.obj', lines.join('\n'));
 
 const totalSegs = (vertOff - 1) / 8;
 console.log(`Building: ${w}x${d}, ${tiers} tiers`);
 console.log(`Total segments: ${totalSegs}`);
 console.log(`Vertices: ${vertOff - 1}`);
-console.log('Output: output/test_building.obj + output/test_building.png');
+console.log(`Atlas: 512x512 (4 tiles)`);
+console.log('Output: output/test_large.obj + output/test_large.png');
