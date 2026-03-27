@@ -458,25 +458,59 @@ const baseFloor = floorData.floors[0].sections[0];
 addSubBox('base_floor', baseFloor.x, 0, baseFloor.z, baseFloor.w, config.slabThickness, baseFloor.d, getUV(baseIdx), true);
 
 // Helper: check if an edge of a section is covered by another section at the same tier
-function edgeCovered(section, side, allSections) {
+// Check if an edge is FULLY covered by adjacent sections.
+// Returns coverage: 1.0 = fully covered, 0 = fully exposed, 0.5 = half covered.
+// We generate edge faces for the uncovered portions.
+function getEdgeCoverage(section, side, allSections) {
   const margin = 0.1;
-  for (const other of allSections) {
-    if (other === section) continue;
-    if (side === 'north') { // -Z edge: covered if another section is adjacent at z
-      if (Math.abs(other.z + other.d - section.z) < margin &&
-          other.x < section.x + section.w - margin && other.x + other.w > section.x + margin) return true;
-    } else if (side === 'south') { // +Z edge
-      if (Math.abs(section.z + section.d - other.z) < margin &&
-          other.x < section.x + section.w - margin && other.x + other.w > section.x + margin) return true;
-    } else if (side === 'west') { // -X edge
-      if (Math.abs(other.x + other.w - section.x) < margin &&
-          other.z < section.z + section.d - margin && other.z + other.d > section.z + margin) return true;
-    } else if (side === 'east') { // +X edge
-      if (Math.abs(section.x + section.w - other.x) < margin &&
-          other.z < section.z + section.d - margin && other.z + other.d > section.z + margin) return true;
+  let edgeStart, edgeEnd;
+  const touchingSections = [];
+
+  if (side === 'north' || side === 'south') {
+    edgeStart = section.x;
+    edgeEnd = section.x + section.w;
+    const edgeZ = side === 'north' ? section.z : section.z + section.d;
+    for (const other of allSections) {
+      if (other === section) continue;
+      const otherEdgeZ = side === 'north' ? other.z + other.d : other.z;
+      if (Math.abs(otherEdgeZ - edgeZ) < margin) {
+        if (other.x < edgeEnd - margin && other.x + other.w > edgeStart + margin) {
+          touchingSections.push({ start: Math.max(edgeStart, other.x), end: Math.min(edgeEnd, other.x + other.w) });
+        }
+      }
+    }
+  } else {
+    edgeStart = section.z;
+    edgeEnd = section.z + section.d;
+    const edgeX = side === 'west' ? section.x : section.x + section.w;
+    for (const other of allSections) {
+      if (other === section) continue;
+      const otherEdgeX = side === 'west' ? other.x + other.w : other.x;
+      if (Math.abs(otherEdgeX - edgeX) < margin) {
+        if (other.z < edgeEnd - margin && other.z + other.d > edgeStart + margin) {
+          touchingSections.push({ start: Math.max(edgeStart, other.z), end: Math.min(edgeEnd, other.z + other.d) });
+        }
+      }
     }
   }
-  return false;
+
+  // Sort and merge touching ranges
+  touchingSections.sort((a, b) => a.start - b.start);
+
+  // Find uncovered gaps
+  const gaps = [];
+  let pos = edgeStart;
+  for (const t of touchingSections) {
+    if (t.start > pos + margin) {
+      gaps.push({ start: pos, end: t.start });
+    }
+    pos = Math.max(pos, t.end);
+  }
+  if (pos < edgeEnd - margin) {
+    gaps.push({ start: pos, end: edgeEnd });
+  }
+
+  return gaps;
 }
 
 // Helper: add edge faces for exposed sides of a floor section
@@ -493,23 +527,29 @@ function addFloorEdges(section, y, h, allSections, uv) {
     objLines.push(`vn ${nx} ${ny} ${nz}`);
     objLines.push(`vn ${-nx} ${-ny} ${-nz}`);
     const uo = uvOff, no = normOff;
-    // Front
     objLines.push(`f ${vo}/${uo}/${no} ${vo+1}/${uo+1}/${no} ${vo+2}/${uo+2}/${no}`);
     objLines.push(`f ${vo}/${uo}/${no} ${vo+2}/${uo+2}/${no} ${vo+3}/${uo+3}/${no}`);
-    // Back
     objLines.push(`f ${vo+2}/${uo+2}/${no+1} ${vo+1}/${uo+1}/${no+1} ${vo}/${uo}/${no+1}`);
     objLines.push(`f ${vo+3}/${uo+3}/${no+1} ${vo+2}/${uo+2}/${no+1} ${vo}/${uo}/${no+1}`);
     vertOff += 4; uvOff += 4; normOff += 2;
   }
 
-  if (!edgeCovered(section, 'north', allSections))
-    addEdge([x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0], 0,0,-1);
-  if (!edgeCovered(section, 'south', allSections))
-    addEdge([x1,y0,z1],[x0,y0,z1],[x0,y1,z1],[x1,y1,z1], 0,0,1);
-  if (!edgeCovered(section, 'west', allSections))
-    addEdge([x0,y0,z1],[x0,y0,z0],[x0,y1,z0],[x0,y1,z1], -1,0,0);
-  if (!edgeCovered(section, 'east', allSections))
-    addEdge([x1,y0,z0],[x1,y0,z1],[x1,y1,z1],[x1,y1,z0], 1,0,0);
+  // North edge (-Z): gaps along X
+  for (const gap of getEdgeCoverage(section, 'north', allSections)) {
+    addEdge([gap.start,y0,z0],[gap.end,y0,z0],[gap.end,y1,z0],[gap.start,y1,z0], 0,0,-1);
+  }
+  // South edge (+Z)
+  for (const gap of getEdgeCoverage(section, 'south', allSections)) {
+    addEdge([gap.end,y0,z1],[gap.start,y0,z1],[gap.start,y1,z1],[gap.end,y1,z1], 0,0,1);
+  }
+  // West edge (-X): gaps along Z
+  for (const gap of getEdgeCoverage(section, 'west', allSections)) {
+    addEdge([x0,y0,gap.end],[x0,y0,gap.start],[x0,y1,gap.start],[x0,y1,gap.end], -1,0,0);
+  }
+  // East edge (+X)
+  for (const gap of getEdgeCoverage(section, 'east', allSections)) {
+    addEdge([x1,y0,gap.start],[x1,y0,gap.end],[x1,y1,gap.end],[x1,y1,gap.start], 1,0,0);
+  }
 }
 
 // Export building floors (tier 1+)
