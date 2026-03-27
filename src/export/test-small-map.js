@@ -404,10 +404,13 @@ function addSubBox(name, x0, y0, z0, sizeX, sizeY, sizeZ, uv, showEdges = false)
       for (const v of [v0,v1,v2,v3]) objLines.push(`v ${v[0].toFixed(6)} ${v[1].toFixed(6)} ${v[2].toFixed(6)}`);
       for (let i = 0; i < 4; i++) objLines.push(`vt ${cu} ${cv}`);
       objLines.push(`vn ${nx} ${ny} ${nz}`);
+      objLines.push(`vn ${-nx} ${-ny} ${-nz}`);
       const uo = uvOff, no = normOff;
       objLines.push(`f ${vo}/${uo}/${no} ${vo+1}/${uo+1}/${no} ${vo+2}/${uo+2}/${no}`);
       objLines.push(`f ${vo}/${uo}/${no} ${vo+2}/${uo+2}/${no} ${vo+3}/${uo+3}/${no}`);
-      vertOff += 4; uvOff += 4; normOff += 1;
+      objLines.push(`f ${vo+2}/${uo+2}/${no+1} ${vo+1}/${uo+1}/${no+1} ${vo}/${uo}/${no+1}`);
+      objLines.push(`f ${vo+3}/${uo+3}/${no+1} ${vo+2}/${uo+2}/${no+1} ${vo}/${uo}/${no+1}`);
+      vertOff += 4; uvOff += 4; normOff += 2;
     }
 
     if (isFloor || (!isWallX && !isWallZ)) {
@@ -448,7 +451,62 @@ function addSubBox(name, x0, y0, z0, sizeX, sizeY, sizeZ, uv, showEdges = false)
 
 // Export base floor
 const baseFloor = floorData.floors[0].sections[0];
-addSubBox('base_floor', baseFloor.x, 0, baseFloor.z, baseFloor.w, config.slabThickness, baseFloor.d, getUV(baseIdx));
+addSubBox('base_floor', baseFloor.x, 0, baseFloor.z, baseFloor.w, config.slabThickness, baseFloor.d, getUV(baseIdx), true);
+
+// Helper: check if an edge of a section is covered by another section at the same tier
+function edgeCovered(section, side, allSections) {
+  const margin = 0.1;
+  for (const other of allSections) {
+    if (other === section) continue;
+    if (side === 'north') { // -Z edge: covered if another section is adjacent at z
+      if (Math.abs(other.z + other.d - section.z) < margin &&
+          other.x < section.x + section.w - margin && other.x + other.w > section.x + margin) return true;
+    } else if (side === 'south') { // +Z edge
+      if (Math.abs(section.z + section.d - other.z) < margin &&
+          other.x < section.x + section.w - margin && other.x + other.w > section.x + margin) return true;
+    } else if (side === 'west') { // -X edge
+      if (Math.abs(other.x + other.w - section.x) < margin &&
+          other.z < section.z + section.d - margin && other.z + other.d > section.z + margin) return true;
+    } else if (side === 'east') { // +X edge
+      if (Math.abs(section.x + section.w - other.x) < margin &&
+          other.z < section.z + section.d - margin && other.z + other.d > section.z + margin) return true;
+    }
+  }
+  return false;
+}
+
+// Helper: add edge faces for exposed sides of a floor section
+function addFloorEdges(section, y, h, allSections, uv) {
+  const x0 = section.x, z0 = section.z, x1 = x0 + section.w, z1 = z0 + section.d;
+  const y0 = y, y1 = y + h;
+  const cu = ((uv.uMin + uv.uMax) / 2).toFixed(6);
+  const cv = ((uv.vMin + uv.vMax) / 2).toFixed(6);
+
+  function addEdge(v0, v1, v2, v3, nx, ny, nz) {
+    const vo = vertOff;
+    for (const v of [v0,v1,v2,v3]) objLines.push(`v ${v[0].toFixed(6)} ${v[1].toFixed(6)} ${v[2].toFixed(6)}`);
+    for (let i = 0; i < 4; i++) objLines.push(`vt ${cu} ${cv}`);
+    objLines.push(`vn ${nx} ${ny} ${nz}`);
+    objLines.push(`vn ${-nx} ${-ny} ${-nz}`);
+    const uo = uvOff, no = normOff;
+    // Front
+    objLines.push(`f ${vo}/${uo}/${no} ${vo+1}/${uo+1}/${no} ${vo+2}/${uo+2}/${no}`);
+    objLines.push(`f ${vo}/${uo}/${no} ${vo+2}/${uo+2}/${no} ${vo+3}/${uo+3}/${no}`);
+    // Back
+    objLines.push(`f ${vo+2}/${uo+2}/${no+1} ${vo+1}/${uo+1}/${no+1} ${vo}/${uo}/${no+1}`);
+    objLines.push(`f ${vo+3}/${uo+3}/${no+1} ${vo+2}/${uo+2}/${no+1} ${vo}/${uo}/${no+1}`);
+    vertOff += 4; uvOff += 4; normOff += 2;
+  }
+
+  if (!edgeCovered(section, 'north', allSections))
+    addEdge([x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0], 0,0,-1);
+  if (!edgeCovered(section, 'south', allSections))
+    addEdge([x1,y0,z1],[x0,y0,z1],[x0,y1,z1],[x1,y1,z1], 0,0,1);
+  if (!edgeCovered(section, 'west', allSections))
+    addEdge([x0,y0,z1],[x0,y0,z0],[x0,y1,z0],[x0,y1,z1], -1,0,0);
+  if (!edgeCovered(section, 'east', allSections))
+    addEdge([x1,y0,z0],[x1,y0,z1],[x1,y1,z1],[x1,y1,z0], 1,0,0);
+}
 
 // Export building floors (tier 1+)
 for (let t = 1; t < floorData.floors.length; t++) {
@@ -459,10 +517,33 @@ for (let t = 1; t < floorData.floors.length; t++) {
     addSubBox(`floor_t${tier.tier}_${Math.round(section.x)}_${Math.round(section.z)}`,
       section.x, tier.tier * config.tierHeight, section.z,
       section.w, config.slabThickness, section.d, getUV(texIdx));
+    // Add exposed edges
+    addFloorEdges(section, tier.tier * config.tierHeight, config.slabThickness, tier.sections, getUV(texIdx));
   }
 }
 
-// Export walls
+// Helper: check if a wall segment's side edge is covered by an adjacent wall segment
+function wallEdgeCovered(wall, side, allWalls) {
+  const margin = 0.1;
+  for (const other of allWalls) {
+    if (other === wall) continue;
+    if (wall.axis !== other.axis) continue;
+    if (Math.abs(wall.baseY - other.baseY) > 0.5) continue;
+    if (Math.abs(wall.height - other.height) > 0.5) continue;
+
+    const wLen = wall.axis === 'x' ? wall.length : wall.length;
+    const wx0 = wall.axis === 'x' ? wall.x : wall.z;
+    const wx1 = wx0 + wall.length;
+    const ox0 = wall.axis === 'x' ? other.x : other.z;
+    const ox1 = ox0 + other.length;
+
+    if (side === 'start' && Math.abs(ox1 - wx0) < margin) return true;
+    if (side === 'end' && Math.abs(wx1 - ox0) < margin) return true;
+  }
+  return false;
+}
+
+// Export walls with edge faces
 for (let i = 0; i < wallData.walls.length; i++) {
   const wall = wallData.walls[i];
   const bi = findBuildingForWall(wall);
@@ -470,6 +551,47 @@ for (let i = 0; i < wallData.walls.length; i++) {
   const wx = wall.axis === 'x' ? wall.length : wall.thickness;
   const wz = wall.axis === 'z' ? wall.length : wall.thickness;
   addSubBox(`wall_${i}`, wall.x, wall.baseY, wall.z, wx, wall.height, wz, getUV(texIdx));
+
+  // Wall edges: top always visible, sides if not adjacent to another wall segment
+  const uvc = getUV(texIdx);
+  const cu = ((uvc.uMin + uvc.uMax) / 2).toFixed(6);
+  const cv = ((uvc.vMin + uvc.vMax) / 2).toFixed(6);
+
+  function addWallEdge(v0, v1, v2, v3, nx, ny, nz) {
+    const vo = vertOff;
+    for (const v of [v0,v1,v2,v3]) objLines.push(`v ${v[0].toFixed(6)} ${v[1].toFixed(6)} ${v[2].toFixed(6)}`);
+    for (let j = 0; j < 4; j++) objLines.push(`vt ${cu} ${cv}`);
+    objLines.push(`vn ${nx} ${ny} ${nz}`);
+    objLines.push(`vn ${-nx} ${-ny} ${-nz}`);
+    const uo = uvOff, no = normOff;
+    objLines.push(`f ${vo}/${uo}/${no} ${vo+1}/${uo+1}/${no} ${vo+2}/${uo+2}/${no}`);
+    objLines.push(`f ${vo}/${uo}/${no} ${vo+2}/${uo+2}/${no} ${vo+3}/${uo+3}/${no}`);
+    objLines.push(`f ${vo+2}/${uo+2}/${no+1} ${vo+1}/${uo+1}/${no+1} ${vo}/${uo}/${no+1}`);
+    objLines.push(`f ${vo+3}/${uo+3}/${no+1} ${vo+2}/${uo+2}/${no+1} ${vo}/${uo}/${no+1}`);
+    vertOff += 4; uvOff += 4; normOff += 2;
+  }
+
+  const x0 = wall.x, z0 = wall.z;
+  const x1 = x0 + wx, z1 = z0 + wz;
+  const y0 = wall.baseY, y1 = y0 + wall.height;
+
+  // Top edge (always visible)
+  addWallEdge([x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1], 0,1,0);
+  // Bottom edge (always visible)
+  addWallEdge([x0,y0,z1],[x1,y0,z1],[x1,y0,z0],[x0,y0,z0], 0,-1,0);
+
+  // Side edges (only if no adjacent wall segment)
+  if (wall.axis === 'x') {
+    if (!wallEdgeCovered(wall, 'start', wallData.walls))
+      addWallEdge([x0,y0,z1],[x0,y0,z0],[x0,y1,z0],[x0,y1,z1], -1,0,0);
+    if (!wallEdgeCovered(wall, 'end', wallData.walls))
+      addWallEdge([x1,y0,z0],[x1,y0,z1],[x1,y1,z1],[x1,y1,z0], 1,0,0);
+  } else {
+    if (!wallEdgeCovered(wall, 'start', wallData.walls))
+      addWallEdge([x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0], 0,0,-1);
+    if (!wallEdgeCovered(wall, 'end', wallData.walls))
+      addWallEdge([x1,y0,z1],[x0,y0,z1],[x0,y1,z1],[x1,y1,z1], 0,0,1);
+  }
 }
 
 // Export walkways
