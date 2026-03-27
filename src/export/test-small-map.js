@@ -10,12 +10,10 @@ import { readFileSync, writeFileSync, readdirSync, existsSync } from 'fs';
 import { PNG } from 'pngjs';
 import { createRng } from '../core/rng.js';
 import { generateGrid } from '../generators/grid.js';
+import { generateBuildings } from '../generators/buildings.js';
 import { generateFloors } from '../generators/floors.js';
 import { generateWalls } from '../generators/walls.js';
 import { BUILDING, GEOMETRY } from '../config.js';
-
-const FOOTPRINTS = BUILDING.footprints;
-const HEIGHTS = BUILDING.heights;
 
 const SEG_SIZE = 3;
 const SEGS_PER_TILE = 4;
@@ -23,8 +21,8 @@ const TILE_SIZE = 256;
 
 const config = {
   seed: 42,
-  mapWidth: 36,
-  mapDepth: 36,
+  mapWidth: 48,
+  mapDepth: 48,
   tiers: 3,
   tierHeight: 3,
   slabThickness: 0.5,
@@ -39,34 +37,12 @@ const rng = createRng(config.seed);
 const gridData = generateGrid(config, rng);
 console.log(`Grid: ${gridData.blocks.length} blocks`);
 
-// Step 2: Place small buildings only (grid-based, no large)
-const buildings = [];
-const avgSize = (FOOTPRINTS.small.min + FOOTPRINTS.small.max) / 2;
-const minCellSize = avgSize * BUILDING.cellSizeMultiplier;
-const cols = Math.floor(config.mapWidth / minCellSize);
-const rows = Math.floor(config.mapDepth / minCellSize);
-const cellW = config.mapWidth / cols;
-const cellD = config.mapDepth / rows;
-
-for (let row = 0; row < rows; row++) {
-  for (let col = 0; col < cols; col++) {
-    const cellX = col * cellW;
-    const cellZ = row * cellD;
-    const w = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
-    const d = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
-    const x = cellX + (cellW - w) / 2;
-    const z = cellZ + (cellD - d) / 2;
-    const heightKey = rng.pick(['short', 'medium', 'tall']);
-    const height = HEIGHTS[heightKey];
-    const maxTier = rng.int(Math.min(height.tierMin, config.tiers), Math.min(height.tierMax, config.tiers));
-    buildings.push({ x, z, w, d, maxTier, size: 'small', height: heightKey, blockIndex: 0 });
-  }
-}
-
-console.log(`Buildings: ${buildings.length}`);
+// Step 2: Place buildings (real pipeline — small grid + large layouts + deletions)
+const buildingData = generateBuildings(gridData, config, rng);
+const buildings = buildingData.buildings;
+console.log(`Buildings: ${buildings.length} (S:${buildings.filter(b=>b.size==='small').length} M:${buildings.filter(b=>b.size==='medium').length} L:${buildings.filter(b=>b.size==='large').length})`);
 
 // Step 3: Generate floors
-const buildingData = { ...gridData, buildings };
 const floorData = generateFloors(buildingData, config, rng);
 console.log(`Floors: ${floorData.floors.map(f => 't' + f.tier + ':' + f.sections.length).join(', ')}`);
 
@@ -85,6 +61,7 @@ function loadTex(category) {
 }
 
 const wallTextures = loadTex('walls') || [];
+const landmarkTextures = loadTex('landmark_walls') || [];
 const floorTextures = loadTex('floors') || [];
 const baseTextures = loadTex('base_map') || [];
 
@@ -103,13 +80,17 @@ function addTexture(name, png) {
 // Add base map texture
 const baseIdx = addTexture('base', baseTextures[0] || wallTextures[0]);
 
-// Per-building texture indices
+// Per-building texture indices — landmark buildings use different wall textures
 const buildingWallIdx = [];
 const buildingFloorIdx = [];
 for (let bi = 0; bi < buildings.length; bi++) {
-  const wTex = wallTextures[bi % wallTextures.length];
+  const b = buildings[bi];
+  const isLandmark = b.size === 'medium' || b.size === 'large';
+  const wPool = isLandmark ? landmarkTextures : wallTextures;
+  const wTex = wPool[bi % wPool.length];
   const fTex = floorTextures[bi % floorTextures.length];
-  buildingWallIdx.push(addTexture(`wall_${bi % wallTextures.length}`, wTex));
+  const prefix = isLandmark ? 'landmark' : 'wall';
+  buildingWallIdx.push(addTexture(`${prefix}_${bi % wPool.length}`, wTex));
   buildingFloorIdx.push(addTexture(`floor_${bi % floorTextures.length}`, fTex));
 }
 
