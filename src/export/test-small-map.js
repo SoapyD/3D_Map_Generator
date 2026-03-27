@@ -528,21 +528,32 @@ for (let t = 1; t < floorData.floors.length; t++) {
 
 // Helper: check if a wall segment's side edge is covered by an adjacent wall segment
 function wallEdgeCovered(wall, side, allWalls) {
-  const margin = 0.1;
+  const margin = 0.5;
+  const wx = wall.axis === 'x' ? wall.length : wall.thickness;
+  const wz = wall.axis === 'z' ? wall.length : wall.thickness;
+
+  // The edge position we're checking
+  let edgeX, edgeZ;
+  if (wall.axis === 'x') {
+    edgeX = side === 'start' ? wall.x : wall.x + wx;
+    edgeZ = wall.z;
+  } else {
+    edgeX = wall.x;
+    edgeZ = side === 'start' ? wall.z : wall.z + wz;
+  }
+
   for (const other of allWalls) {
     if (other === wall) continue;
-    if (wall.axis !== other.axis) continue;
     if (Math.abs(wall.baseY - other.baseY) > 0.5) continue;
-    if (Math.abs(wall.height - other.height) > 0.5) continue;
 
-    const wLen = wall.axis === 'x' ? wall.length : wall.length;
-    const wx0 = wall.axis === 'x' ? wall.x : wall.z;
-    const wx1 = wx0 + wall.length;
-    const ox0 = wall.axis === 'x' ? other.x : other.z;
-    const ox1 = ox0 + other.length;
+    const ox = other.axis === 'x' ? other.length : other.thickness;
+    const oz = other.axis === 'z' ? other.length : other.thickness;
 
-    if (side === 'start' && Math.abs(ox1 - wx0) < margin) return true;
-    if (side === 'end' && Math.abs(wx1 - ox0) < margin) return true;
+    // Check if the other wall touches our edge point
+    if (edgeX >= other.x - margin && edgeX <= other.x + ox + margin &&
+        edgeZ >= other.z - margin && edgeZ <= other.z + oz + margin) {
+      return true;
+    }
   }
   return false;
 }
