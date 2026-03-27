@@ -111,6 +111,10 @@ for (let bi = 0; bi < buildings.length; bi++) {
 // Add walkway texture
 const walkwayIdx = addTexture('walkway_0', walkwayTextures[0]);
 
+// Add ladder texture
+const ladderTextures = loadTex('ladders') || wallTextures;
+const ladderIdx = addTexture('ladder_0', ladderTextures[0]);
+
 // Add object textures
 const objectIdx = addTexture('object_0', objectTextures.length > 0 ? objectTextures[0] : wallTextures[0]);
 
@@ -617,6 +621,50 @@ for (let i = 0; i < coverData.deletedFootprints.length; i++) {
   const df = coverData.deletedFootprints[i];
   addSubBox(`deleted_${i}`, df.x, 0.55, df.z, df.w, 0.1, df.d, getUV(courtyardIdx), true);
 }
+
+// Export ladders (all types) as simple boxes with edges
+const conn = connData.connections;
+
+// Yellow ladders (walkway-wall)
+for (let i = 0; i < conn.ladders.length; i++) {
+  const l = conn.ladders[i];
+  const h = l.y1 - l.y0;
+  if (h <= 0) continue;
+  addSubBox(`ladder_${i}`, l.x, l.y0, l.z, l.w, h, l.d, getUV(ladderIdx), true);
+}
+
+// Red ladders (ground)
+for (let i = 0; i < conn.groundLadders.length; i++) {
+  const l = conn.groundLadders[i];
+  const h = l.y1 - l.y0;
+  if (h <= 0) continue;
+  addSubBox(`ground_ladder_${i}`, l.x, l.y0, l.z, l.w, h, l.d, getUV(ladderIdx), true);
+}
+
+// Orange ladders
+for (let i = 0; i < conn.orangeLadders.length; i++) {
+  const l = conn.orangeLadders[i];
+  if (l.bad) continue;
+  const h = l.y1 - l.y0;
+  if (h <= 0) continue;
+  addSubBox(`orange_ladder_${i}`, l.x, l.y0, l.z, l.w, h, l.d, getUV(ladderIdx), true);
+}
+
+// Cyan ladders (interior)
+for (let i = 0; i < conn.interiorLadders.length; i++) {
+  const l = conn.interiorLadders[i];
+  const h = l.y1 - l.y0;
+  if (h <= 0) continue;
+  addSubBox(`interior_ladder_${i}`, l.x, l.y0, l.z, l.w, h, l.d, getUV(ladderIdx), true);
+}
+
+// Ladder platforms
+for (let i = 0; i < conn.ladderPlatforms.length; i++) {
+  const p = conn.ladderPlatforms[i];
+  addSubBox(`ladder_platform_${i}`, p.x, p.y, p.z, p.w, 0.2, p.d, getUV(walkwayIdx), true);
+}
+
+console.log(`Ladders: Y:${conn.ladders.length} R:${conn.groundLadders.length} O:${conn.orangeLadders.filter(l=>!l.bad).length} C:${conn.interiorLadders.length} Platforms:${conn.ladderPlatforms.length}`);
 
 writeFileSync('output/test_smallmap.obj', objLines.join('\n'));
 
