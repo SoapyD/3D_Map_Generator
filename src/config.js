@@ -1,7 +1,8 @@
 /**
- * Default configuration and CLI argument parsing.
+ * Centralised configuration — all tuneable parameters in one place.
  */
 
+// --- CLI defaults ---
 const DEFAULTS = {
   seed: Math.floor(Math.random() * 100000),
   mapWidth: 48,       // inches
@@ -16,9 +17,141 @@ const DEFAULTS = {
   textureSet: 'base',
   preview: false,
   debug: false,
+  obj: false,
   outputDir: 'output',
 };
 
+// --- Buildings ---
+export const BUILDING = {
+  footprints: {
+    small:  { min: 4, max: 7 },
+    medium: { min: 7, max: 12 },
+    large:  { min: 11, max: 18 },
+  },
+  heights: {
+    short:  { tierMin: 2, tierMax: 2 },
+    medium: { tierMin: 2, tierMax: 3 },
+    tall:   { tierMin: 3, tierMax: 4 },
+  },
+  gap: 0.5,                // minimum gap between buildings (inches)
+  cellSizeMultiplier: 1.5,// grid cell = avg small footprint × this
+  deleteRatio: 0.20,       // fraction of small buildings randomly deleted
+};
+
+// --- Walls ---
+export const WALL = {
+  quadSize: 1.5,           // inches per wall quadrant column
+  upperRemovalRatio: 0.7,  // max fraction of upper row removed
+  lowerRemovalRatio: 0.5,  // max fraction of lower row removed
+};
+
+// --- Floors ---
+export const FLOOR = {
+  minWalkable: 2,          // minimum walkable area dimension (inches)
+  maxTier0Floors: 2,       // max floors at removal tier 0 (fully intact)
+  tier1EscalateChance: 0.5,
+  tier2EscalateChance: 0.6,
+  tier3EscalateChance: 0.5,
+};
+
+// --- Connectivity ---
+export const CONNECTIVITY = {
+  walkwayWidth: 2.0,       // inches
+  walkwayThickness: 0.3,   // inches
+  ladderWidth: 1.0,        // inches (half walkway width)
+  ladderDepth: 0.5,        // inches
+  ladderWallOffset: 0.3,   // offset from wall to prevent clashing
+  maxWalkwayLength: 15,    // inches
+  minWalkwayLength: 3,     // inches
+  walkwayKeepRatio: 0.6,   // fraction of walkways kept per tier
+  ladderCullRatio: 0.6,    // fraction of red/orange ladders kept
+  proximity: 3,            // minimum distance between same-type connectors
+  mapBoundaryMargin: 2,    // keep ladders away from map edge (inches)
+  // Orange ladder spawn chances per tier
+  orangeSpawnChance: { ground: 0.10, tier1: 0.20, tier2Plus: 0.30 },
+  orangeMinSpan: 2,        // minimum tiers an orange ladder must span
+  // Ground ladder wall check margin
+  wallCheckMargin: 0.3,
+  // Cyan (interior) ladder cull ratio
+  cyanLadderCullRatio: 0.4,
+  // Distance for ladder-top near walkway check
+  ladderTopWalkwayDist: 2,
+};
+
+// --- Cover ---
+export const COVER = {
+  thin: 1.5,               // standard cover dimension (inches)
+  types: [
+    { height: 1.5, chance: 0.8 },  // low wall
+    { height: 3.0, chance: 0.1 },  // pillar
+    { height: 6.0, chance: 0.1 },  // tall pillar
+  ],
+  maxTall: 3,              // max tall objects total
+  rooftopChance: 0.5,      // chance per rooftop quadrant
+  maxHeightUnderBuilding: 3.0, // cap for cover under big buildings
+  // 3" pillar roof: 'none' | 'dome' | 'spire'
+  roof3Chances: { none: 0.33, dome: 0.33, spire: 0.34 },
+  // 6" pillar roof: 'dome' | 'spire' (always has one)
+  roof6Chances: { dome: 0.5, spire: 0.5 },
+  // 6" pillar decoration: 'none' | 'skirt' | 'cube'
+  deco6Chances: { none: 0.33, skirt: 0.33, cube: 0.34 },
+  // Interior cover
+  interiorMaxMedium: 1,    // max objects per mid-floor for medium buildings
+  interiorMaxLarge: 3,     // max objects per mid-floor for large buildings
+};
+
+// --- Geometry ---
+export const GEOMETRY = {
+  tileSize: 3,             // inches per texture repeat
+};
+
+// --- Ladder Display ---
+export const LADDER_DISPLAY = {
+  showBoxLadders: false,     // show the original box ladders (debug)
+  showMeshLadders: true,     // show the detailed ladder meshes (poles + rungs)
+  poleRadius: 0.1,           // radius of ladder poles (inches)
+  rungRadius: 0.08,          // radius of rungs
+  rungSpacing: 0.75,         // inches between rungs
+  rungInset: 0.1,            // how far rungs sit inside the poles
+};
+
+// --- Deletion Toggles ---
+// Set any to false to disable that deletion rule (useful for debugging)
+export const DELETIONS = {
+  // Buildings
+  buildingRandomCull: true,        // delete 15% of small buildings randomly
+  buildingDisplaceByLarge: true,   // delete small buildings overlapping large ones
+
+  // Walkways
+  walkwayWallCollision: true,      // drop walkways that hit walls on their tier
+  walkwayBothEndsCheck: true,      // drop walkways where one end has no floor
+  walkwayIntersectionStrip: true,  // drop walkways that overlap other walkways
+  walkwayKeepRatioCull: true,      // cull walkways to keepRatio per tier
+  walkwayProximityCull: true,      // drop walkways too close to other walkways
+
+  // Yellow ladders (walkway-wall ladders)
+  yellowLadderProximityCull: true, // drop yellow ladders too close to red/orange
+
+  // Red ladders (ground)
+  redLadderWalkwayOverlap: true,   // drop red ladders touching walkways
+  redLadderCull: true,             // cull red ladders to ladderCullRatio
+  redLadderProximityCull: true,    // drop red ladders too close to red/orange
+
+  // Orange ladders (free-standing)
+  orangeLadderWalkwayOverlap: true,// drop orange ladders touching walkways
+  orangeLadderRedOverlap: true,    // drop orange ladders touching red ladders
+  orangeLadderCull: true,          // cull orange ladders to ladderCullRatio
+  orangeLadderProximityCull: true, // drop orange ladders too close to other orange
+
+  // Cyan ladders (interior)
+  cyanLadderCull: true,            // cull cyan ladders to cyanLadderCullRatio
+  cyanLadderProximityCull: true,   // drop cyan ladders too close to other cyan
+  cyanLadderOrangeOverlap: true,   // drop cyan ladders touching orange ladders
+  cyanLadderTopNearWalkway: true,  // drop cyan ladders whose top is near a walkway
+  orangeLadderTopNearWalkway: true,// drop orange ladders whose top is near a walkway
+};
+
+// --- CLI parser ---
 export function parseArgs(argv) {
   const config = { ...DEFAULTS };
 
@@ -32,6 +165,11 @@ export function parseArgs(argv) {
 
     if (arg === '--debug') {
       config.debug = true;
+      continue;
+    }
+
+    if (arg === '--obj') {
+      config.obj = true;
       continue;
     }
 

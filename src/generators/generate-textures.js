@@ -89,10 +89,10 @@ writeSolidPng('objects', 'stone_block_dark', 89, 77, 64);
 writeSolidPng('objects', 'stone_block_grey', 102, 97, 89);
 
 console.log('Ladders:');
-writeLadderPng('ladders', 'dark_wood', 89, 64, 38, 65, 45, 25);
-writeLadderPng('ladders', 'medium_wood', 102, 77, 46, 75, 55, 30);
-writeLadderPng('ladders', 'aged_wood', 77, 56, 36, 55, 40, 22);
-writeLadderPng('ladders', 'warm_wood', 97, 71, 43, 72, 50, 28);
+writeSolidPng('ladders', 'dark_wood', 89, 64, 38);
+writeSolidPng('ladders', 'medium_wood', 102, 77, 46);
+writeSolidPng('ladders', 'aged_wood', 77, 56, 36);
+writeSolidPng('ladders', 'warm_wood', 97, 71, 43);
 
 console.log('Walkways:');
 writeSolidPng('walkways', 'dark_plank', 77, 56, 38);
@@ -108,5 +108,11 @@ console.log('Base Map:');
 writeSolidPng('base_map', 'stone', 89, 84, 77);
 writeSolidPng('base_map', 'mud', 77, 64, 46);
 writeSolidPng('base_map', 'rubble', 97, 92, 87);
+
+console.log('Domes:');
+writeSolidPng('domes', 'rusty_red', 102, 51, 36);
+writeSolidPng('domes', 'dark_rust', 82, 41, 28);
+writeSolidPng('domes', 'oxidised_copper', 56, 77, 64);
+writeSolidPng('domes', 'dark_bronze', 71, 56, 36);
 
 console.log('\nDone!');

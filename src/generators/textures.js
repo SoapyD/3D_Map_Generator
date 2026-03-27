@@ -18,11 +18,12 @@
 
 import * as THREE from 'three';
 import { readFileSync, readdirSync, existsSync } from 'fs';
+import { PNG } from 'pngjs';
 import path from 'path';
 
 const CATEGORIES = [
-  'walls', 'landmark_walls', 'floors', 'objects',
-  'ladders', 'walkways', 'courtyards', 'base_map',
+  'walls', 'landmark_walls', 'floors', 'objects', 'objects_medium', 'objects_tall',
+  'ladders', 'walkways', 'courtyards', 'base_map', 'domes',
 ];
 
 /**
@@ -38,7 +39,22 @@ export function buildTexturePools(packName = 'base') {
       const files = readdirSync(catDir).filter((f) => f.endsWith('.png')).sort();
       pools[cat] = files.map((f) => {
         const pngBuffer = readFileSync(path.join(catDir, f));
-        const mat = new THREE.MeshStandardMaterial({ roughness: 0.85 });
+        // Check if PNG has transparency
+        let avgAlpha = 1.0;
+        try {
+          const png = PNG.sync.read(pngBuffer);
+          let totalAlpha = 0;
+          for (let i = 0; i < png.width * png.height; i++) {
+            totalAlpha += png.data[i * 4 + 3];
+          }
+          avgAlpha = totalAlpha / (png.width * png.height * 255);
+        } catch (e) {}
+        const hasAlpha = avgAlpha < 0.99;
+        const mat = new THREE.MeshStandardMaterial({
+          roughness: 0.85,
+          transparent: hasAlpha,
+          opacity: hasAlpha ? avgAlpha : 1.0,
+        });
         mat._pngBuffer = pngBuffer;
         return mat;
       });

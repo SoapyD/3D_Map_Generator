@@ -18,9 +18,11 @@
  *   3: south, east
  */
 
-const WALL_QUAD_SIZE = 1.5;
-const UPPER_REMOVAL_RATIO = 0.7;
-const LOWER_REMOVAL_RATIO = 0.5;
+import { WALL } from '../config.js';
+
+const WALL_QUAD_SIZE = WALL.quadSize;
+const UPPER_REMOVAL_RATIO = WALL.upperRemovalRatio;
+const LOWER_REMOVAL_RATIO = WALL.lowerRemovalRatio;
 
 export function generateWalls(data, config, rng) {
   const { tierHeight, wallThickness, slabThickness } = config;

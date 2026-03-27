@@ -10,14 +10,10 @@
  * - Long: random width (2-4") × 1.5" tall × 1.5" deep
  */
 
-const COVER_THIN = 1.5;
+import { COVER } from '../config.js';
 
-// Cover types: { height, spawnChance }
-const COVER_TYPES = [
-  { height: 1.5, chance: 0.8 },  // low wall
-  { height: 3.0, chance: 0.1 },  // pillar
-  { height: 6.0, chance: 0.1 },  // tall pillar
-];
+const COVER_THIN = COVER.thin;
+const COVER_TYPES = COVER.types;
 
 export function generateCover(data, config, rng) {
   const { tierHeight, slabThickness } = config;
@@ -25,7 +21,7 @@ export function generateCover(data, config, rng) {
 
   // Track tall cover counts (max 3 total across both types)
   let tallTotal = 0;
-  const MAX_TALL = 3;
+  const MAX_TALL = COVER.maxTall;
 
   // Rooftop cover: place on each top-tier quadrant with a chance
   for (let bi = 0; bi < data.buildings.length; bi++) {
@@ -41,7 +37,7 @@ export function generateCover(data, config, rng) {
 
     for (const q of present) {
       // 50% chance per quadrant
-      if (!rng.chance(0.5)) continue;
+      if (!rng.chance(COVER.rooftopChance)) continue;
 
       const qr = {
         0: { x: b.x, z: b.z, w: b.w / 2, d: b.d / 2 },
@@ -76,18 +72,21 @@ export function generateCover(data, config, rng) {
     const b = data.buildings[bi];
     if (b.size !== 'medium' && b.size !== 'large') continue;
     const bq = data.buildingQuadrants[bi];
-    const maxObjects = b.size === 'large' ? 2 : 1;
+    const maxObjects = b.size === 'large' ? COVER.interiorMaxLarge : COVER.interiorMaxMedium;
 
     const mx = b.x + b.w / 2;
     const mz = b.z + b.d / 2;
 
-    for (let tier = 2; tier < b.maxTier; tier++) {
+    for (let tier = 1; tier < b.maxTier; tier++) {
       const present = bq.tiers[tier];
       if (!present) continue;
 
       const y = tier * tierHeight + slabThickness;
-      // Bias toward placing objects — roll twice and take the higher value
-      const count = Math.max(rng.int(0, maxObjects), rng.int(0, maxObjects));
+      // Large: 2-3, Medium: biased 0-1 (roll twice, take higher)
+      const minObjects = b.size === 'large' ? 2 : 0;
+      const count = b.size === 'large'
+        ? rng.int(minObjects, maxObjects)
+        : Math.max(rng.int(0, maxObjects), rng.int(0, maxObjects));
 
       for (let i = 0; i < count; i++) {
         // Pick a random present quadrant
@@ -108,6 +107,18 @@ export function generateCover(data, config, rng) {
         const px = rng.float(qr.x + 0.25, qr.x + qr.w - w - 0.25);
         const pz = rng.float(qr.z + 0.25, qr.z + qr.d - d - 0.25);
 
+        // Check doesn't overlap existing interior cover on same tier
+        let overlaps = false;
+        for (const existing of interiorCover) {
+          if (Math.abs(existing.y - y) > 1) continue;
+          if (px < existing.x + existing.w && px + w > existing.x &&
+              pz < existing.z + existing.d && pz + d > existing.z) {
+            overlaps = true;
+            break;
+          }
+        }
+        if (overlaps) continue;
+
         interiorCover.push({ x: px, z: pz, w, d, height: COVER_THIN, y, interior: true });
       }
     }
@@ -124,11 +135,11 @@ export function generateCover(data, config, rng) {
       db.x < b.x + b.w && db.x + db.w > b.x &&
       db.z < b.z + b.d && db.z + db.d > b.z
     );
-    const maxHeight = underBigBuilding ? 3.0 : Infinity;
+    const maxHeight = underBigBuilding ? COVER.maxHeightUnderBuilding : Infinity;
 
     const count = rng.int(1, 3);
     for (let i = 0; i < count; i++) {
-      const piece = makeCoverPiece(db, 0, rng);
+      const piece = makeCoverPiece(db, slabThickness, rng);
       if (!piece) continue;
       // Cap height if under a big building
       if (piece.height > maxHeight) piece.height = maxHeight;
@@ -153,7 +164,7 @@ export function generateCover(data, config, rng) {
 
   // Replace 1 random ground cover piece (not under a building) with a tall object
   const groundNotUnder = cover.filter((c) => {
-    if (c.y !== 0 || c.height > 1.5) return false;
+    if (c.y > slabThickness + 0.1 || c.height > 1.5) return false;
     return !data.buildings.some((b) =>
       b.size !== 'small' &&
       c.x < b.x + b.w && c.x + c.w > b.x &&
@@ -167,12 +178,37 @@ export function generateCover(data, config, rng) {
     pick.d = COVER_THIN;
   }
 
+  // Remove ground-level cover that intersects visible building walls
+  const filteredCover = cover.filter((c) => {
+    if (c.y > slabThickness + 0.1) return true; // only check ground level
+    for (const wall of data.walls) {
+      const wallX1 = wall.axis === 'x' ? wall.x + wall.length : wall.x + wall.thickness;
+      const wallZ1 = wall.axis === 'z' ? wall.z + wall.length : wall.z + wall.thickness;
+      if (c.x < wallX1 && c.x + c.w > wall.x &&
+          c.z < wallZ1 && c.z + c.d > wall.z) {
+        return false;
+      }
+    }
+    return true;
+  });
+
   // Debug: generate pink footprints for deleted building positions
+  // Remove any that intersect visible building walls
   const deletedFootprints = deleted.map((db, i) => ({
     x: db.x, z: db.z, w: db.w, d: db.d, index: i,
-  }));
+  })).filter((fp) => {
+    for (const wall of data.walls) {
+      const wallX1 = wall.axis === 'x' ? wall.x + wall.length : wall.x + wall.thickness;
+      const wallZ1 = wall.axis === 'z' ? wall.z + wall.length : wall.z + wall.thickness;
+      if (fp.x < wallX1 && fp.x + fp.w > wall.x &&
+          fp.z < wallZ1 && fp.z + fp.d > wall.z) {
+        return false;
+      }
+    }
+    return true;
+  });
 
-  return { ...data, cover, interiorCover, deletedFootprints };
+  return { ...data, cover: filteredCover, interiorCover, deletedFootprints };
 }
 
 /**

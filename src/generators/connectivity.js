@@ -19,11 +19,11 @@
  * Output: { ...data, connections: { ladders: [], walkways: [], ramps: [] } }
  */
 
-const LADDER_WIDTH = 1.0;   // inches
-const LADDER_DEPTH = 0.5;   // inches
-const WALKWAY_WIDTH = 2.0;  // inches
-const WALKWAY_THICKNESS = 0.3;
-const RAMP_WIDTH = 2.5;     // inches
+import { CONNECTIVITY, DELETIONS } from '../config.js';
+
+const LADDER_WIDTH = CONNECTIVITY.ladderWidth;
+const LADDER_DEPTH = CONNECTIVITY.ladderDepth;
+const WALKWAY_WIDTH = CONNECTIVITY.walkwayWidth;
 const RAMP_DEPTH = 4.0;     // length of the ramp along ground
 const RAMP_THICKNESS = 0.3;
 
@@ -72,13 +72,21 @@ export function generateConnectivity(data, config, rng) {
       for (const q of present) {
         const srcRect = getQuadrantRect(building, q);
 
-        // Try connecting from each of the quadrant's 4 edges
-        const edges = [
-          { side: 'north', x: srcRect.x + srcRect.w / 2, z: srcRect.z },
-          { side: 'south', x: srcRect.x + srcRect.w / 2, z: srcRect.z + srcRect.d },
-          { side: 'west',  x: srcRect.x, z: srcRect.z + srcRect.d / 2 },
-          { side: 'east',  x: srcRect.x + srcRect.w, z: srcRect.z + srcRect.d / 2 },
-        ];
+        // Only external edges — skip edges shared with another present quadrant
+        const neighborN = (q === 2) ? 0 : (q === 3) ? 1 : -1;
+        const neighborS = (q === 0) ? 2 : (q === 1) ? 3 : -1;
+        const neighborW = (q === 1) ? 0 : (q === 3) ? 2 : -1;
+        const neighborE = (q === 0) ? 1 : (q === 2) ? 3 : -1;
+
+        const edges = [];
+        if (neighborN < 0 || !present.has(neighborN))
+          edges.push({ side: 'north', x: srcRect.x + srcRect.w / 2, z: srcRect.z });
+        if (neighborS < 0 || !present.has(neighborS))
+          edges.push({ side: 'south', x: srcRect.x + srcRect.w / 2, z: srcRect.z + srcRect.d });
+        if (neighborW < 0 || !present.has(neighborW))
+          edges.push({ side: 'west', x: srcRect.x, z: srcRect.z + srcRect.d / 2 });
+        if (neighborE < 0 || !present.has(neighborE))
+          edges.push({ side: 'east', x: srcRect.x + srcRect.w, z: srcRect.z + srcRect.d / 2 });
 
         for (const edge of edges) {
           // Find nearest floor section in a different building to this edge point
@@ -121,7 +129,7 @@ export function generateConnectivity(data, config, rng) {
             const ge = edge.side === 'east' ? tgtRect.x : srcRect.x;
             if (ge <= gs) continue; // target overlaps or is behind us
             const len = ge - gs;
-            if (len < 3 || len > 15) continue;
+            if (len < CONNECTIVITY.minWalkwayLength || len > CONNECTIVITY.maxWalkwayLength) continue;
 
             // Z position: middle of source edge, clamped to target's Z range
             const clampedZ = Math.max(tgtRect.z + WALKWAY_WIDTH / 2, Math.min(edge.z, tgtRect.z + tgtRect.d - WALKWAY_WIDTH / 2));
@@ -132,7 +140,7 @@ export function generateConnectivity(data, config, rng) {
             const ge = edge.side === 'south' ? tgtRect.z : srcRect.z;
             if (ge <= gs) continue;
             const len = ge - gs;
-            if (len < 3 || len > 15) continue;
+            if (len < CONNECTIVITY.minWalkwayLength || len > CONNECTIVITY.maxWalkwayLength) continue;
 
             // X position: middle of source edge, clamped to target's X range
             const clampedX = Math.max(tgtRect.x + WALKWAY_WIDTH / 2, Math.min(edge.x, tgtRect.x + tgtRect.w - WALKWAY_WIDTH / 2));
@@ -154,7 +162,7 @@ export function generateConnectivity(data, config, rng) {
               break;
             }
           }
-          if (hitsWall) {
+          if (DELETIONS.walkwayWallCollision && hitsWall) {
             walkway.blocked = true;
           }
 
@@ -169,7 +177,7 @@ export function generateConnectivity(data, config, rng) {
               if (Math.abs(s.z - (walkway.z + walkway.d)) < 0.5 && walkway.x + walkway.w > s.x && walkway.x < s.x + s.w) endTouches = true;
             }
           }
-          if (!startTouches || !endTouches) continue;
+          if (DELETIONS.walkwayBothEndsCheck && (!startTouches || !endTouches)) continue;
 
           walkways.push(walkway);
         }
@@ -180,30 +188,40 @@ export function generateConnectivity(data, config, rng) {
   // Strip intersecting walkways: loop through, if current walkway intersects
   // another, mark the other for dropping. Skip intersection checks against
   // walkways already marked for dropping.
-  const toDrop = new Set();
-  for (let i = 0; i < walkways.length; i++) {
-    if (toDrop.has(i)) continue;
-    for (let j = i + 1; j < walkways.length; j++) {
-      if (toDrop.has(j)) continue;
-      if (walkwaysIntersect(walkways[i], walkways[j])) {
-        toDrop.add(j);
+  let filteredWalkways;
+  if (DELETIONS.walkwayIntersectionStrip) {
+    const toDrop = new Set();
+    for (let i = 0; i < walkways.length; i++) {
+      if (toDrop.has(i)) continue;
+      for (let j = i + 1; j < walkways.length; j++) {
+        if (toDrop.has(j)) continue;
+        if (walkwaysIntersect(walkways[i], walkways[j])) {
+          toDrop.add(j);
+        }
       }
     }
+    filteredWalkways = walkways.filter((_, i) => !toDrop.has(i));
+  } else {
+    filteredWalkways = walkways;
   }
-  const filteredWalkways = walkways.filter((_, i) => !toDrop.has(i));
 
-  // Keep only 20% of walkways per tier
-  const byTier = new Map();
-  for (const w of filteredWalkways) {
-    const t = Math.round(w.y / tierHeight);
-    if (!byTier.has(t)) byTier.set(t, []);
-    byTier.get(t).push(w);
-  }
-  const culledWalkways = [];
-  for (const [, tierWalkways] of byTier) {
-    rng.shuffle(tierWalkways);
-    const keep = Math.max(1, Math.ceil(tierWalkways.length * 0.3));
-    culledWalkways.push(...tierWalkways.slice(0, keep));
+  // Keep ratio cull per tier
+  let culledWalkways;
+  if (DELETIONS.walkwayKeepRatioCull) {
+    const byTier = new Map();
+    for (const w of filteredWalkways) {
+      const t = Math.round(w.y / tierHeight);
+      if (!byTier.has(t)) byTier.set(t, []);
+      byTier.get(t).push(w);
+    }
+    culledWalkways = [];
+    for (const [, tierWalkways] of byTier) {
+      rng.shuffle(tierWalkways);
+      const keep = Math.max(1, Math.ceil(tierWalkways.length * CONNECTIVITY.walkwayKeepRatio));
+      culledWalkways.push(...tierWalkways.slice(0, keep));
+    }
+  } else {
+    culledWalkways = filteredWalkways;
   }
 
   // For blocked walkways, place a ladder on the side(s) that touch a wall.
@@ -211,7 +229,8 @@ export function generateConnectivity(data, config, rng) {
   const LADDER_WIDTH = 1.0;
   const LADDER_DEPTH = 0.5;
 
-  for (const w of culledWalkways) {
+  for (let wi = 0; wi < culledWalkways.length; wi++) {
+    const w = culledWalkways[wi];
     if (!w.blocked) continue;
 
     const tier = Math.round(w.y / tierHeight);
@@ -283,12 +302,26 @@ export function generateConnectivity(data, config, rng) {
         else break;
       }
 
+      // Trim to highest tier that has a floor near the ladder
+      let ladderTopTier = topTier + 1;
+      while (ladderTopTier > tier) {
+        const fd = data.floors.find((f) => f.tier === ladderTopTier);
+        if (fd && fd.sections.some((s) =>
+          ladderX < s.x + s.w + 0.5 && ladderX + ladderW > s.x - 0.5 &&
+          ladderZ < s.z + s.d + 0.5 && ladderZ + ladderD > s.z - 0.5
+        )) {
+          break;
+        }
+        ladderTopTier--;
+      }
+
       const ladderY0 = w.y; // start at walkway level
-      const ladderY1 = (topTier + 1) * tierHeight;
+      const ladderY1 = ladderTopTier * tierHeight;
 
       if (ladderY1 > ladderY0) {
         ladders.push({
           type: 'ladder',
+          parentWalkway: w, // link to source walkway
           x: ladderX, z: ladderZ,
           w: ladderW, d: ladderD,
           y0: ladderY0, y1: ladderY1,
@@ -301,7 +334,7 @@ export function generateConnectivity(data, config, rng) {
   // check if there's a wall. If so, place a red ladder from ground up to the
   // first tier with no wall. Skip edges near map boundary.
   const groundLadders = [];
-  const MAP_BOUNDARY_MARGIN = 2;
+  const MAP_BOUNDARY_MARGIN = CONNECTIVITY.mapBoundaryMargin;
 
   for (let bi = 0; bi < data.buildings.length; bi++) {
     const b = data.buildings[bi];
@@ -388,12 +421,13 @@ export function generateConnectivity(data, config, rng) {
 
         // Ladder reaches the floor above the last walled tier,
         // but only if that floor actually exists near this quadrant
+        // Trim to highest tier that has a floor near the ladder's visual position
         let ladderTopTier = topTier + 1;
         while (ladderTopTier > 0) {
           const floorData2 = data.floors.find((f) => f.tier === ladderTopTier);
           if (floorData2 && floorData2.sections.some((s) =>
-            s.x < qr.x + qr.w - 0.1 && s.x + s.w > qr.x + 0.1 &&
-            s.z < qr.z + qr.d - 0.1 && s.z + s.d > qr.z + 0.1
+            lx < s.x + s.w + 0.5 && lx + lw > s.x - 0.5 &&
+            lz < s.z + s.d + 0.5 && lz + ld > s.z - 0.5
           )) {
             break;
           }
@@ -416,15 +450,17 @@ export function generateConnectivity(data, config, rng) {
   }
 
   // Remove ground ladders that touch any walkway
-  const filteredGroundLadders = groundLadders.filter((gl) => {
-    for (const w of culledWalkways) {
-      if (gl.x < w.x + w.w && gl.x + gl.w > w.x &&
-          gl.z < w.z + w.d && gl.z + gl.d > w.z) {
-        return false;
-      }
-    }
-    return true;
-  });
+  const filteredGroundLadders = DELETIONS.redLadderWalkwayOverlap
+    ? groundLadders.filter((gl) => {
+        for (const w of culledWalkways) {
+          if (gl.x < w.x + w.w && gl.x + gl.w > w.x &&
+              gl.z < w.z + w.d && gl.z + gl.d > w.z) {
+            return false;
+          }
+        }
+        return true;
+      })
+    : groundLadders;
 
   // Orange ladders: placed on any quadrant edge, any tier except top.
   // Go up one tier. Only kept if they connect to a floor above.
@@ -469,7 +505,7 @@ export function generateConnectivity(data, config, rng) {
           if (edge.side === 'east' && edge.x > config.mapWidth - MAP_BOUNDARY_MARGIN) continue;
 
           // Spawn chance: 10% on ground floor, 20% on tier 1, 30% on tier 2+
-          const spawnChance = tier === 0 ? 0.10 : tier === 1 ? 0.20 : 0.30;
+          const spawnChance = tier === 0 ? CONNECTIVITY.orangeSpawnChance.ground : tier === 1 ? CONNECTIVITY.orangeSpawnChance.tier1 : CONNECTIVITY.orangeSpawnChance.tier2Plus;
           if (!rng.chance(spawnChance)) continue;
 
           // Position: centred on edge, outside building, ladder width
@@ -488,13 +524,14 @@ export function generateConnectivity(data, config, rng) {
           }
 
           // Climb upward through multiple tiers until no floor exists
+          // Use the ladder's visual position, not the source quadrant
           const y0 = tier * tierHeight;
           let topTier = tier;
           for (let t = tier + 1; t <= config.tiers; t++) {
             const floorAtT = data.floors.find((f) => f.tier === t);
             if (floorAtT && floorAtT.sections.some((s) =>
-              s.x < qr.x + qr.w - 0.1 && s.x + s.w > qr.x + 0.1 &&
-              s.z < qr.z + qr.d - 0.1 && s.z + s.d > qr.z + 0.1
+              lx < s.x + s.w + 0.5 && lx + lw > s.x - 0.5 &&
+              lz < s.z + s.d + 0.5 && lz + ld > s.z - 0.5
             )) {
               topTier = t;
             } else {
@@ -503,7 +540,7 @@ export function generateConnectivity(data, config, rng) {
           }
 
           // Must span at least 2 tiers
-          if (topTier - tier < 2) continue;
+          if (topTier - tier < CONNECTIVITY.orangeMinSpan) continue;
           const y1 = topTier * tierHeight;
 
           orangeLadders.push({
@@ -517,98 +554,380 @@ export function generateConnectivity(data, config, rng) {
     }
   }
 
-  // Remove orange ladders that touch any walkway or red ladder
-  const filteredOrangeLadders = orangeLadders.filter((ol) => {
-    for (const w of culledWalkways) {
-      if (ol.x < w.x + w.w && ol.x + ol.w > w.x &&
-          ol.z < w.z + w.d && ol.z + ol.d > w.z) {
-        return false;
+  // Interior ladders (cyan) — climb through exposed internal quadrant edges
+  // Find internal edges where the adjacent quadrant is missing above,
+  // then ladder from the solid floor below up through the gap
+  const interiorLadders = [];
+
+  for (let bi = 0; bi < data.buildings.length; bi++) {
+    const b = data.buildings[bi];
+    const bq = data.buildingQuadrants[bi];
+    const mx = b.x + b.w / 2;
+    const mz = b.z + b.d / 2;
+
+    // For each tier, check internal edges for exposed gaps
+    for (let tier = 2; tier <= b.maxTier; tier++) {
+      const present = bq.tiers[tier];
+      if (!present) continue;
+
+      for (const q of present) {
+        const qr = getQuadrantRect(b, q);
+
+        // Check each internal neighbor
+        const neighbors = [
+          { nq: (q === 0) ? 1 : (q === 2) ? 3 : -1, side: 'east', axis: 'z' },
+          { nq: (q === 1) ? 0 : (q === 3) ? 2 : -1, side: 'west', axis: 'z' },
+          { nq: (q === 0) ? 2 : (q === 1) ? 3 : -1, side: 'south', axis: 'x' },
+          { nq: (q === 2) ? 0 : (q === 3) ? 1 : -1, side: 'north', axis: 'x' },
+        ];
+
+        for (const { nq, side, axis } of neighbors) {
+          if (nq < 0) continue;
+          // Only interested if neighbor is MISSING at this tier (exposed internal edge)
+          if (present.has(nq)) continue;
+
+          // Find the lowest tier where BOTH quadrants exist (solid floor below)
+          let baseTier = -1;
+          for (let t = tier - 1; t >= 1; t--) {
+            const pAtT = bq.tiers[t];
+            if (pAtT && pAtT.has(q) && pAtT.has(nq)) {
+              baseTier = t;
+              break;
+            }
+          }
+          // If no solid floor found, start from ground
+          if (baseTier < 0) baseTier = 0;
+
+          // Find the highest tier where this internal edge is still exposed
+          let topTier = tier;
+          for (let t = tier + 1; t <= b.maxTier; t++) {
+            const pAtT = bq.tiers[t];
+            if (pAtT && pAtT.has(q) && !pAtT.has(nq)) {
+              topTier = t;
+            } else {
+              break;
+            }
+          }
+
+          // Must span at least 1 tier
+          if (topTier <= baseTier) continue;
+
+          // Position: on the internal edge, centred
+          let lx, lz, lw, ld;
+          if (side === 'east') {
+            lx = qr.x + qr.w - LADDER_DEPTH / 2;
+            lz = qr.z + qr.d / 2 - LADDER_WIDTH / 2;
+            lw = LADDER_DEPTH; ld = LADDER_WIDTH;
+          } else if (side === 'west') {
+            lx = qr.x - LADDER_DEPTH / 2;
+            lz = qr.z + qr.d / 2 - LADDER_WIDTH / 2;
+            lw = LADDER_DEPTH; ld = LADDER_WIDTH;
+          } else if (side === 'south') {
+            lx = qr.x + qr.w / 2 - LADDER_WIDTH / 2;
+            lz = qr.z + qr.d - LADDER_DEPTH / 2;
+            lw = LADDER_WIDTH; ld = LADDER_DEPTH;
+          } else {
+            lx = qr.x + qr.w / 2 - LADDER_WIDTH / 2;
+            lz = qr.z - LADDER_DEPTH / 2;
+            lw = LADDER_WIDTH; ld = LADDER_DEPTH;
+          }
+
+          // Trim to highest tier that has a floor near the ladder
+          let trimmedTop = topTier;
+          while (trimmedTop > baseTier) {
+            const fd = data.floors.find((f) => f.tier === trimmedTop);
+            if (fd && fd.sections.some((s) =>
+              lx < s.x + s.w + 0.5 && lx + lw > s.x - 0.5 &&
+              lz < s.z + s.d + 0.5 && lz + ld > s.z - 0.5
+            )) {
+              break;
+            }
+            trimmedTop--;
+          }
+          if (trimmedTop <= baseTier) continue;
+
+          const y0 = baseTier * tierHeight;
+          const y1 = trimmedTop * tierHeight;
+
+          interiorLadders.push({
+            type: 'interior_ladder',
+            x: lx, z: lz,
+            w: lw, d: ld,
+            y0, y1,
+          });
+        }
       }
     }
-    for (const gl of filteredGroundLadders) {
-      if (ol.x < gl.x + gl.w && ol.x + ol.w > gl.x &&
-          ol.z < gl.z + gl.d && ol.z + ol.d > gl.z) {
-        return false;
+  }
+
+  // Remove orange ladders that touch any walkway or red ladder
+  const filteredOrangeLadders = orangeLadders.filter((ol) => {
+    if (DELETIONS.orangeLadderWalkwayOverlap) {
+      for (const w of culledWalkways) {
+        if (ol.x < w.x + w.w && ol.x + ol.w > w.x &&
+            ol.z < w.z + w.d && ol.z + ol.d > w.z) {
+          return false;
+        }
+      }
+    }
+    if (DELETIONS.orangeLadderRedOverlap) {
+      for (const gl of filteredGroundLadders) {
+        if (ol.x < gl.x + gl.w && ol.x + ol.w > gl.x &&
+            ol.z < gl.z + gl.d && ol.z + ol.d > gl.z) {
+          return false;
+        }
       }
     }
     return true;
   });
 
   // Cull red and orange ladders to 40% each
-  rng.shuffle(filteredGroundLadders);
-  const culledGroundLadders = filteredGroundLadders.slice(0, Math.max(1, Math.ceil(filteredGroundLadders.length * 0.4)));
+  const culledGroundLadders = DELETIONS.redLadderCull
+    ? (rng.shuffle(filteredGroundLadders), filteredGroundLadders.slice(0, Math.max(1, Math.ceil(filteredGroundLadders.length * CONNECTIVITY.ladderCullRatio))))
+    : filteredGroundLadders;
 
-  rng.shuffle(filteredOrangeLadders);
-  const culledOrangeLadders = filteredOrangeLadders.slice(0, Math.max(1, Math.ceil(filteredOrangeLadders.length * 0.4)));
+  const culledOrangeLadders = DELETIONS.orangeLadderCull
+    ? (rng.shuffle(filteredOrangeLadders), filteredOrangeLadders.slice(0, Math.max(1, Math.ceil(filteredOrangeLadders.length * CONNECTIVITY.ladderCullRatio))))
+    : filteredOrangeLadders;
 
   // Proximity culling — only delete if same tier start point
-  const PROXIMITY = 3;
+  const PROXIMITY = CONNECTIVITY.proximity;
 
-  // Walkways
-  const walkwayDropSet = new Set();
-  for (let i = 0; i < culledWalkways.length; i++) {
-    if (walkwayDropSet.has(i)) continue;
-    for (let j = i + 1; j < culledWalkways.length; j++) {
-      if (walkwayDropSet.has(j)) continue;
-      if (Math.abs(culledWalkways[i].y - culledWalkways[j].y) > 0.5) continue;
-      if (isClose(culledWalkways[i], culledWalkways[j], PROXIMITY)) {
-        walkwayDropSet.add(j);
+  // Walkways proximity
+  let finalWalkways;
+  if (DELETIONS.walkwayProximityCull) {
+    const walkwayDropSet = new Set();
+    for (let i = 0; i < culledWalkways.length; i++) {
+      if (walkwayDropSet.has(i)) continue;
+      for (let j = i + 1; j < culledWalkways.length; j++) {
+        if (walkwayDropSet.has(j)) continue;
+        if (Math.abs(culledWalkways[i].y - culledWalkways[j].y) > 0.5) continue;
+        if (isClose(culledWalkways[i], culledWalkways[j], PROXIMITY)) {
+          walkwayDropSet.add(j);
+        }
       }
+    }
+    finalWalkways = culledWalkways.filter((_, i) => !walkwayDropSet.has(i));
+  } else {
+    finalWalkways = culledWalkways;
+  }
+
+  // Yellow ladders vs red + orange proximity
+  let finalYellow;
+  if (DELETIONS.yellowLadderProximityCull) {
+    const allRedOrange = [...culledGroundLadders, ...culledOrangeLadders];
+    const yellowDropSet = new Set();
+    for (let i = 0; i < ladders.length; i++) {
+      if (yellowDropSet.has(i)) continue;
+      for (const other of allRedOrange) {
+        if (Math.abs(ladders[i].y0 - other.y0) > 0.5) continue;
+        if (isClose(ladders[i], other, PROXIMITY)) {
+          yellowDropSet.add(i);
+          break;
+        }
+      }
+    }
+    finalYellow = ladders.filter((_, i) => !yellowDropSet.has(i));
+  } else {
+    finalYellow = ladders;
+  }
+
+  // Red ladders vs red + orange proximity
+  let finalRed;
+  if (DELETIONS.redLadderProximityCull) {
+    const redDropSet = new Set();
+    for (let i = 0; i < culledGroundLadders.length; i++) {
+      if (redDropSet.has(i)) continue;
+      for (let j = i + 1; j < culledGroundLadders.length; j++) {
+        if (redDropSet.has(j)) continue;
+        if (Math.abs(culledGroundLadders[i].y0 - culledGroundLadders[j].y0) > 0.5) continue;
+        if (isClose(culledGroundLadders[i], culledGroundLadders[j], PROXIMITY)) {
+          redDropSet.add(j);
+        }
+      }
+      for (const ol of culledOrangeLadders) {
+        if (Math.abs(culledGroundLadders[i].y0 - ol.y0) > 0.5) continue;
+        if (isClose(culledGroundLadders[i], ol, PROXIMITY)) {
+          redDropSet.add(i);
+          break;
+        }
+      }
+    }
+    finalRed = culledGroundLadders.filter((_, i) => !redDropSet.has(i));
+  } else {
+    finalRed = culledGroundLadders;
+  }
+
+  // Orange ladders vs other orange proximity
+  let finalOrange;
+  if (DELETIONS.orangeLadderProximityCull) {
+    const orangeDropSet = new Set();
+    for (let i = 0; i < culledOrangeLadders.length; i++) {
+      if (orangeDropSet.has(i)) continue;
+      for (let j = i + 1; j < culledOrangeLadders.length; j++) {
+        if (orangeDropSet.has(j)) continue;
+        if (Math.abs(culledOrangeLadders[i].y0 - culledOrangeLadders[j].y0) > 0.5) continue;
+        if (isClose(culledOrangeLadders[i], culledOrangeLadders[j], PROXIMITY)) {
+          orangeDropSet.add(j);
+        }
+      }
+    }
+    finalOrange = culledOrangeLadders.filter((_, i) => !orangeDropSet.has(i));
+  } else {
+    finalOrange = culledOrangeLadders;
+  }
+
+  // Post-process: flag orange ladders that don't have floor at their top tier
+  for (const ol of finalOrange) {
+    const endTier = Math.round(ol.y1 / tierHeight);
+    const fd = data.floors.find((f) => f.tier === endTier);
+    const hasFloor = fd && fd.sections.some((s) =>
+      ol.x < s.x + s.w + 1 && ol.x + ol.w > s.x - 1 &&
+      ol.z < s.z + s.d + 1 && ol.z + ol.d > s.z - 1
+    );
+    if (!hasFloor) ol.bad = true;
+  }
+
+  // Cyan (interior) ladder cull
+  const culledInterior = DELETIONS.cyanLadderCull
+    ? (rng.shuffle(interiorLadders), interiorLadders.slice(0, Math.max(1, Math.ceil(interiorLadders.length * CONNECTIVITY.cyanLadderCullRatio))))
+    : interiorLadders;
+
+  // Cyan ladder proximity cull (against other cyan, same start tier)
+  let finalInterior;
+  if (DELETIONS.cyanLadderProximityCull) {
+    const cyanDropSet = new Set();
+    for (let i = 0; i < culledInterior.length; i++) {
+      if (cyanDropSet.has(i)) continue;
+      for (let j = i + 1; j < culledInterior.length; j++) {
+        if (cyanDropSet.has(j)) continue;
+        if (Math.abs(culledInterior[i].y0 - culledInterior[j].y0) > 0.5) continue;
+        if (isClose(culledInterior[i], culledInterior[j], PROXIMITY)) {
+          cyanDropSet.add(j);
+        }
+      }
+    }
+    finalInterior = culledInterior.filter((_, i) => !cyanDropSet.has(i));
+  } else {
+    finalInterior = culledInterior;
+  }
+
+  // Remove cyan ladders that touch orange ladders
+  if (DELETIONS.cyanLadderOrangeOverlap) {
+    finalInterior = finalInterior.filter((cl) => {
+      for (const ol of finalOrange) {
+        if (cl.x < ol.x + ol.w && cl.x + cl.w > ol.x &&
+            cl.z < ol.z + ol.d && cl.z + cl.d > ol.z) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }
+
+  // Remove cyan and orange ladders whose top is near a walkway
+  const topDist = CONNECTIVITY.ladderTopWalkwayDist;
+  if (DELETIONS.cyanLadderTopNearWalkway) {
+    finalInterior = finalInterior.filter((l) => {
+      for (const w of finalWalkways) {
+        if (Math.abs(l.y1 - w.y) > 1) continue;
+        if (isClose(l, w, topDist)) return false;
+      }
+      return true;
+    });
+  }
+  if (DELETIONS.orangeLadderTopNearWalkway) {
+    finalOrange = finalOrange.filter((l) => {
+      for (const w of finalWalkways) {
+        if (Math.abs(l.y1 - w.y) > 1) continue;
+        if (isClose(l, w, topDist)) return false;
+      }
+      return true;
+    });
+  }
+
+  // Remove yellow ladders whose parent walkway was deleted
+  const survivingYellow = finalYellow.filter((l) =>
+    finalWalkways.includes(l.parentWalkway)
+  );
+
+  // Generate ladder platforms — 2x2" platforms at each floor a ladder spans
+  const PLATFORM_SIZE = 2;
+  const PLATFORM_THICKNESS = 0.2;
+  const ladderPlatforms = [];
+  const allLadders = [...survivingYellow, ...finalRed, ...finalOrange, ...finalInterior];
+
+  for (let li = 0; li < allLadders.length; li++) {
+    const ladder = allLadders[li];
+    if (ladder.bad) continue;
+    const startTier = Math.ceil(ladder.y0 / tierHeight);
+    const endTier = Math.floor(ladder.y1 / tierHeight);
+
+    for (let t = startTier; t <= endTier; t++) {
+      const py = t * tierHeight;
+      // Skip if platform is at the very bottom or top of the ladder
+      if (Math.abs(py - ladder.y0) < 0.1 || Math.abs(py - ladder.y1) < 0.1) continue;
+
+      // Centre platform on the ladder's wide axis, align outer edge with ladder's outer face
+      let px, pz;
+      if (ladder.w < ladder.d) {
+        // Thin in X (ladder flat against wall in X) — extend platform outward in X
+        // Find nearest building to determine which side the wall is on
+        let nearestBuildingCx = ladder.x; // default
+        for (const b of data.buildings) {
+          if (ladder.z + ladder.d > b.z && ladder.z < b.z + b.d &&
+              Math.abs(ladder.x - b.x) < b.w + 1) {
+            nearestBuildingCx = b.x + b.w / 2;
+            break;
+          }
+        }
+        // If ladder is to the right of building centre, extend right; else left
+        if (ladder.x > nearestBuildingCx) {
+          px = ladder.x; // flush with ladder, extending right
+        } else {
+          px = ladder.x + ladder.w - PLATFORM_SIZE; // flush, extending left
+        }
+        pz = ladder.z + ladder.d / 2 - PLATFORM_SIZE / 2;
+      } else {
+        // Thin in Z (ladder flat against wall in Z)
+        px = ladder.x + ladder.w / 2 - PLATFORM_SIZE / 2;
+        let nearestBuildingCz = ladder.z;
+        for (const b of data.buildings) {
+          if (ladder.x + ladder.w > b.x && ladder.x < b.x + b.w &&
+              Math.abs(ladder.z - b.z) < b.d + 1) {
+            nearestBuildingCz = b.z + b.d / 2;
+            break;
+          }
+        }
+        if (ladder.z > nearestBuildingCz) {
+          pz = ladder.z;
+        } else {
+          pz = ladder.z + ladder.d - PLATFORM_SIZE;
+        }
+      }
+
+      ladderPlatforms.push({
+        x: px, z: pz,
+        w: PLATFORM_SIZE, d: PLATFORM_SIZE,
+        y: py,
+        ladderIndex: li,
+      });
     }
   }
-  const finalWalkways = culledWalkways.filter((_, i) => !walkwayDropSet.has(i));
 
-  // Yellow ladders vs red + orange (same start tier only)
-  const allRedOrange = [...culledGroundLadders, ...culledOrangeLadders];
-  const yellowDropSet = new Set();
-  for (let i = 0; i < ladders.length; i++) {
-    if (yellowDropSet.has(i)) continue;
-    for (const other of allRedOrange) {
-      if (Math.abs(ladders[i].y0 - other.y0) > 0.5) continue;
-      if (isClose(ladders[i], other, PROXIMITY)) {
-        yellowDropSet.add(i);
-        break;
+  // Remove platforms that touch walkways
+  const filteredPlatforms = ladderPlatforms.filter((p) => {
+    for (const w of finalWalkways) {
+      if (Math.abs(p.y - w.y) > 1) continue;
+      if (p.x < w.x + w.w && p.x + p.w > w.x &&
+          p.z < w.z + w.d && p.z + p.d > w.z) {
+        return false;
       }
     }
-  }
-  const finalYellow = ladders.filter((_, i) => !yellowDropSet.has(i));
+    return true;
+  });
 
-  // Red ladders vs red + orange (same start tier only)
-  const redDropSet = new Set();
-  for (let i = 0; i < culledGroundLadders.length; i++) {
-    if (redDropSet.has(i)) continue;
-    for (let j = i + 1; j < culledGroundLadders.length; j++) {
-      if (redDropSet.has(j)) continue;
-      if (Math.abs(culledGroundLadders[i].y0 - culledGroundLadders[j].y0) > 0.5) continue;
-      if (isClose(culledGroundLadders[i], culledGroundLadders[j], PROXIMITY)) {
-        redDropSet.add(j);
-      }
-    }
-    for (const ol of culledOrangeLadders) {
-      if (Math.abs(culledGroundLadders[i].y0 - ol.y0) > 0.5) continue;
-      if (isClose(culledGroundLadders[i], ol, PROXIMITY)) {
-        redDropSet.add(i);
-        break;
-      }
-    }
-  }
-  const finalRed = culledGroundLadders.filter((_, i) => !redDropSet.has(i));
-
-  // Orange ladders vs other orange (same start tier only)
-  const orangeDropSet = new Set();
-  for (let i = 0; i < culledOrangeLadders.length; i++) {
-    if (orangeDropSet.has(i)) continue;
-    for (let j = i + 1; j < culledOrangeLadders.length; j++) {
-      if (orangeDropSet.has(j)) continue;
-      if (Math.abs(culledOrangeLadders[i].y0 - culledOrangeLadders[j].y0) > 0.5) continue;
-      if (isClose(culledOrangeLadders[i], culledOrangeLadders[j], PROXIMITY)) {
-        orangeDropSet.add(j);
-      }
-    }
-  }
-  const finalOrange = culledOrangeLadders.filter((_, i) => !orangeDropSet.has(i));
-
-  const connections = { ladders: finalYellow, walkways: finalWalkways, groundLadders: finalRed, orangeLadders: finalOrange };
+  const connections = { ladders: survivingYellow, walkways: finalWalkways, groundLadders: finalRed, orangeLadders: finalOrange, interiorLadders: finalInterior, ladderPlatforms: filteredPlatforms };
   return { ...data, connections };
 }
 
