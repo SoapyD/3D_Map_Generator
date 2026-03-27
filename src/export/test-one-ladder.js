@@ -1,5 +1,5 @@
 /**
- * Test: one ladder with poles + rungs as OBJ geometry.
+ * Test: one ladder with flat stiles + rungs as OBJ geometry.
  * Run: node src/export/test-one-ladder.js
  */
 
@@ -25,116 +25,37 @@ writeFileSync('output/test_ladder.png', PNG.sync.write(atlas));
 
 // Ladder params
 const ladder = { x: 0, z: 0, w: 1, d: 0.5, y0: 0, y1: 6 };
-const POLE_RADIUS = 0.1;
-const RUNG_RADIUS = 0.08;
+const POLE_WIDTH = 0.08;
+const POLE_DEPTH = 0.08;
+const RUNG_HEIGHT = 0.06;
+const RUNG_DEPTH = 0.06;
 const RUNG_SPACING = 0.75;
-const SEGMENTS = 6; // polygon segments for cylinders
+const RUNG_INSET = 0.05;
 
 const lines = [];
 let vertOff = 1, uvOff = 1, normOff = 1;
 
-lines.push('# Test ladder - poles + rungs');
+lines.push('# Test ladder - flat stiles + rungs');
 lines.push('');
 
-// UV: centre point (solid colour from atlas)
 const cu = '0.500000', cv = '0.500000';
 
-/**
- * Add a cylinder to the OBJ.
- * @param {number} cx,cy,cz - centre position
- * @param {number} radius
- * @param {number} height
- * @param {string} axis - 'y' for vertical poles, 'x' or 'z' for rungs
- */
-function addCylinder(name, cx, cy, cz, radius, height, axis) {
+// Add a flat double-sided quad
+function addQuad(name, v0, v1, v2, v3, nx, ny, nz) {
   lines.push(`o ${name}`);
-
-  const segs = SEGMENTS;
-  const halfH = height / 2;
-
-  // Generate two circles of vertices (top + bottom)
-  const topVerts = [];
-  const botVerts = [];
-
-  for (let i = 0; i < segs; i++) {
-    const angle = (i / segs) * Math.PI * 2;
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-
-    let tx, ty, tz, bx, by, bz;
-
-    if (axis === 'y') {
-      tx = cx + cos * radius; ty = cy + halfH; tz = cz + sin * radius;
-      bx = cx + cos * radius; by = cy - halfH; bz = cz + sin * radius;
-    } else if (axis === 'z') {
-      tx = cx + cos * radius; ty = cy + sin * radius; tz = cz + halfH;
-      bx = cx + cos * radius; by = cy + sin * radius; bz = cz - halfH;
-    } else { // x
-      tx = cx + halfH; ty = cy + cos * radius; tz = cz + sin * radius;
-      bx = cx - halfH; by = cy + cos * radius; bz = cz + sin * radius;
-    }
-
-    topVerts.push([tx, ty, tz]);
-    botVerts.push([bx, by, bz]);
-  }
-
-  // Top centre + bottom centre
-  let topCx, topCy, topCz, botCx, botCy, botCz;
-  if (axis === 'y') {
-    topCx = cx; topCy = cy + halfH; topCz = cz;
-    botCx = cx; botCy = cy - halfH; botCz = cz;
-  } else if (axis === 'z') {
-    topCx = cx; topCy = cy; topCz = cz + halfH;
-    botCx = cx; botCy = cy; botCz = cz - halfH;
-  } else {
-    topCx = cx + halfH; topCy = cy; topCz = cz;
-    botCx = cx - halfH; botCy = cy; botCz = cz;
-  }
-
-  // Output vertices: bottom ring, top ring, bottom centre, top centre
-  for (const v of botVerts) lines.push(`v ${v[0].toFixed(6)} ${v[1].toFixed(6)} ${v[2].toFixed(6)}`);
-  for (const v of topVerts) lines.push(`v ${v[0].toFixed(6)} ${v[1].toFixed(6)} ${v[2].toFixed(6)}`);
-  lines.push(`v ${botCx.toFixed(6)} ${botCy.toFixed(6)} ${botCz.toFixed(6)}`);
-  lines.push(`v ${topCx.toFixed(6)} ${topCy.toFixed(6)} ${topCz.toFixed(6)}`);
-
-  const totalVerts = segs * 2 + 2;
-
-  // UVs — all centre point
-  for (let i = 0; i < totalVerts; i++) lines.push(`vt ${cu} ${cv}`);
-
-  // Normal — just use a single up normal (TTS lighting is basic)
-  lines.push('vn 0 1 0');
-
   const vo = vertOff;
-  const uo = uvOff;
-  const no = normOff;
-  const botCentreIdx = vo + segs * 2;
-  const topCentreIdx = vo + segs * 2 + 1;
-
-  // Side faces (quads as 2 triangles)
-  for (let i = 0; i < segs; i++) {
-    const i2 = (i + 1) % segs;
-    const b1 = vo + i, b2 = vo + i2;
-    const t1 = vo + segs + i, t2 = vo + segs + i2;
-    lines.push(`f ${b1}/${uo+i}/${no} ${b2}/${uo+i2}/${no} ${t2}/${uo+segs+i2}/${no}`);
-    lines.push(`f ${b1}/${uo+i}/${no} ${t2}/${uo+segs+i2}/${no} ${t1}/${uo+segs+i}/${no}`);
-  }
-
-  // Top cap
-  for (let i = 0; i < segs; i++) {
-    const i2 = (i + 1) % segs;
-    lines.push(`f ${topCentreIdx}/${uo+segs*2+1}/${no} ${vo+segs+i}/${uo+segs+i}/${no} ${vo+segs+i2}/${uo+segs+i2}/${no}`);
-  }
-
-  // Bottom cap
-  for (let i = 0; i < segs; i++) {
-    const i2 = (i + 1) % segs;
-    lines.push(`f ${botCentreIdx}/${uo+segs*2}/${no} ${vo+i2}/${uo+i2}/${no} ${vo+i}/${uo+i}/${no}`);
-  }
-
-  vertOff += totalVerts;
-  uvOff += totalVerts;
-  normOff += 1;
+  for (const v of [v0,v1,v2,v3]) lines.push(`v ${v[0].toFixed(6)} ${v[1].toFixed(6)} ${v[2].toFixed(6)}`);
+  for (let i = 0; i < 4; i++) lines.push(`vt ${cu} ${cv}`);
+  lines.push(`vn ${nx} ${ny} ${nz}`);
+  lines.push(`vn ${-nx} ${-ny} ${-nz}`);
+  const uo = uvOff, no = normOff;
+  // Front
+  lines.push(`f ${vo}/${uo}/${no} ${vo+1}/${uo+1}/${no} ${vo+2}/${uo+2}/${no}`);
+  lines.push(`f ${vo}/${uo}/${no} ${vo+2}/${uo+2}/${no} ${vo+3}/${uo+3}/${no}`);
+  // Back
+  lines.push(`f ${vo+2}/${uo+2}/${no+1} ${vo+1}/${uo+1}/${no+1} ${vo}/${uo}/${no+1}`);
+  lines.push(`f ${vo+3}/${uo+3}/${no+1} ${vo+2}/${uo+2}/${no+1} ${vo}/${uo}/${no+1}`);
+  vertOff += 4; uvOff += 4; normOff += 2;
   lines.push('');
 }
 
@@ -144,30 +65,73 @@ const isThinX = ladder.w < ladder.d;
 const ladderWidth = isThinX ? ladder.d : ladder.w;
 const cx = ladder.x + ladder.w / 2;
 const cz = ladder.z + ladder.d / 2;
-const cy = ladder.y0 + height / 2;
-const halfSpread = (ladderWidth / 2) - POLE_RADIUS - 0.1;
+const halfSpread = (ladderWidth / 2) - POLE_WIDTH / 2 - RUNG_INSET;
 
-// Two poles
+// Two stiles (vertical flat rectangles)
 if (isThinX) {
-  addCylinder('pole_left', cx, cy, cz - halfSpread, POLE_RADIUS, height, 'y');
-  addCylinder('pole_right', cx, cy, cz + halfSpread, POLE_RADIUS, height, 'y');
+  // Stiles run along Z, thin in X
+  const lz = cz - halfSpread;
+  const rz = cz + halfSpread;
+  // Left stile
+  addQuad('stile_left',
+    [cx, ladder.y0, lz - POLE_WIDTH/2],
+    [cx, ladder.y0, lz + POLE_WIDTH/2],
+    [cx, ladder.y1, lz + POLE_WIDTH/2],
+    [cx, ladder.y1, lz - POLE_WIDTH/2],
+    1, 0, 0);
+  // Right stile
+  addQuad('stile_right',
+    [cx, ladder.y0, rz - POLE_WIDTH/2],
+    [cx, ladder.y0, rz + POLE_WIDTH/2],
+    [cx, ladder.y1, rz + POLE_WIDTH/2],
+    [cx, ladder.y1, rz - POLE_WIDTH/2],
+    1, 0, 0);
 } else {
-  addCylinder('pole_left', cx - halfSpread, cy, cz, POLE_RADIUS, height, 'y');
-  addCylinder('pole_right', cx + halfSpread, cy, cz, POLE_RADIUS, height, 'y');
+  // Stiles run along X, thin in Z
+  const lx = cx - halfSpread;
+  const rx = cx + halfSpread;
+  addQuad('stile_left',
+    [lx - POLE_WIDTH/2, ladder.y0, cz],
+    [lx + POLE_WIDTH/2, ladder.y0, cz],
+    [lx + POLE_WIDTH/2, ladder.y1, cz],
+    [lx - POLE_WIDTH/2, ladder.y1, cz],
+    0, 0, 1);
+  addQuad('stile_right',
+    [rx - POLE_WIDTH/2, ladder.y0, cz],
+    [rx + POLE_WIDTH/2, ladder.y0, cz],
+    [rx + POLE_WIDTH/2, ladder.y1, cz],
+    [rx - POLE_WIDTH/2, ladder.y1, cz],
+    0, 0, 1);
 }
 
-// Rungs
+// Rungs (horizontal flat rectangles spanning between stiles)
 const rungCount = Math.floor(height / RUNG_SPACING);
-const rungLength = halfSpread * 2;
 for (let i = 1; i <= rungCount; i++) {
   const ry = ladder.y0 + i * RUNG_SPACING;
   if (ry >= ladder.y1 - RUNG_SPACING * 0.3) break;
-  const rungAxis = isThinX ? 'z' : 'x';
-  addCylinder(`rung_${i}`, cx, ry, cz, RUNG_RADIUS, rungLength, rungAxis);
+
+  if (isThinX) {
+    // Rung runs along Z
+    addQuad(`rung_${i}`,
+      [cx, ry - RUNG_HEIGHT/2, cz - halfSpread],
+      [cx, ry - RUNG_HEIGHT/2, cz + halfSpread],
+      [cx, ry + RUNG_HEIGHT/2, cz + halfSpread],
+      [cx, ry + RUNG_HEIGHT/2, cz - halfSpread],
+      1, 0, 0);
+  } else {
+    // Rung runs along X
+    addQuad(`rung_${i}`,
+      [cx - halfSpread, ry - RUNG_HEIGHT/2, cz],
+      [cx + halfSpread, ry - RUNG_HEIGHT/2, cz],
+      [cx + halfSpread, ry + RUNG_HEIGHT/2, cz],
+      [cx - halfSpread, ry + RUNG_HEIGHT/2, cz],
+      0, 0, 1);
+  }
 }
 
 writeFileSync('output/test_ladder.obj', lines.join('\n'));
 
 console.log(`Ladder: ${ladder.w}x${ladder.d}, height ${height}`);
+console.log(`Rungs: ${rungCount}`);
 console.log(`Vertices: ${vertOff - 1}`);
 console.log('Output: output/test_ladder.obj + output/test_ladder.png');

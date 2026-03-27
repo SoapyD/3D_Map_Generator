@@ -633,43 +633,67 @@ for (let i = 0; i < coverData.deletedFootprints.length; i++) {
   addSubBox(`deleted_${i}`, df.x, 0.55, df.z, df.w, 0.1, df.d, getUV(courtyardIdx), true);
 }
 
-// Export ladders (all types) as simple boxes with edges
+// Flat ladder generator: 2 stiles + rungs as double-sided quads
+const POLE_WIDTH = 0.24;
+const POLE_DEPTH = 0.24;
+const RUNG_HEIGHT = 0.18;
+const RUNG_DEPTH = 0.18;
+const RUNG_SPACING = 0.75;
+const RUNG_INSET = 0.05;
+
+function addLadderMesh(prefix, l, uv) {
+  const height = l.y1 - l.y0;
+  if (height <= 0) return;
+
+  const isThinX = l.w < l.d;
+  const ladderWidth = isThinX ? l.d : l.w;
+  const cx = l.x + l.w / 2;
+  const cz = l.z + l.d / 2;
+  const halfSpread = (ladderWidth / 2) - POLE_WIDTH / 2 - RUNG_INSET;
+
+  // Stiles as 3D boxes
+  if (isThinX) {
+    addSubBox(`${prefix}_stile_L`, cx - POLE_DEPTH/2, l.y0, cz - halfSpread - POLE_WIDTH/2, POLE_DEPTH, height, POLE_WIDTH, uv, true);
+    addSubBox(`${prefix}_stile_R`, cx - POLE_DEPTH/2, l.y0, cz + halfSpread - POLE_WIDTH/2, POLE_DEPTH, height, POLE_WIDTH, uv, true);
+  } else {
+    addSubBox(`${prefix}_stile_L`, cx - halfSpread - POLE_WIDTH/2, l.y0, cz - POLE_DEPTH/2, POLE_WIDTH, height, POLE_DEPTH, uv, true);
+    addSubBox(`${prefix}_stile_R`, cx + halfSpread - POLE_WIDTH/2, l.y0, cz - POLE_DEPTH/2, POLE_WIDTH, height, POLE_DEPTH, uv, true);
+  }
+
+  // Rungs as 3D boxes
+  const rungCount = Math.floor(height / RUNG_SPACING);
+  for (let r = 1; r <= rungCount; r++) {
+    const ry = l.y0 + r * RUNG_SPACING;
+    if (ry >= l.y1 - RUNG_SPACING * 0.3) break;
+    if (isThinX) {
+      const rungLen = halfSpread * 2 + POLE_WIDTH;
+      addSubBox(`${prefix}_rung_${r}`, cx - RUNG_DEPTH/2, ry - RUNG_HEIGHT/2, cz - halfSpread - POLE_WIDTH/2, RUNG_DEPTH, RUNG_HEIGHT, rungLen, uv, true);
+    } else {
+      const rungLen = halfSpread * 2 + POLE_WIDTH;
+      addSubBox(`${prefix}_rung_${r}`, cx - halfSpread - POLE_WIDTH/2, ry - RUNG_HEIGHT/2, cz - RUNG_DEPTH/2, rungLen, RUNG_HEIGHT, RUNG_DEPTH, uv, true);
+    }
+  }
+}
+
+// Export ladders as flat stiles + rungs
 const conn = connData.connections;
+const ladderUV = getUV(ladderIdx);
 
-// Yellow ladders (walkway-wall)
 for (let i = 0; i < conn.ladders.length; i++) {
-  const l = conn.ladders[i];
-  const h = l.y1 - l.y0;
-  if (h <= 0) continue;
-  addSubBox(`ladder_${i}`, l.x, l.y0, l.z, l.w, h, l.d, getUV(ladderIdx), true);
+  addLadderMesh(`ladder_${i}`, conn.ladders[i], ladderUV);
 }
-
-// Red ladders (ground)
 for (let i = 0; i < conn.groundLadders.length; i++) {
-  const l = conn.groundLadders[i];
-  const h = l.y1 - l.y0;
-  if (h <= 0) continue;
-  addSubBox(`ground_ladder_${i}`, l.x, l.y0, l.z, l.w, h, l.d, getUV(ladderIdx), true);
+  addLadderMesh(`ground_ladder_${i}`, conn.groundLadders[i], ladderUV);
 }
-
-// Orange ladders
 for (let i = 0; i < conn.orangeLadders.length; i++) {
-  const l = conn.orangeLadders[i];
-  if (l.bad) continue;
-  const h = l.y1 - l.y0;
-  if (h <= 0) continue;
-  addSubBox(`orange_ladder_${i}`, l.x, l.y0, l.z, l.w, h, l.d, getUV(ladderIdx), true);
+  if (conn.orangeLadders[i].bad) continue;
+  addLadderMesh(`orange_ladder_${i}`, conn.orangeLadders[i], ladderUV);
 }
-
-// Cyan ladders (interior)
 for (let i = 0; i < conn.interiorLadders.length; i++) {
-  const l = conn.interiorLadders[i];
-  const h = l.y1 - l.y0;
-  if (h <= 0) continue;
-  addSubBox(`interior_ladder_${i}`, l.x, l.y0, l.z, l.w, h, l.d, getUV(ladderIdx), true);
+  addLadderMesh(`interior_ladder_${i}`, conn.interiorLadders[i], ladderUV);
 }
 
-// Ladder platforms
+// Ladder platforms (still boxes with edges)
 for (let i = 0; i < conn.ladderPlatforms.length; i++) {
   const p = conn.ladderPlatforms[i];
   addSubBox(`ladder_platform_${i}`, p.x, p.y, p.z, p.w, 0.2, p.d, getUV(walkwayIdx), true);
