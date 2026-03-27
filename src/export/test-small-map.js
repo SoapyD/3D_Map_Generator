@@ -13,6 +13,8 @@ import { generateGrid } from '../generators/grid.js';
 import { generateBuildings } from '../generators/buildings.js';
 import { generateFloors } from '../generators/floors.js';
 import { generateWalls } from '../generators/walls.js';
+import { generateConnectivity } from '../generators/connectivity.js';
+import { generateCover } from '../generators/cover.js';
 import { BUILDING, GEOMETRY } from '../config.js';
 
 const SEG_SIZE = 3;
@@ -50,6 +52,15 @@ console.log(`Floors: ${floorData.floors.map(f => 't' + f.tier + ':' + f.sections
 const wallData = generateWalls(floorData, config, rng);
 console.log(`Walls: ${wallData.walls.length}`);
 
+// Step 5: Connectivity (walkways)
+const connData = generateConnectivity(wallData, config, rng);
+const walkways = connData.connections.walkways;
+console.log(`Walkways: ${walkways.length}`);
+
+// Step 6: Cover + pink footprints
+const coverData = generateCover(connData, config, rng);
+console.log(`Cover: ${coverData.cover.length}, Interior: ${coverData.interiorCover.length}, Pink: ${coverData.deletedFootprints.length}`);
+
 // --- Load textures ---
 const packDir = 'assets/textures/loaded';
 function loadTex(category) {
@@ -64,6 +75,9 @@ const wallTextures = loadTex('walls') || [];
 const landmarkTextures = loadTex('landmark_walls') || [];
 const floorTextures = loadTex('floors') || [];
 const baseTextures = loadTex('base_map') || [];
+const walkwayTextures = loadTex('walkways') || floorTextures;
+const objectTextures = loadTex('objects') || [];
+const courtyardTextures = loadTex('courtyards') || baseTextures;
 
 // Build atlas: collect unique textures needed
 const allTextures = [];
@@ -93,6 +107,15 @@ for (let bi = 0; bi < buildings.length; bi++) {
   buildingWallIdx.push(addTexture(`${prefix}_${bi % wPool.length}`, wTex));
   buildingFloorIdx.push(addTexture(`floor_${bi % floorTextures.length}`, fTex));
 }
+
+// Add walkway texture
+const walkwayIdx = addTexture('walkway_0', walkwayTextures[0]);
+
+// Add object textures
+const objectIdx = addTexture('object_0', objectTextures.length > 0 ? objectTextures[0] : wallTextures[0]);
+
+// Add courtyard textures (for pink footprints)
+const courtyardIdx = addTexture('courtyard_0', courtyardTextures[0]);
 
 console.log(`Atlas tiles: ${allTextures.length}`);
 
@@ -254,6 +277,30 @@ for (let i = 0; i < wallData.walls.length; i++) {
   const wx = wall.axis === 'x' ? wall.length : wall.thickness;
   const wz = wall.axis === 'z' ? wall.length : wall.thickness;
   addSubBox(`wall_${i}`, wall.x, wall.baseY, wall.z, wx, wall.height, wz, getUV(texIdx));
+}
+
+// Export walkways
+for (let i = 0; i < walkways.length; i++) {
+  const w = walkways[i];
+  addSubBox(`walkway_${i}`, w.x, w.y, w.z, w.w, 0.3, w.d, getUV(walkwayIdx));
+}
+
+// Export cover (purple objects)
+for (let i = 0; i < coverData.cover.length; i++) {
+  const c = coverData.cover[i];
+  addSubBox(`cover_${i}`, c.x, c.y, c.z, c.w, c.height, c.d, getUV(objectIdx));
+}
+
+// Export interior cover (grey objects)
+for (let i = 0; i < coverData.interiorCover.length; i++) {
+  const c = coverData.interiorCover[i];
+  addSubBox(`interior_cover_${i}`, c.x, c.y, c.z, c.w, c.height, c.d, getUV(objectIdx));
+}
+
+// Export pink footprints
+for (let i = 0; i < coverData.deletedFootprints.length; i++) {
+  const df = coverData.deletedFootprints[i];
+  addSubBox(`deleted_${i}`, df.x, 0.55, df.z, df.w, 0.1, df.d, getUV(courtyardIdx));
 }
 
 writeFileSync('output/test_smallmap.obj', objLines.join('\n'));
