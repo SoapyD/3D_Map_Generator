@@ -42,6 +42,11 @@ export async function exportToObj(scene, outputDir, baseName) {
 
   const atlas = new PNG({ width: atlasSize, height: atlasSize });
 
+  // Fill background with opaque black (unused tiles shouldn't be transparent)
+  for (let i = 0; i < atlasSize * atlasSize; i++) {
+    atlas.data[i * 4 + 3] = 255;
+  }
+
   // Fill atlas with each material's colour/texture
   for (let mi = 0; mi < materialList.length; mi++) {
     const mat = materialList[mi];
@@ -69,7 +74,7 @@ export async function exportToObj(scene, outputDir, baseName) {
           atlas.data[aidx] = tilePng.data[sidx];
           atlas.data[aidx + 1] = tilePng.data[sidx + 1];
           atlas.data[aidx + 2] = tilePng.data[sidx + 2];
-          atlas.data[aidx + 3] = 255;
+          atlas.data[aidx + 3] = tilePng.data[sidx + 3];
         } else {
           // Solid colour from material
           const c = mat.color || new THREE.Color(0x888888);
@@ -97,6 +102,7 @@ export async function exportToObj(scene, outputDir, baseName) {
   const margin = 0.5 / atlasSize;
 
   objLines.push(`# Mordheim Map Generator`);
+  objLines.push(`mtllib ${baseName}.mtl`);
   objLines.push('');
 
   for (const mesh of meshes) {
@@ -119,7 +125,9 @@ export async function exportToObj(scene, outputDir, baseName) {
     const vMin = 1 - (tileRow + 1) / gridSize + margin; // OBJ V is flipped
     const vMax = 1 - tileRow / gridSize - margin;
 
+    const isTransparent = mesh.material.transparent && mesh.material.opacity < 1;
     objLines.push(`o ${mesh.name || 'mesh'}`);
+    objLines.push(`usemtl ${isTransparent ? 'atlas_transparent' : 'atlas_opaque'}`);
 
     // Vertices
     for (let i = 0; i < position.count; i++) {
@@ -186,6 +194,37 @@ export async function exportToObj(scene, outputDir, baseName) {
 
   const objPath = path.join(outputDir, `${baseName}.obj`);
   await writeFile(objPath, objLines.join('\n'));
+
+  // Find the lowest opacity among transparent materials
+  let transparentOpacity = 0.85;
+  for (const mat of materialList) {
+    if (mat.transparent && mat.opacity < 1) {
+      transparentOpacity = mat.opacity;
+      break;
+    }
+  }
+
+  // Write MTL with opaque and transparent materials
+  const mtlLines = [
+    `# Mordheim Map Generator`,
+    ``,
+    `newmtl atlas_opaque`,
+    `Ka 1.0000 1.0000 1.0000`,
+    `Kd 1.0000 1.0000 1.0000`,
+    `d 1.0`,
+    `illum 1`,
+    `map_Kd ${baseName}.png`,
+    ``,
+    `newmtl atlas_transparent`,
+    `Ka 1.0000 1.0000 1.0000`,
+    `Kd 1.0000 1.0000 1.0000`,
+    `d 1.0`,
+    `illum 2`,
+    `map_Kd ${baseName}.png`,
+    `map_d ${baseName}.png`,
+  ];
+  const mtlPath = path.join(outputDir, `${baseName}.mtl`);
+  await writeFile(mtlPath, mtlLines.join('\n'));
 
   return objPath;
 }

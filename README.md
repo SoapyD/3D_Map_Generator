@@ -82,11 +82,44 @@ assets/textures/base/
   walkways/        — walkway plank textures
   courtyards/      — ground courtyard textures
   base_map/        — base ground textures
+  domes/           — dome/spire top textures (rusty/oxidised colours)
 ```
 
-To create a custom pack, copy the `base` folder, rename it, replace the PNGs, and use `--texture-set your_pack_name`.
+### Included packs
 
-To regenerate the base procedural textures:
+- **`base`** — default solid colour textures, fully opaque
+- **`transparent_base`** — same as base but walls have 85% opacity (15% transparent). Transparency works in GLB viewers but **not in TTS** (TTS doesn't support transparent PNGs on custom models)
+
+### Switching texture packs
+
+```bash
+node src/index.js --seed 42                                    # uses 'base' (default)
+node src/index.js --seed 42 --texture-set transparent_base     # semi-transparent walls (GLB only)
+node src/index.js --seed 42 --texture-set my_custom_pack       # your own textures
+```
+
+The default pack is set in `src/config.js` under `textureSet: 'base'`.
+
+### Creating a custom pack
+
+1. Copy the `assets/textures/base/` folder
+2. Rename it (e.g. `my_pack`)
+3. Replace the PNGs in each subfolder with your own textures
+4. Run with `--texture-set my_pack`
+
+Each subfolder is a pool — all PNGs in that folder are available for random selection. Buildings use the same texture for all their walls/floors but different buildings can use different textures from the pool.
+
+### Adding transparency (GLB only)
+
+PNGs with alpha channels are automatically detected. Materials with alpha < 100% are set to transparent in the GLB export. To make walls semi-transparent:
+
+1. Copy the base pack
+2. Edit the wall PNGs to have a lower alpha (e.g. 85%)
+3. Use `--texture-set your_transparent_pack`
+
+Note: TTS does not support PNG transparency on custom models. The transparent pack is useful for the GLB browser preview only.
+
+### Regenerating procedural textures
 
 ```bash
 node src/generators/generate-textures.js

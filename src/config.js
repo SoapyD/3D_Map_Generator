@@ -35,7 +35,7 @@ export const BUILDING = {
   },
   gap: 0.5,                // minimum gap between buildings (inches)
   cellSizeMultiplier: 1.5,// grid cell = avg small footprint × this
-  deleteRatio: 0.15,       // fraction of small buildings randomly deleted
+  deleteRatio: 0.20,       // fraction of small buildings randomly deleted
 };
 
 // --- Walls ---

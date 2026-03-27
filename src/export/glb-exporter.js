@@ -90,6 +90,12 @@ export async function exportToGlb(scene, outputPath) {
         matDef.pbrMetallicRoughness.baseColorFactor = [1, 1, 1, 1];
       }
 
+      // Handle transparency
+      if (mesh.material.transparent && mesh.material.opacity < 1) {
+        matDef.alphaMode = 'BLEND';
+        matDef.pbrMetallicRoughness.baseColorFactor[3] = mesh.material.opacity;
+      }
+
       materials.push(matDef);
     }
 

@@ -211,8 +211,10 @@ export function buildScene(data, config) {
       let bodyMat;
       if (debug) {
         bodyMat = DEBUG_MATERIALS.cover;
-      } else if (c.height > 1.5) {
-        bodyMat = pickFromPool(pools.objects, i);
+      } else if (c.height >= 6) {
+        bodyMat = pickFromPool(pools.objects_tall, i);
+      } else if (c.height >= 3) {
+        bodyMat = pickFromPool(pools.objects_medium, i);
       } else {
         bodyMat = pickFromPool(pools.objects, i);
       }
