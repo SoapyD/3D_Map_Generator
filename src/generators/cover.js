@@ -139,7 +139,7 @@ export function generateCover(data, config, rng) {
 
     const count = rng.int(1, 3);
     for (let i = 0; i < count; i++) {
-      const piece = makeCoverPiece(db, 0, rng);
+      const piece = makeCoverPiece(db, slabThickness, rng);
       if (!piece) continue;
       // Cap height if under a big building
       if (piece.height > maxHeight) piece.height = maxHeight;
@@ -164,7 +164,7 @@ export function generateCover(data, config, rng) {
 
   // Replace 1 random ground cover piece (not under a building) with a tall object
   const groundNotUnder = cover.filter((c) => {
-    if (c.y !== 0 || c.height > 1.5) return false;
+    if (c.y > slabThickness + 0.1 || c.height > 1.5) return false;
     return !data.buildings.some((b) =>
       b.size !== 'small' &&
       c.x < b.x + b.w && c.x + c.w > b.x &&
@@ -178,12 +178,37 @@ export function generateCover(data, config, rng) {
     pick.d = COVER_THIN;
   }
 
+  // Remove ground-level cover that intersects visible building walls
+  const filteredCover = cover.filter((c) => {
+    if (c.y > slabThickness + 0.1) return true; // only check ground level
+    for (const wall of data.walls) {
+      const wallX1 = wall.axis === 'x' ? wall.x + wall.length : wall.x + wall.thickness;
+      const wallZ1 = wall.axis === 'z' ? wall.z + wall.length : wall.z + wall.thickness;
+      if (c.x < wallX1 && c.x + c.w > wall.x &&
+          c.z < wallZ1 && c.z + c.d > wall.z) {
+        return false;
+      }
+    }
+    return true;
+  });
+
   // Debug: generate pink footprints for deleted building positions
+  // Remove any that intersect visible building walls
   const deletedFootprints = deleted.map((db, i) => ({
     x: db.x, z: db.z, w: db.w, d: db.d, index: i,
-  }));
+  })).filter((fp) => {
+    for (const wall of data.walls) {
+      const wallX1 = wall.axis === 'x' ? wall.x + wall.length : wall.x + wall.thickness;
+      const wallZ1 = wall.axis === 'z' ? wall.z + wall.length : wall.z + wall.thickness;
+      if (fp.x < wallX1 && fp.x + fp.w > wall.x &&
+          fp.z < wallZ1 && fp.z + fp.d > wall.z) {
+        return false;
+      }
+    }
+    return true;
+  });
 
-  return { ...data, cover, interiorCover, deletedFootprints };
+  return { ...data, cover: filteredCover, interiorCover, deletedFootprints };
 }
 
 /**
