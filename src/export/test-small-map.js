@@ -119,9 +119,11 @@ const courtyardIdx = addTexture('courtyard_0', courtyardTextures[0]);
 
 console.log(`Atlas tiles: ${allTextures.length}`);
 
-// Build atlas image
+// Build atlas image with padding border around each tile to prevent UV bleeding
+const PADDING = 4; // pixels of border around each tile
+const PADDED_TILE = TILE_SIZE + PADDING * 2;
 const gridSz = Math.ceil(Math.sqrt(allTextures.length));
-const atlasSize = gridSz * TILE_SIZE;
+const atlasSize = gridSz * PADDED_TILE;
 const atlas = new PNG({ width: atlasSize, height: atlasSize });
 // Fill opaque black
 for (let i = 0; i < atlasSize * atlasSize; i++) atlas.data[i * 4 + 3] = 255;
@@ -130,10 +132,16 @@ for (let ti = 0; ti < allTextures.length; ti++) {
   const col = ti % gridSz;
   const row = Math.floor(ti / gridSz);
   const src = allTextures[ti];
-  for (let y = 0; y < TILE_SIZE; y++) {
-    for (let x = 0; x < TILE_SIZE; x++) {
-      const si = ((y % src.height) * src.width + (x % src.width)) * 4;
-      const di = ((row * TILE_SIZE + y) * atlasSize + (col * TILE_SIZE + x)) * 4;
+  // Write tile + padding border (clamp to edge pixels)
+  for (let y = -PADDING; y < TILE_SIZE + PADDING; y++) {
+    for (let x = -PADDING; x < TILE_SIZE + PADDING; x++) {
+      const sx = Math.max(0, Math.min(src.width - 1, x % src.width));
+      const sy = Math.max(0, Math.min(src.height - 1, y % src.height));
+      const si = (sy * src.width + sx) * 4;
+      const dx = col * PADDED_TILE + PADDING + x;
+      const dy = row * PADDED_TILE + PADDING + y;
+      if (dx < 0 || dx >= atlasSize || dy < 0 || dy >= atlasSize) continue;
+      const di = (dy * atlasSize + dx) * 4;
       atlas.data[di] = src.data[si];
       atlas.data[di + 1] = src.data[si + 1];
       atlas.data[di + 2] = src.data[si + 2];
@@ -149,12 +157,13 @@ console.log(`Atlas: ${atlasSize}x${atlasSize}`);
 function getUV(tileIdx) {
   const col = tileIdx % gridSz;
   const row = Math.floor(tileIdx / gridSz);
-  const margin = 0.001;
+  // UV region is the inner tile area (excluding padding)
+  const tileStart = PADDING / atlasSize;
   return {
-    uMin: col / gridSz + margin,
-    uMax: (col + 1) / gridSz - margin,
-    vMin: 1 - (row + 1) / gridSz + margin,
-    vMax: 1 - row / gridSz - margin,
+    uMin: (col * PADDED_TILE + PADDING) / atlasSize,
+    uMax: (col * PADDED_TILE + PADDING + TILE_SIZE) / atlasSize,
+    vMin: 1 - (row * PADDED_TILE + PADDING + TILE_SIZE) / atlasSize,
+    vMax: 1 - (row * PADDED_TILE + PADDING) / atlasSize,
   };
 }
 
@@ -192,12 +201,9 @@ objLines.push('# Test small map - subdivided');
 objLines.push('');
 
 function addSubBox(name, x0, y0, z0, sizeX, sizeY, sizeZ, uv) {
-  const segsX = Math.max(1, Math.ceil(sizeX / SEG_SIZE));
-  const segsY = Math.max(1, Math.ceil(sizeY / SEG_SIZE));
-  const segsZ = Math.max(1, Math.ceil(sizeZ / SEG_SIZE));
-  const stepX = sizeX / segsX;
-  const stepY = sizeY / segsY;
-  const stepZ = sizeZ / segsZ;
+  const isFloor = sizeY < 1;
+  const isWallX = sizeX < 1;
+  const isWallZ = sizeZ < 1;
 
   const tileW = uv.uMax - uv.uMin;
   const tileH = uv.vMax - uv.vMin;
@@ -206,50 +212,186 @@ function addSubBox(name, x0, y0, z0, sizeX, sizeY, sizeZ, uv) {
 
   objLines.push(`o ${name}`);
 
-  for (let sx = 0; sx < segsX; sx++) {
-    for (let sy = 0; sy < segsY; sy++) {
+  if (isFloor) {
+    // Floor: top + bottom faces only, with depth
+    const segsX = Math.max(1, Math.ceil(sizeX / SEG_SIZE));
+    const segsZ = Math.max(1, Math.ceil(sizeZ / SEG_SIZE));
+    const stepX = sizeX / segsX;
+    const stepZ = sizeZ / segsZ;
+
+    for (let sx = 0; sx < segsX; sx++) {
       for (let sz = 0; sz < segsZ; sz++) {
-        const bx0 = x0 + sx * stepX;
-        const by0 = y0 + sy * stepY;
-        const bz0 = z0 + sz * stepZ;
+        const qx = x0 + sx * stepX;
+        const qz = z0 + sz * stepZ;
+        const vo = vertOff;
+        const yTop = y0 + sizeY;
 
-        const verts = [
-          [bx0, by0, bz0], [bx0 + stepX, by0, bz0], [bx0 + stepX, by0 + stepY, bz0], [bx0, by0 + stepY, bz0],
-          [bx0, by0, bz0 + stepZ], [bx0 + stepX, by0, bz0 + stepZ], [bx0 + stepX, by0 + stepY, bz0 + stepZ], [bx0, by0 + stepY, bz0 + stepZ],
-        ];
-        for (const v of verts) objLines.push(`v ${v[0].toFixed(6)} ${v[1].toFixed(6)} ${v[2].toFixed(6)}`);
+        // 8 verts (top 4 + bottom 4)
+        objLines.push(`v ${qx.toFixed(6)} ${y0.toFixed(6)} ${qz.toFixed(6)}`);
+        objLines.push(`v ${(qx+stepX).toFixed(6)} ${y0.toFixed(6)} ${qz.toFixed(6)}`);
+        objLines.push(`v ${(qx+stepX).toFixed(6)} ${y0.toFixed(6)} ${(qz+stepZ).toFixed(6)}`);
+        objLines.push(`v ${qx.toFixed(6)} ${y0.toFixed(6)} ${(qz+stepZ).toFixed(6)}`);
+        objLines.push(`v ${qx.toFixed(6)} ${yTop.toFixed(6)} ${qz.toFixed(6)}`);
+        objLines.push(`v ${(qx+stepX).toFixed(6)} ${yTop.toFixed(6)} ${qz.toFixed(6)}`);
+        objLines.push(`v ${(qx+stepX).toFixed(6)} ${yTop.toFixed(6)} ${(qz+stepZ).toFixed(6)}`);
+        objLines.push(`v ${qx.toFixed(6)} ${yTop.toFixed(6)} ${(qz+stepZ).toFixed(6)}`);
 
-        const uOffX = (sx % SEGS_PER_TILE) * uvStep;
-        const uOffZ = (sz % SEGS_PER_TILE) * uvStep;
-        const vOffY = (sy % SEGS_PER_TILE) * uvStepV;
-        const vOffZ = (sz % SEGS_PER_TILE) * uvStepV;
-
-        const faceUVs = [
-          [[uv.uMin+uOffX,uv.vMin+vOffY],[uv.uMin+uOffX,uv.vMin+vOffY+uvStepV],[uv.uMin+uOffX+uvStep,uv.vMin+vOffY+uvStepV],[uv.uMin+uOffX+uvStep,uv.vMin+vOffY]],
-          [[uv.uMin+uOffX+uvStep,uv.vMin+vOffY],[uv.uMin+uOffX,uv.vMin+vOffY],[uv.uMin+uOffX,uv.vMin+vOffY+uvStepV],[uv.uMin+uOffX+uvStep,uv.vMin+vOffY+uvStepV]],
-          [[uv.uMin+uOffX,uv.vMin+vOffZ],[uv.uMin+uOffX+uvStep,uv.vMin+vOffZ],[uv.uMin+uOffX+uvStep,uv.vMin+vOffZ+uvStepV],[uv.uMin+uOffX,uv.vMin+vOffZ+uvStepV]],
-          [[uv.uMin+uOffX+uvStep,uv.vMin+vOffZ],[uv.uMin+uOffX,uv.vMin+vOffZ],[uv.uMin+uOffX,uv.vMin+vOffZ+uvStepV],[uv.uMin+uOffX+uvStep,uv.vMin+vOffZ+uvStepV]],
-          [[uv.uMin+uOffZ+uvStep,uv.vMin+vOffY],[uv.uMin+uOffZ,uv.vMin+vOffY],[uv.uMin+uOffZ,uv.vMin+vOffY+uvStepV],[uv.uMin+uOffZ+uvStep,uv.vMin+vOffY+uvStepV]],
-          [[uv.uMin+uOffZ,uv.vMin+vOffY],[uv.uMin+uOffZ,uv.vMin+vOffY+uvStepV],[uv.uMin+uOffZ+uvStep,uv.vMin+vOffY+uvStepV],[uv.uMin+uOffZ+uvStep,uv.vMin+vOffY]],
-        ];
-        for (const uvSet of faceUVs) for (const c of uvSet) objLines.push(`vt ${c[0].toFixed(6)} ${c[1].toFixed(6)}`);
-
-        for (const n of [[0,0,-1],[0,0,1],[0,-1,0],[0,1,0],[-1,0,0],[1,0,0]]) objLines.push(`vn ${n[0]} ${n[1]} ${n[2]}`);
-
-        const vo = vertOff, uo = uvOff, no = normOff;
-        for (const face of [
-          {vi:[0,3,2,1],ufi:0,ni:0},{vi:[4,5,6,7],ufi:1,ni:1},{vi:[0,1,5,4],ufi:2,ni:2},
-          {vi:[2,3,7,6],ufi:3,ni:3},{vi:[0,4,7,3],ufi:4,ni:4},{vi:[1,2,6,5],ufi:5,ni:5},
-        ]) {
-          const [a,b,c,d] = face.vi;
-          const ub = uo + face.ufi * 4, n = no + face.ni;
-          objLines.push(`f ${vo+a}/${ub}/${n} ${vo+b}/${ub+1}/${n} ${vo+c}/${ub+2}/${n}`);
-          objLines.push(`f ${vo+a}/${ub}/${n} ${vo+c}/${ub+2}/${n} ${vo+d}/${ub+3}/${n}`);
+        const uOff = (sx % SEGS_PER_TILE) * uvStep;
+        const vOff = (sz % SEGS_PER_TILE) * uvStepV;
+        // UVs for top and bottom faces
+        for (let f = 0; f < 2; f++) {
+          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
         }
-        vertOff += 8; uvOff += 24; normOff += 6;
+
+        objLines.push(`vn 0 -1 0`);
+        objLines.push(`vn 0 1 0`);
+        const uo = uvOff, no = normOff;
+        // Bottom face (y0)
+        objLines.push(`f ${vo}/${uo}/${no} ${vo+1}/${uo+1}/${no} ${vo+2}/${uo+2}/${no}`);
+        objLines.push(`f ${vo}/${uo}/${no} ${vo+2}/${uo+2}/${no} ${vo+3}/${uo+3}/${no}`);
+        // Top face (yTop)
+        objLines.push(`f ${vo+6}/${uo+6}/${no+1} ${vo+5}/${uo+5}/${no+1} ${vo+4}/${uo+4}/${no+1}`);
+        objLines.push(`f ${vo+7}/${uo+7}/${no+1} ${vo+6}/${uo+6}/${no+1} ${vo+4}/${uo+4}/${no+1}`);
+        vertOff += 8; uvOff += 8; normOff += 2;
+      }
+    }
+  } else if (isWallZ) {
+    // Wall facing Z: front + back faces only, with depth
+    const segsX = Math.max(1, Math.ceil(sizeX / SEG_SIZE));
+    const segsY = Math.max(1, Math.ceil(sizeY / SEG_SIZE));
+    const stepX = sizeX / segsX;
+    const stepY = sizeY / segsY;
+
+    for (let sx = 0; sx < segsX; sx++) {
+      for (let sy = 0; sy < segsY; sy++) {
+        const qx = x0 + sx * stepX;
+        const qy = y0 + sy * stepY;
+        const vo = vertOff;
+        const z1 = z0 + sizeZ;
+
+        // Front 4 + back 4
+        objLines.push(`v ${qx.toFixed(6)} ${qy.toFixed(6)} ${z0.toFixed(6)}`);
+        objLines.push(`v ${(qx+stepX).toFixed(6)} ${qy.toFixed(6)} ${z0.toFixed(6)}`);
+        objLines.push(`v ${(qx+stepX).toFixed(6)} ${(qy+stepY).toFixed(6)} ${z0.toFixed(6)}`);
+        objLines.push(`v ${qx.toFixed(6)} ${(qy+stepY).toFixed(6)} ${z0.toFixed(6)}`);
+        objLines.push(`v ${qx.toFixed(6)} ${qy.toFixed(6)} ${z1.toFixed(6)}`);
+        objLines.push(`v ${(qx+stepX).toFixed(6)} ${qy.toFixed(6)} ${z1.toFixed(6)}`);
+        objLines.push(`v ${(qx+stepX).toFixed(6)} ${(qy+stepY).toFixed(6)} ${z1.toFixed(6)}`);
+        objLines.push(`v ${qx.toFixed(6)} ${(qy+stepY).toFixed(6)} ${z1.toFixed(6)}`);
+
+        const uOff = (sx % SEGS_PER_TILE) * uvStep;
+        const vOff = (sy % SEGS_PER_TILE) * uvStepV;
+        for (let f = 0; f < 2; f++) {
+          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+        }
+
+        objLines.push(`vn 0 0 -1`);
+        objLines.push(`vn 0 0 1`);
+        const uo = uvOff, no = normOff;
+        // Front face (-Z)
+        objLines.push(`f ${vo}/${uo}/${no} ${vo+3}/${uo+3}/${no} ${vo+2}/${uo+2}/${no}`);
+        objLines.push(`f ${vo}/${uo}/${no} ${vo+2}/${uo+2}/${no} ${vo+1}/${uo+1}/${no}`);
+        // Back face (+Z)
+        objLines.push(`f ${vo+4}/${uo+4}/${no+1} ${vo+5}/${uo+5}/${no+1} ${vo+6}/${uo+6}/${no+1}`);
+        objLines.push(`f ${vo+4}/${uo+4}/${no+1} ${vo+6}/${uo+6}/${no+1} ${vo+7}/${uo+7}/${no+1}`);
+        vertOff += 8; uvOff += 8; normOff += 2;
+      }
+    }
+  } else if (isWallX) {
+    // Wall facing X: left + right faces only, with depth
+    const segsZ = Math.max(1, Math.ceil(sizeZ / SEG_SIZE));
+    const segsY = Math.max(1, Math.ceil(sizeY / SEG_SIZE));
+    const stepZ = sizeZ / segsZ;
+    const stepY = sizeY / segsY;
+
+    for (let sz = 0; sz < segsZ; sz++) {
+      for (let sy = 0; sy < segsY; sy++) {
+        const qz = z0 + sz * stepZ;
+        const qy = y0 + sy * stepY;
+        const vo = vertOff;
+        const x1 = x0 + sizeX;
+
+        // Left 4 + right 4
+        objLines.push(`v ${x0.toFixed(6)} ${qy.toFixed(6)} ${qz.toFixed(6)}`);
+        objLines.push(`v ${x0.toFixed(6)} ${qy.toFixed(6)} ${(qz+stepZ).toFixed(6)}`);
+        objLines.push(`v ${x0.toFixed(6)} ${(qy+stepY).toFixed(6)} ${(qz+stepZ).toFixed(6)}`);
+        objLines.push(`v ${x0.toFixed(6)} ${(qy+stepY).toFixed(6)} ${qz.toFixed(6)}`);
+        objLines.push(`v ${x1.toFixed(6)} ${qy.toFixed(6)} ${qz.toFixed(6)}`);
+        objLines.push(`v ${x1.toFixed(6)} ${qy.toFixed(6)} ${(qz+stepZ).toFixed(6)}`);
+        objLines.push(`v ${x1.toFixed(6)} ${(qy+stepY).toFixed(6)} ${(qz+stepZ).toFixed(6)}`);
+        objLines.push(`v ${x1.toFixed(6)} ${(qy+stepY).toFixed(6)} ${qz.toFixed(6)}`);
+
+        const uOff = (sz % SEGS_PER_TILE) * uvStep;
+        const vOff = (sy % SEGS_PER_TILE) * uvStepV;
+        for (let f = 0; f < 2; f++) {
+          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+        }
+
+        objLines.push(`vn -1 0 0`);
+        objLines.push(`vn 1 0 0`);
+        const uo = uvOff, no = normOff;
+        // Left face (-X)
+        objLines.push(`f ${vo}/${uo}/${no} ${vo+1}/${uo+1}/${no} ${vo+2}/${uo+2}/${no}`);
+        objLines.push(`f ${vo}/${uo}/${no} ${vo+2}/${uo+2}/${no} ${vo+3}/${uo+3}/${no}`);
+        // Right face (+X)
+        objLines.push(`f ${vo+4}/${uo+4}/${no+1} ${vo+7}/${uo+7}/${no+1} ${vo+6}/${uo+6}/${no+1}`);
+        objLines.push(`f ${vo+4}/${uo+4}/${no+1} ${vo+6}/${uo+6}/${no+1} ${vo+5}/${uo+5}/${no+1}`);
+        vertOff += 8; uvOff += 8; normOff += 2;
+      }
+    }
+  } else {
+    // Generic thick object (cover, etc) — output top + bottom only
+    const segsX = Math.max(1, Math.ceil(sizeX / SEG_SIZE));
+    const segsZ = Math.max(1, Math.ceil(sizeZ / SEG_SIZE));
+    const stepX = sizeX / segsX;
+    const stepZ = sizeZ / segsZ;
+    const yTop = y0 + sizeY;
+
+    for (let sx = 0; sx < segsX; sx++) {
+      for (let sz = 0; sz < segsZ; sz++) {
+        const qx = x0 + sx * stepX;
+        const qz = z0 + sz * stepZ;
+        const vo = vertOff;
+
+        objLines.push(`v ${qx.toFixed(6)} ${y0.toFixed(6)} ${qz.toFixed(6)}`);
+        objLines.push(`v ${(qx+stepX).toFixed(6)} ${y0.toFixed(6)} ${qz.toFixed(6)}`);
+        objLines.push(`v ${(qx+stepX).toFixed(6)} ${y0.toFixed(6)} ${(qz+stepZ).toFixed(6)}`);
+        objLines.push(`v ${qx.toFixed(6)} ${y0.toFixed(6)} ${(qz+stepZ).toFixed(6)}`);
+        objLines.push(`v ${qx.toFixed(6)} ${yTop.toFixed(6)} ${qz.toFixed(6)}`);
+        objLines.push(`v ${(qx+stepX).toFixed(6)} ${yTop.toFixed(6)} ${qz.toFixed(6)}`);
+        objLines.push(`v ${(qx+stepX).toFixed(6)} ${yTop.toFixed(6)} ${(qz+stepZ).toFixed(6)}`);
+        objLines.push(`v ${qx.toFixed(6)} ${yTop.toFixed(6)} ${(qz+stepZ).toFixed(6)}`);
+
+        const uOff = (sx % SEGS_PER_TILE) * uvStep;
+        const vOff = (sz % SEGS_PER_TILE) * uvStepV;
+        for (let f = 0; f < 2; f++) {
+          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+        }
+
+        objLines.push(`vn 0 -1 0`);
+        objLines.push(`vn 0 1 0`);
+        const uo = uvOff, no = normOff;
+        objLines.push(`f ${vo}/${uo}/${no} ${vo+1}/${uo+1}/${no} ${vo+2}/${uo+2}/${no}`);
+        objLines.push(`f ${vo}/${uo}/${no} ${vo+2}/${uo+2}/${no} ${vo+3}/${uo+3}/${no}`);
+        objLines.push(`f ${vo+6}/${uo+6}/${no+1} ${vo+5}/${uo+5}/${no+1} ${vo+4}/${uo+4}/${no+1}`);
+        objLines.push(`f ${vo+7}/${uo+7}/${no+1} ${vo+6}/${uo+6}/${no+1} ${vo+4}/${uo+4}/${no+1}`);
+        vertOff += 8; uvOff += 8; normOff += 2;
       }
     }
   }
+
   objLines.push('');
 }
 
