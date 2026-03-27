@@ -98,7 +98,8 @@ export function generateCover(data, config, rng) {
           3: { x: mx, z: mz, w: b.w / 2, d: b.d / 2 },
         }[q];
 
-        // Only low walls inside buildings
+        // Interior cover: 75% chance 0.75" tall, 25% chance 1.5" tall
+        const interiorHeight = rng.chance(0.75) ? 0.75 : COVER_THIN;
         const isWide = rng.chance(0.5);
         const w = isWide ? COVER_THIN : rng.float(2, 4);
         const d = isWide ? rng.float(2, 4) : COVER_THIN;
@@ -119,7 +120,7 @@ export function generateCover(data, config, rng) {
         }
         if (overlaps) continue;
 
-        interiorCover.push({ x: px, z: pz, w, d, height: COVER_THIN, y, interior: true });
+        interiorCover.push({ x: px, z: pz, w, d, height: interiorHeight, y, interior: true });
       }
     }
   }

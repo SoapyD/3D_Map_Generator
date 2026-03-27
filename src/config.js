@@ -82,7 +82,8 @@ export const CONNECTIVITY = {
 export const COVER = {
   thin: 1.5,               // standard cover dimension (inches)
   types: [
-    { height: 1.5, chance: 0.8 },  // low wall
+    { height: 0.75, chance: 0.6 }, // low rubble/debris
+    { height: 1.5, chance: 0.2 },  // low wall
     { height: 3.0, chance: 0.1 },  // pillar
     { height: 6.0, chance: 0.1 },  // tall pillar
   ],

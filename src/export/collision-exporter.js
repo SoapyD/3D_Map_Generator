@@ -22,6 +22,7 @@ const INCLUDE_PREFIXES = [
   'interior_cover_',
   'ladder_platform_',
   'deleted_',
+  'walkway_',
 ];
 
 /**
