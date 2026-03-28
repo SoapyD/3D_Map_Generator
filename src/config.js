@@ -95,7 +95,7 @@ export const COVER = {
 export const GEOMETRY = {
   glbTileSize: 3,            // GLB only: inches per texture repeat
   objAtlasTileSize: 256,     // OBJ atlas: pixels per tile
-  objSegmentsPerTile: 4,     // OBJ atlas: how many 3" segments map to one tile (64px each at 256px tile)
+  objSegmentsPerTile: 2,     // OBJ atlas: how many 3" segments map to one tile (64px each at 256px tile)
 };
 
 // --- Ladder Display ---
@@ -114,6 +114,7 @@ export const DELETIONS = {
   // Buildings
   buildingRandomCull: true,        // delete 15% of small buildings randomly
   buildingDisplaceByLarge: true,   // delete small buildings overlapping large ones
+  courtyardWallCull: true,          // remove courtyards that intersect visible walls
 
   // Walkways
   walkwayWallCollision: true,      // drop walkways that hit walls on their tier

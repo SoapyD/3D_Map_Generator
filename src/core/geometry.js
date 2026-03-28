@@ -38,12 +38,17 @@ export function createSlab(x, y, z, width, height, depth, material, { rotateUV =
       [width / TILE_SIZE, height / TILE_SIZE],  // -z face
     ];
 
+    // Per-object UV offset to break tiling repetition
+    const fract = (v) => v - Math.floor(v);
+    const offU = fract(x * 0.7123 + z * 0.3917);
+    const offV = fract(x * 0.5431 + z * 0.9281 + y * 0.1637);
+
     for (let face = 0; face < 6; face++) {
       const [su, sv] = scales[face];
       for (let v = 0; v < 4; v++) {
         const idx = face * 4 + v;
-        uv.setX(idx, uv.getX(idx) * su);
-        uv.setY(idx, uv.getY(idx) * sv);
+        uv.setX(idx, uv.getX(idx) * su + offU);
+        uv.setY(idx, uv.getY(idx) * sv + offV);
       }
     }
     uv.needsUpdate = true;
