@@ -605,6 +605,13 @@ export async function exportToObj(data, config, outputDir, baseName) {
     addSubBox(`deleted_${i}`, df.x, 0.55, df.z, df.w, 0.1, df.d, getUV(courtyardIdx), true);
   }
 
+  // Street scatter
+  const streetScatter = data.streetScatter || [];
+  for (let i = 0; i < streetScatter.length; i++) {
+    const c = streetScatter[i];
+    addSubBox(`street_scatter_${i}`, c.x, c.y, c.z, c.w, c.height, c.d, getUV(objectIdx), true);
+  }
+
   // Flat ladder meshes
   function addLadderMesh(prefix, l, uv) {
     const height = l.y1 - l.y0;

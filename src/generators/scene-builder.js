@@ -30,6 +30,7 @@ const DEBUG_MATERIALS = {
   badLadder: new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.7 }),
   interiorLadder: new THREE.MeshStandardMaterial({ color: 0x22cccc, roughness: 0.7 }),
   ladderPlatform: new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.7 }),
+  streetScatter: new THREE.MeshStandardMaterial({ color: 0x22ee44, roughness: 0.7 }),
 };
 
 /**
@@ -229,6 +230,17 @@ export function buildScene(data, config) {
       }
       const mesh = createFloorSlab({ x: df.x, z: df.z, w: df.w, d: df.d }, 0.55, 0.1, material);
       mesh.name = `deleted_${i}`;
+      scene.add(mesh);
+    }
+  }
+
+  // Street scatter
+  if (data.streetScatter) {
+    for (let i = 0; i < data.streetScatter.length; i++) {
+      const c = data.streetScatter[i];
+      const material = debug ? DEBUG_MATERIALS.streetScatter : pickFromPool(pools.objects, i + 100);
+      const mesh = createSlab(c.x + c.w / 2, c.y + c.height / 2, c.z + c.d / 2, c.w, c.height, c.d, material);
+      mesh.name = `street_scatter_${i}`;
       scene.add(mesh);
     }
   }

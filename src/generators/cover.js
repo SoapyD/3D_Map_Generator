@@ -175,6 +175,85 @@ export function generateCover(data, config, rng) {
     }
   }
 
+  // Street scatter: 20 random objects placed anywhere on ground floor
+  const streetScatter = [];
+  const mapW = config.mapWidth;
+  const mapD = config.mapDepth;
+  for (let attempt = 0; attempt < 200 && streetScatter.length < 20; attempt++) {
+    const roll = rng.random();
+    let type;
+    let cumulative = 0;
+    for (const t of COVER_TYPES) {
+      cumulative += t.chance;
+      if (roll < cumulative) { type = t; break; }
+    }
+    if (!type) type = COVER_TYPES[0];
+
+    const isWide = rng.chance(0.5);
+    const w = isWide ? COVER_THIN : rng.float(2, 4);
+    const d = isWide ? rng.float(2, 4) : COVER_THIN;
+    const x = rng.float(0.5, mapW - w - 0.5);
+    const z = rng.float(0.5, mapD - d - 0.5);
+    const piece = { x, z, w, d, height: type.height, y: 0.65, streetScatter: true };
+
+    // Check against walls
+    let blocked = false;
+    for (const wall of data.walls) {
+      if (wall.baseY > 1) continue; // only ground-level walls
+      const wallX1 = wall.axis === 'x' ? wall.x + wall.length : wall.x + wall.thickness;
+      const wallZ1 = wall.axis === 'z' ? wall.z + wall.length : wall.z + wall.thickness;
+      if (piece.x < wallX1 && piece.x + piece.w > wall.x &&
+          piece.z < wallZ1 && piece.z + piece.d > wall.z) {
+        blocked = true;
+        break;
+      }
+    }
+    if (blocked) continue;
+
+    // Check against ladders
+    for (const l of allLadders) {
+      if (piece.x < l.x + l.w && piece.x + piece.w > l.x &&
+          piece.z < l.z + l.d && piece.z + piece.d > l.z) {
+        blocked = true;
+        break;
+      }
+    }
+    if (blocked) continue;
+
+    // Check against existing cover
+    for (const existing of cover) {
+      if (Math.abs(existing.y - piece.y) > 1) continue;
+      if (piece.x < existing.x + existing.w && piece.x + piece.w > existing.x &&
+          piece.z < existing.z + existing.d && piece.z + piece.d > existing.z) {
+        blocked = true;
+        break;
+      }
+    }
+    if (blocked) continue;
+
+    // Check against other street scatter
+    for (const existing of streetScatter) {
+      if (piece.x < existing.x + existing.w && piece.x + piece.w > existing.x &&
+          piece.z < existing.z + existing.d && piece.z + piece.d > existing.z) {
+        blocked = true;
+        break;
+      }
+    }
+    if (blocked) continue;
+
+    // Check against courtyards
+    for (const fp of deletedFootprints) {
+      if (piece.x < fp.x + fp.w && piece.x + piece.w > fp.x &&
+          piece.z < fp.z + fp.d && piece.z + piece.d > fp.z) {
+        blocked = true;
+        break;
+      }
+    }
+    if (blocked) continue;
+
+    streetScatter.push(piece);
+  }
+
   // Remove ground-level cover that intersects visible building walls
   const filteredCover = cover.filter((c) => {
     if (c.y > slabThickness + 0.1) return true; // only check ground level
@@ -189,7 +268,7 @@ export function generateCover(data, config, rng) {
     return true;
   });
 
-  return { ...data, cover: filteredCover, interiorCover, deletedFootprints };
+  return { ...data, cover: filteredCover, interiorCover, deletedFootprints, streetScatter };
 }
 
 /**
