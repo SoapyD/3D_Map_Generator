@@ -27,42 +27,7 @@ function writeSolidPng(dir, name, r, g, b) {
   console.log(`  ${filePath}`);
 }
 
-function writeLadderPng(dir, name, woodR, woodG, woodB, rungR, rungG, rungB) {
-  const png = new PNG({ width: TEX_SIZE, height: TEX_SIZE });
-  const borderW = 0;       // border disabled
-  const rungSpacing = 4;   // pixels between rungs (tight spacing)
-  const rungH = 1;         // rung thickness in pixels
-  // Border colour — darker than wood
-  const bR = Math.max(0, woodR - 40);
-  const bG = Math.max(0, woodG - 40);
-  const bB = Math.max(0, woodB - 40);
 
-  for (let y = 0; y < TEX_SIZE; y++) {
-    for (let x = 0; x < TEX_SIZE; x++) {
-      const idx = (y * TEX_SIZE + x) * 4;
-      const isBorder = x < borderW || x >= TEX_SIZE - borderW || y < borderW || y >= TEX_SIZE - borderW;
-      const isRung = (y % rungSpacing < rungH) && !isBorder;
-
-      if (isBorder) {
-        png.data[idx] = bR;
-        png.data[idx + 1] = bG;
-        png.data[idx + 2] = bB;
-      } else if (isRung) {
-        png.data[idx] = rungR;
-        png.data[idx + 1] = rungG;
-        png.data[idx + 2] = rungB;
-      } else {
-        png.data[idx] = woodR;
-        png.data[idx + 1] = woodG;
-        png.data[idx + 2] = woodB;
-      }
-      png.data[idx + 3] = 255;
-    }
-  }
-  const filePath = path.join(BASE_DIR, dir, `${name}.png`);
-  writeFileSync(filePath, PNG.sync.write(png));
-  console.log(`  ${filePath}`);
-}
 
 console.log('Walls:');
 writeSolidPng('walls', 'brown', 89, 77, 64);

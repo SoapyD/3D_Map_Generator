@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { createFloorSlab, createWallSlab, createSlab, createLadderMesh } from '../core/geometry.js';
 import { buildTexturePools, pickFromPool } from './textures.js';
-import { LADDER_DISPLAY, COVER } from '../config.js';
+import { LADDER_DISPLAY, COVER, GEOMETRY } from '../config.js';
 
 // Debug materials (flat colours)
 const DEBUG_MATERIALS = {
@@ -152,7 +152,7 @@ export function buildScene(data, config) {
       } else {
         material = pickFromPool(pools.walkways, i);
       }
-      const mesh = createFloorSlab({ x: w.x, z: w.z, w: w.w, d: w.d }, w.y, 0.3, material, { rotateUV: w.w > w.d });
+      const mesh = createFloorSlab({ x: w.x, z: w.z, w: w.w, d: w.d }, w.y, GEOMETRY.walkwayThickness, material, { rotateUV: w.w > w.d });
       mesh.name = w.blocked ? `walkway_BLOCKED_${i}` : `walkway_${i}`;
       scene.add(mesh);
     }
@@ -185,7 +185,7 @@ export function buildScene(data, config) {
       const p = ladderPlatforms[i];
       // All platforms from the same ladder share the same texture
       const material = debug ? DEBUG_MATERIALS.ladderPlatform : pickFromPool(pools.floors, p.ladderIndex);
-      const mesh = createFloorSlab({ x: p.x, z: p.z, w: p.w, d: p.d }, p.y, 0.2, material);
+      const mesh = createFloorSlab({ x: p.x, z: p.z, w: p.w, d: p.d }, p.y, GEOMETRY.platformThickness, material);
       mesh.name = `ladder_platform_${i}`;
       scene.add(mesh);
     }
@@ -210,7 +210,7 @@ export function buildScene(data, config) {
       if (debug) {
         material = DEBUG_MATERIALS.interiorCover;
       } else {
-        material = (i % 2 === 0) ? pickFromPool(pools.objects, i + 50) : pickFromPool(pools.objects, i + 50);
+        material = pickFromPool(pools.objects, i + 50);
       }
       const mesh = createSlab(c.x + c.w / 2, c.y + c.height / 2, c.z + c.d / 2, c.w, c.height, c.d, material);
       mesh.name = `interior_cover_${i}`;
@@ -228,7 +228,7 @@ export function buildScene(data, config) {
       } else {
         material = pickFromPool(pools.courtyards, i);
       }
-      const mesh = createFloorSlab({ x: df.x, z: df.z, w: df.w, d: df.d }, 0.55, 0.1, material);
+      const mesh = createFloorSlab({ x: df.x, z: df.z, w: df.w, d: df.d }, GEOMETRY.courtyardY, GEOMETRY.courtyardThickness, material);
       mesh.name = `deleted_${i}`;
       scene.add(mesh);
     }

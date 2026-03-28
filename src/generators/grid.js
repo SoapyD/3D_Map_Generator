@@ -7,7 +7,9 @@
  * Output: Array of block rectangles { x, z, w, d } and street areas.
  */
 
-const MIN_BLOCK_SIZE = 10; // minimum block dimension in inches
+import { GRID } from '../config.js';
+
+const MIN_BLOCK_SIZE = GRID.minBlockSize;
 
 /**
  * @param {object} config

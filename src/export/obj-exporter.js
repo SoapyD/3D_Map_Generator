@@ -15,16 +15,16 @@ import { GEOMETRY } from '../config.js';
 const SEG_SIZE = 3;
 const SEGS_PER_TILE = GEOMETRY.objSegmentsPerTile;
 const TILE_SIZE = GEOMETRY.objAtlasTileSize;
-const PADDING = 4;
+const PADDING = GEOMETRY.objAtlasPadding;
 const PADDED_TILE = TILE_SIZE + PADDING * 2;
 
 // Ladder dimensions
-const POLE_WIDTH = 0.24;
-const POLE_DEPTH = 0.24;
-const RUNG_HEIGHT = 0.18;
-const RUNG_DEPTH = 0.18;
-const RUNG_SPACING = 0.75;
-const RUNG_INSET = 0.05;
+const POLE_WIDTH = GEOMETRY.ladderPoleWidth;
+const POLE_DEPTH = GEOMETRY.ladderPoleDepth;
+const RUNG_HEIGHT = GEOMETRY.ladderRungHeight;
+const RUNG_DEPTH = GEOMETRY.ladderRungDepth;
+const RUNG_SPACING = GEOMETRY.ladderRungSpacing;
+const RUNG_INSET = GEOMETRY.ladderRungInset;
 
 function loadTexPool(packDir, category) {
   const dir = path.join(packDir, category);
@@ -44,10 +44,13 @@ export async function exportToObj(data, config, outputDir, baseName) {
   const landmarkTextures = loadTexPool(packDir, 'landmark_walls');
   const floorTextures = loadTexPool(packDir, 'floors');
   const baseTextures = loadTexPool(packDir, 'base_map');
-  const walkwayTextures = loadTexPool(packDir, 'walkways').length > 0 ? loadTexPool(packDir, 'walkways') : floorTextures;
+  const walkwayPool = loadTexPool(packDir, 'walkways');
+  const walkwayTextures = walkwayPool.length > 0 ? walkwayPool : floorTextures;
   const objectTextures = loadTexPool(packDir, 'objects');
-  const courtyardTextures = loadTexPool(packDir, 'courtyards').length > 0 ? loadTexPool(packDir, 'courtyards') : baseTextures;
-  const ladderTextures = loadTexPool(packDir, 'ladders').length > 0 ? loadTexPool(packDir, 'ladders') : wallTextures;
+  const courtyardPool = loadTexPool(packDir, 'courtyards');
+  const courtyardTextures = courtyardPool.length > 0 ? courtyardPool : baseTextures;
+  const ladderPool = loadTexPool(packDir, 'ladders');
+  const ladderTextures = ladderPool.length > 0 ? ladderPool : wallTextures;
 
   // Build atlas: collect unique textures needed
   const allTextures = [];
@@ -171,8 +174,10 @@ export async function exportToObj(data, config, outputDir, baseName) {
 
     // Per-object UV offset to break tiling repetition
     const fract = (v) => v - Math.floor(v);
-    const hashU = fract(x0 * 0.7123 + z0 * 0.3917) * SEGS_PER_TILE;
-    const hashV = fract(x0 * 0.5431 + z0 * 0.9281 + y0 * 0.1637) * SEGS_PER_TILE;
+    const [hu0, hu1] = GEOMETRY.uvHashU;
+    const [hv0, hv1, hv2] = GEOMETRY.uvHashV;
+    const hashU = fract(x0 * hu0 + z0 * hu1) * SEGS_PER_TILE;
+    const hashV = fract(x0 * hv0 + z0 * hv1 + y0 * hv2) * SEGS_PER_TILE;
     const baseSegU = Math.floor(hashU);
     const baseSegV = Math.floor(hashV);
 
@@ -581,7 +586,7 @@ export async function exportToObj(data, config, outputDir, baseName) {
   const walkways = data.connections ? data.connections.walkways : [];
   for (let i = 0; i < walkways.length; i++) {
     const w = walkways[i];
-    addSubBox(`walkway_${i}`, w.x, w.y, w.z, w.w, 0.3, w.d, getUV(walkwayIdx), true, w.w > w.d);
+    addSubBox(`walkway_${i}`, w.x, w.y, w.z, w.w, GEOMETRY.walkwayThickness, w.d, getUV(walkwayIdx), true, w.w > w.d);
   }
 
   // Cover
@@ -602,7 +607,7 @@ export async function exportToObj(data, config, outputDir, baseName) {
   const deletedFootprints = data.deletedFootprints || [];
   for (let i = 0; i < deletedFootprints.length; i++) {
     const df = deletedFootprints[i];
-    addSubBox(`deleted_${i}`, df.x, 0.55, df.z, df.w, 0.1, df.d, getUV(courtyardIdx), true);
+    addSubBox(`deleted_${i}`, df.x, GEOMETRY.courtyardY, df.z, df.w, GEOMETRY.courtyardThickness, df.d, getUV(courtyardIdx), true);
   }
 
   // Street scatter
@@ -665,7 +670,7 @@ export async function exportToObj(data, config, outputDir, baseName) {
   // Ladder platforms
   for (let i = 0; i < (conn.ladderPlatforms || []).length; i++) {
     const p = conn.ladderPlatforms[i];
-    addSubBox(`ladder_platform_${i}`, p.x, p.y, p.z, p.w, 0.2, p.d, getUV(walkwayIdx), true);
+    addSubBox(`ladder_platform_${i}`, p.x, p.y, p.z, p.w, GEOMETRY.platformThickness, p.d, getUV(walkwayIdx), true);
   }
 
   // Write OBJ
