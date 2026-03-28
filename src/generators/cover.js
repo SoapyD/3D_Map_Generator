@@ -170,7 +170,7 @@ export function generateCover(data, config, rng) {
   // Debug: generate pink footprints for deleted building positions
   // Remove any that intersect visible building walls
   const deletedFootprints = deleted.map((db, i) => ({
-    x: db.x, z: db.z, w: db.w, d: db.d, index: i,
+    x: db.x - 0.75, z: db.z - 0.75, w: db.w + 1.5, d: db.d + 1.5, index: i,
   })).filter((fp) => {
     for (const wall of data.walls) {
       const wallX1 = wall.axis === 'x' ? wall.x + wall.length : wall.x + wall.thickness;

@@ -169,6 +169,13 @@ export async function exportToObj(data, config, outputDir, baseName) {
     const uvStep = tileW / SEGS_PER_TILE;
     const uvStepV = tileH / SEGS_PER_TILE;
 
+    // Per-object UV offset to break tiling repetition
+    const fract = (v) => v - Math.floor(v);
+    const hashU = fract(x0 * 0.7123 + z0 * 0.3917) * SEGS_PER_TILE;
+    const hashV = fract(x0 * 0.5431 + z0 * 0.9281 + y0 * 0.1637) * SEGS_PER_TILE;
+    const baseSegU = Math.floor(hashU);
+    const baseSegV = Math.floor(hashV);
+
     objLines.push(`o ${name}`);
 
     if (isFloor) {
@@ -193,14 +200,13 @@ export async function exportToObj(data, config, outputDir, baseName) {
           objLines.push(`v ${(qx+stepX).toFixed(6)} ${yTop.toFixed(6)} ${(qz+stepZ).toFixed(6)}`);
           objLines.push(`v ${qx.toFixed(6)} ${yTop.toFixed(6)} ${(qz+stepZ).toFixed(6)}`);
 
-          const uOff = (sx % SEGS_PER_TILE) * uvStep, vOff = (sz % SEGS_PER_TILE) * uvStepV;
+          const uOff = ((sx + baseSegU) % SEGS_PER_TILE) * uvStep, vOff = ((sz + baseSegV) % SEGS_PER_TILE) * uvStepV;
           for (let f = 0; f < 2; f++) {
             if (rotateUV) {
-              // Rotated: U maps to Z, V maps to X — verts are (x,z): 0=(-,-) 1=(+,-) 2=(+,+) 3=(-,+)
-              objLines.push(`vt ${(uv.uMin+vOff).toFixed(6)} ${(uv.vMin+uOff).toFixed(6)}`);             // v0: U=z, V=x
-              objLines.push(`vt ${(uv.uMin+vOff).toFixed(6)} ${(uv.vMin+uOff+uvStep).toFixed(6)}`);       // v1: U=z, V=x+
-              objLines.push(`vt ${(uv.uMin+vOff+uvStepV).toFixed(6)} ${(uv.vMin+uOff+uvStep).toFixed(6)}`); // v2: U=z+, V=x+
-              objLines.push(`vt ${(uv.uMin+vOff+uvStepV).toFixed(6)} ${(uv.vMin+uOff).toFixed(6)}`);       // v3: U=z+, V=x
+              objLines.push(`vt ${(uv.uMin+vOff).toFixed(6)} ${(uv.vMin+uOff).toFixed(6)}`);
+              objLines.push(`vt ${(uv.uMin+vOff).toFixed(6)} ${(uv.vMin+uOff+uvStep).toFixed(6)}`);
+              objLines.push(`vt ${(uv.uMin+vOff+uvStepV).toFixed(6)} ${(uv.vMin+uOff+uvStep).toFixed(6)}`);
+              objLines.push(`vt ${(uv.uMin+vOff+uvStepV).toFixed(6)} ${(uv.vMin+uOff).toFixed(6)}`);
             } else {
               objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
               objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
@@ -241,7 +247,7 @@ export async function exportToObj(data, config, outputDir, baseName) {
           objLines.push(`v ${(qx+stepX).toFixed(6)} ${(qy+stepY).toFixed(6)} ${z1.toFixed(6)}`);
           objLines.push(`v ${qx.toFixed(6)} ${(qy+stepY).toFixed(6)} ${z1.toFixed(6)}`);
 
-          const uOff = (sx % SEGS_PER_TILE) * uvStep, vOff = (sy % SEGS_PER_TILE) * uvStepV;
+          const uOff = ((sx + baseSegU) % SEGS_PER_TILE) * uvStep, vOff = ((sy + baseSegV) % SEGS_PER_TILE) * uvStepV;
           for (let f = 0; f < 2; f++) {
             objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
             objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
@@ -281,7 +287,7 @@ export async function exportToObj(data, config, outputDir, baseName) {
           objLines.push(`v ${x1.toFixed(6)} ${(qy+stepY).toFixed(6)} ${(qz+stepZ).toFixed(6)}`);
           objLines.push(`v ${x1.toFixed(6)} ${(qy+stepY).toFixed(6)} ${qz.toFixed(6)}`);
 
-          const uOff = (sz % SEGS_PER_TILE) * uvStep, vOff = (sy % SEGS_PER_TILE) * uvStepV;
+          const uOff = ((sz + baseSegU) % SEGS_PER_TILE) * uvStep, vOff = ((sy + baseSegV) % SEGS_PER_TILE) * uvStepV;
           for (let f = 0; f < 2; f++) {
             objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
             objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
@@ -322,7 +328,7 @@ export async function exportToObj(data, config, outputDir, baseName) {
           objLines.push(`v ${(qx+stepX).toFixed(6)} ${yTop.toFixed(6)} ${(qz+stepZ).toFixed(6)}`);
           objLines.push(`v ${qx.toFixed(6)} ${yTop.toFixed(6)} ${(qz+stepZ).toFixed(6)}`);
 
-          const uOff = (sx % SEGS_PER_TILE) * uvStep, vOff = (sz % SEGS_PER_TILE) * uvStepV;
+          const uOff = ((sx + baseSegU) % SEGS_PER_TILE) * uvStep, vOff = ((sz + baseSegV) % SEGS_PER_TILE) * uvStepV;
           for (let f = 0; f < 2; f++) {
             objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
             objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
