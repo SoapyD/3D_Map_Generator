@@ -19,10 +19,6 @@ export function generateCover(data, config, rng) {
   const { tierHeight, slabThickness } = config;
   const cover = [];
 
-  // Track tall cover counts (max 3 total across both types)
-  let tallTotal = 0;
-  const MAX_TALL = COVER.maxTall;
-
   // Rooftop cover: place on each top-tier quadrant with a chance
   for (let bi = 0; bi < data.buildings.length; bi++) {
     const b = data.buildings[bi];
@@ -48,8 +44,6 @@ export function generateCover(data, config, rng) {
 
       const piece = makeCoverPiece(qr, y, rng);
       if (!piece) continue;
-      // Enforce max 3 tall objects total
-      if (piece.height > 1.5 && tallTotal >= MAX_TALL) continue;
       let overlaps = false;
       for (const existing of cover) {
         if (Math.abs(existing.y - piece.y) > 1) continue;
@@ -60,7 +54,6 @@ export function generateCover(data, config, rng) {
         }
       }
       if (!overlaps) {
-        if (piece.height > 1.5) tallTotal++;
         cover.push(piece);
       }
     }
@@ -144,8 +137,6 @@ export function generateCover(data, config, rng) {
       if (!piece) continue;
       // Cap height if under a big building
       if (piece.height > maxHeight) piece.height = maxHeight;
-      // Enforce max 3 tall objects total
-      if (piece.height > 1.5 && tallTotal >= MAX_TALL) continue;
       // Check doesn't overlap existing cover
       let overlaps = false;
       for (const existing of cover) {
@@ -157,26 +148,9 @@ export function generateCover(data, config, rng) {
         }
       }
       if (!overlaps) {
-        if (piece.height > 1.5) tallTotal++;
         cover.push(piece);
       }
     }
-  }
-
-  // Replace 1 random ground cover piece (not under a building) with a tall object
-  const groundNotUnder = cover.filter((c) => {
-    if (c.y > slabThickness + 0.1 || c.height > 1.5) return false;
-    return !data.buildings.some((b) =>
-      b.size !== 'small' &&
-      c.x < b.x + b.w && c.x + c.w > b.x &&
-      c.z < b.z + b.d && c.z + c.d > b.z
-    );
-  });
-  if (groundNotUnder.length > 0) {
-    const pick = rng.pick(groundNotUnder);
-    pick.height = rng.chance(0.5) ? 3.0 : 6.0;
-    pick.w = COVER_THIN;
-    pick.d = COVER_THIN;
   }
 
   // Remove ground-level cover that intersects visible building walls
@@ -214,11 +188,10 @@ export function generateCover(data, config, rng) {
 
 /**
  * Create a cover piece randomly placed within a rect.
- * Picks from cover types: 70% low wall, 20% pillar (3"), 10% tall pillar (6").
- * The two taller types are 1.5" x 1.5" footprint.
+ * Picks from cover types (0.75" rubble or 1.5" low wall).
+ * One dimension is 1.5", the other is 2-4".
  */
 function makeCoverPiece(rect, y, rng) {
-  // Pick cover type
   const roll = rng.random();
   let type;
   let cumulative = 0;
@@ -228,17 +201,9 @@ function makeCoverPiece(rect, y, rng) {
   }
   if (!type) type = COVER_TYPES[0];
 
-  let w, d;
-  if (type.height > 1.5) {
-    // Taller types are always 1.5" x 1.5"
-    w = COVER_THIN;
-    d = COVER_THIN;
-  } else {
-    // Low wall: one dimension is 1.5", the other is 2-4"
-    const isWide = rng.chance(0.5);
-    w = isWide ? COVER_THIN : rng.float(2, 4);
-    d = isWide ? rng.float(2, 4) : COVER_THIN;
-  }
+  const isWide = rng.chance(0.5);
+  const w = isWide ? COVER_THIN : rng.float(2, 4);
+  const d = isWide ? rng.float(2, 4) : COVER_THIN;
 
   if (w > rect.w - 0.5 || d > rect.d - 0.5) return null;
 

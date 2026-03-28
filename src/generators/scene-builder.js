@@ -4,10 +4,9 @@
  */
 
 import * as THREE from 'three';
-import { createFloorSlab, createWallSlab, createSlab, createLadderMesh, createPillar } from '../core/geometry.js';
+import { createFloorSlab, createWallSlab, createSlab, createLadderMesh } from '../core/geometry.js';
 import { buildTexturePools, pickFromPool } from './textures.js';
 import { LADDER_DISPLAY, COVER } from '../config.js';
-import { createRng } from '../core/rng.js';
 
 // Debug materials (flat colours)
 const DEBUG_MATERIALS = {
@@ -193,71 +192,12 @@ export function buildScene(data, config) {
 
   // Cover pieces
   if (data.cover) {
-    const coverRng = createRng(config.seed + 7777);
-
-    // Weighted pick helper
-    function weightedPick(chances) {
-      const roll = coverRng.random();
-      let cumulative = 0;
-      for (const [key, weight] of Object.entries(chances)) {
-        cumulative += weight;
-        if (roll < cumulative) return key;
-      }
-      return Object.keys(chances)[0];
-    }
-
     for (let i = 0; i < data.cover.length; i++) {
       const c = data.cover[i];
-      let bodyMat;
-      if (debug) {
-        bodyMat = DEBUG_MATERIALS.cover;
-      } else if (c.height >= 6) {
-        bodyMat = pickFromPool(pools.objects_tall, i);
-      } else if (c.height >= 3) {
-        bodyMat = pickFromPool(pools.objects_medium, i);
-      } else {
-        bodyMat = pickFromPool(pools.objects, i);
-      }
-
-      if (c.height >= 6) {
-        // 6" pillar: always dome or spire, optional decoration
-        const roof = weightedPick(COVER.roof6Chances);
-        const deco = weightedPick(COVER.deco6Chances);
-        const roofMat = debug ? DEBUG_MATERIALS.cover : pickFromPool(pools.domes, i);
-        const decoMat = debug ? DEBUG_MATERIALS.wall : pickFromPool(pools.walls, i);
-
-        const pillar = createPillar(c.x + c.w / 2, c.y, c.z + c.d / 2, c.w, c.d, c.height, bodyMat, {
-          roof,
-          roofMaterial: roofMat,
-          decoration: deco,
-          decoMaterial: decoMat,
-        });
-        pillar.name = `cover_${i}`;
-        scene.add(pillar);
-      } else if (c.height >= 3) {
-        // 3" pillar: none/dome/spire, never decoration
-        const roof = weightedPick(COVER.roof3Chances);
-        const roofMat = debug ? DEBUG_MATERIALS.cover : pickFromPool(pools.domes, i);
-
-        if (roof === 'none') {
-          const mesh = createSlab(c.x + c.w / 2, c.y + c.height / 2, c.z + c.d / 2, c.w, c.height, c.d, bodyMat);
-          mesh.name = `cover_${i}`;
-          scene.add(mesh);
-        } else {
-          const pillar = createPillar(c.x + c.w / 2, c.y, c.z + c.d / 2, c.w, c.d, c.height, bodyMat, {
-            roof,
-            roofMaterial: roofMat,
-            decoration: 'none',
-          });
-          pillar.name = `cover_${i}`;
-          scene.add(pillar);
-        }
-      } else {
-        // Low cover: regular box
-        const mesh = createSlab(c.x + c.w / 2, c.y + c.height / 2, c.z + c.d / 2, c.w, c.height, c.d, bodyMat);
-        mesh.name = `cover_${i}`;
-        scene.add(mesh);
-      }
+      const bodyMat = debug ? DEBUG_MATERIALS.cover : pickFromPool(pools.objects, i);
+      const mesh = createSlab(c.x + c.w / 2, c.y + c.height / 2, c.z + c.d / 2, c.w, c.height, c.d, bodyMat);
+      mesh.name = `cover_${i}`;
+      scene.add(mesh);
     }
   }
 
