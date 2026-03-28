@@ -82,13 +82,10 @@ export const CONNECTIVITY = {
 export const COVER = {
   thin: 1.5,               // standard cover dimension (inches)
   types: [
-    { height: 0.75, chance: 0.6 }, // low rubble/debris
-    { height: 1.5, chance: 0.2 },  // low wall
-    { height: 3.0, chance: 0.1 },  // pillar
-    { height: 6.0, chance: 0.1 },  // tall pillar
+    { height: 0.75, chance: 0.75 }, // low rubble/debris
+    { height: 1.5, chance: 0.25 },  // low wall
   ],
   rooftopChance: 0.5,      // chance per rooftop quadrant
-  maxHeightUnderBuilding: 3.0, // cap for cover under big buildings
   // Interior cover
   interiorMaxMedium: 1,    // max objects per mid-floor for medium buildings
   interiorMaxLarge: 3,     // max objects per mid-floor for large buildings
