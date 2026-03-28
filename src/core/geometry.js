@@ -40,8 +40,10 @@ export function createSlab(x, y, z, width, height, depth, material, { rotateUV =
 
     // Per-object UV offset to break tiling repetition
     const fract = (v) => v - Math.floor(v);
-    const offU = fract(x * 0.7123 + z * 0.3917);
-    const offV = fract(x * 0.5431 + z * 0.9281 + y * 0.1637);
+    const [hu0, hu1] = GEOMETRY.uvHashU;
+    const [hv0, hv1, hv2] = GEOMETRY.uvHashV;
+    const offU = fract(x * hu0 + z * hu1);
+    const offV = fract(x * hv0 + z * hv1 + y * hv2);
 
     for (let face = 0; face < 6; face++) {
       const [su, sv] = scales[face];
@@ -109,30 +111,6 @@ export function createWallSlab(x, z, length, height, y, thickness, axis, materia
     d,
     material,
   );
-}
-
-/**
- * Merge an array of meshes into a single BufferGeometry for performance.
- * Returns a new mesh with the merged geometry.
- *
- * @param {THREE.Mesh[]} meshes
- * @param {THREE.Material} material
- * @returns {THREE.Mesh}
- */
-export function mergeMeshes(meshes, material) {
-  if (meshes.length === 0) return null;
-
-  const geometries = meshes.map((mesh) => {
-    mesh.updateMatrixWorld(true);
-    const geo = mesh.geometry.clone();
-    geo.applyMatrix4(mesh.matrixWorld);
-    return geo;
-  });
-
-  const merged = mergeBufferGeometries(geometries);
-  geometries.forEach((g) => g.dispose());
-
-  return new THREE.Mesh(merged, material);
 }
 
 /**

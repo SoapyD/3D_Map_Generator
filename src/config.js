@@ -86,9 +86,21 @@ export const COVER = {
     { height: 1.5, chance: 0.25 },  // low wall
   ],
   rooftopChance: 0.5,      // chance per rooftop quadrant
+  placementPadding: 0.25,  // edge inset for placing cover within quadrants (inches)
+  groundCoverY: 0.65,      // Y position for ground-level cover (on top of courtyard slab)
+  courtyardExpansion: 0.75, // how far courtyards extend beyond deleted footprint per side (inches)
   // Interior cover
   interiorMaxMedium: 1,    // max objects per mid-floor for medium buildings
   interiorMaxLarge: 3,     // max objects per mid-floor for large buildings
+  interiorShortChance: 0.75, // chance of 0.75" height vs 1.5" for interior cover
+  // Street scatter
+  streetScatterTarget: 20, // target number of street scatter objects
+  streetScatterAttempts: 200, // max placement attempts for street scatter
+};
+
+// --- Grid ---
+export const GRID = {
+  minBlockSize: 10,        // minimum block dimension in inches
 };
 
 // --- Geometry ---
@@ -96,6 +108,24 @@ export const GEOMETRY = {
   glbTileSize: 3,            // GLB only: inches per texture repeat
   objAtlasTileSize: 256,     // OBJ atlas: pixels per tile
   objSegmentsPerTile: 2,     // OBJ atlas: how many 3" segments map to one tile (64px each at 256px tile)
+  objAtlasPadding: 4,        // pixels of padding around each atlas tile
+  // UV hash constants for per-object tiling offset (shared by GLB + OBJ)
+  uvHashU: [0.7123, 0.3917],     // multipliers for U offset: x * [0] + z * [1]
+  uvHashV: [0.5431, 0.9281, 0.1637], // multipliers for V offset: x * [0] + z * [1] + y * [2]
+  // OBJ ladder mesh dimensions
+  ladderPoleWidth: 0.24,
+  ladderPoleDepth: 0.24,
+  ladderRungHeight: 0.18,
+  ladderRungDepth: 0.18,
+  ladderRungSpacing: 0.75,
+  ladderRungInset: 0.05,
+  // Courtyard slab
+  courtyardY: 0.55,          // Y position of courtyard slab
+  courtyardThickness: 0.1,   // thickness of courtyard slab
+  // Platform
+  platformSize: 2,           // ladder platform width/depth (inches)
+  platformThickness: 0.2,    // ladder platform thickness (inches)
+  walkwayThickness: 0.3,     // walkway slab thickness (inches)
 };
 
 // --- Ladder Display ---

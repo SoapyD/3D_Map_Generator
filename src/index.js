@@ -30,24 +30,24 @@ async function main() {
   console.log(`  Damage level: ${config.damageLevel}`);
 
   // Stage 1: Grid partitioning
-  console.log('\n[1/6] Generating city grid...');
+  console.log('\n[1/7] Generating city grid...');
   const gridData = generateGrid(config, rng);
   console.log(`  ${gridData.blocks.length} city blocks`);
 
   // Stage 2: Building footprints
-  console.log('[2/6] Placing buildings...');
+  console.log('[2/7] Placing buildings...');
   const buildingData = generateBuildings(gridData, config, rng);
   console.log(`  ${buildingData.buildings.length} buildings`);
 
   // Stage 3: Floor plates
-  console.log('[3/6] Generating floor plates...');
+  console.log('[3/7] Generating floor plates...');
   const floorData = generateFloors(buildingData, config, rng);
   for (const f of floorData.floors) {
     console.log(`  Tier ${f.tier}: ${f.sections.length} sections`);
   }
 
   // Stage 4: Walls
-  console.log('[4/6] Generating walls...');
+  console.log('[4/7] Generating walls...');
   const wallData = generateWalls(floorData, config, rng);
   console.log(`  ${wallData.walls.length} wall segments`);
 

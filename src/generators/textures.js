@@ -22,8 +22,8 @@ import { PNG } from 'pngjs';
 import path from 'path';
 
 const CATEGORIES = [
-  'walls', 'landmark_walls', 'floors', 'objects', 'objects_medium', 'objects_tall',
-  'ladders', 'walkways', 'courtyards', 'base_map', 'domes',
+  'walls', 'landmark_walls', 'floors', 'objects',
+  'ladders', 'walkways', 'courtyards', 'base_map',
 ];
 
 /**
