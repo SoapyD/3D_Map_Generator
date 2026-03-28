@@ -114,6 +114,7 @@ export const DELETIONS = {
   // Buildings
   buildingRandomCull: true,        // delete 15% of small buildings randomly
   buildingDisplaceByLarge: true,   // delete small buildings overlapping large ones
+  courtyardWallCull: true,          // remove courtyards that intersect visible walls
 
   // Walkways
   walkwayWallCollision: true,      // drop walkways that hit walls on their tier
