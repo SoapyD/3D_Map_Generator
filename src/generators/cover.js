@@ -133,7 +133,7 @@ export function generateCover(data, config, rng) {
 
     const count = rng.int(1, 3);
     for (let i = 0; i < count; i++) {
-      const piece = makeCoverPiece(db, slabThickness, rng);
+      const piece = makeCoverPiece(db, 0.65, rng);
       if (!piece) continue;
       // Cap height if under a big building
       if (piece.height > maxHeight) piece.height = maxHeight;
