@@ -103,7 +103,9 @@ export const COVER = {
 
 // --- Geometry ---
 export const GEOMETRY = {
-  tileSize: 3,             // inches per texture repeat
+  glbTileSize: 3,            // GLB only: inches per texture repeat
+  objAtlasTileSize: 256,     // OBJ atlas: pixels per tile
+  objSegmentsPerTile: 4,     // OBJ atlas: how many 3" segments map to one tile (64px each at 256px tile)
 };
 
 // --- Ladder Display ---
