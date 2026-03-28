@@ -629,11 +629,11 @@ export async function exportToObj(data, config, outputDir, baseName) {
     const halfSpread = (ladderWidth / 2) - POLE_WIDTH / 2 - RUNG_INSET;
 
     if (isThinX) {
-      addSubBox(`${prefix}_stile_L`, cx - POLE_DEPTH/2, l.y0, cz - halfSpread - POLE_WIDTH/2, POLE_DEPTH, height, POLE_WIDTH, uv, true);
-      addSubBox(`${prefix}_stile_R`, cx - POLE_DEPTH/2, l.y0, cz + halfSpread - POLE_WIDTH/2, POLE_DEPTH, height, POLE_WIDTH, uv, true);
+      addSubBox(`${prefix}_stile_L`, cx - POLE_DEPTH/2, l.y0, cz - halfSpread - POLE_WIDTH/2, POLE_DEPTH, height, POLE_WIDTH, uv, false);
+      addSubBox(`${prefix}_stile_R`, cx - POLE_DEPTH/2, l.y0, cz + halfSpread - POLE_WIDTH/2, POLE_DEPTH, height, POLE_WIDTH, uv, false);
     } else {
-      addSubBox(`${prefix}_stile_L`, cx - halfSpread - POLE_WIDTH/2, l.y0, cz - POLE_DEPTH/2, POLE_WIDTH, height, POLE_DEPTH, uv, true);
-      addSubBox(`${prefix}_stile_R`, cx + halfSpread - POLE_WIDTH/2, l.y0, cz - POLE_DEPTH/2, POLE_WIDTH, height, POLE_DEPTH, uv, true);
+      addSubBox(`${prefix}_stile_L`, cx - halfSpread - POLE_WIDTH/2, l.y0, cz - POLE_DEPTH/2, POLE_WIDTH, height, POLE_DEPTH, uv, false);
+      addSubBox(`${prefix}_stile_R`, cx + halfSpread - POLE_WIDTH/2, l.y0, cz - POLE_DEPTH/2, POLE_WIDTH, height, POLE_DEPTH, uv, false);
     }
 
     const rungCount = Math.floor(height / RUNG_SPACING);
@@ -642,10 +642,10 @@ export async function exportToObj(data, config, outputDir, baseName) {
       if (ry >= l.y1 - RUNG_SPACING * 0.3) break;
       if (isThinX) {
         const rungLen = halfSpread * 2 + POLE_WIDTH;
-        addSubBox(`${prefix}_rung_${r}`, cx - RUNG_DEPTH/2, ry - RUNG_HEIGHT/2, cz - halfSpread - POLE_WIDTH/2, RUNG_DEPTH, RUNG_HEIGHT, rungLen, uv, true);
+        addSubBox(`${prefix}_rung_${r}`, cx - RUNG_DEPTH/2, ry - RUNG_HEIGHT/2, cz - halfSpread - POLE_WIDTH/2, RUNG_DEPTH, RUNG_HEIGHT, rungLen, uv, false);
       } else {
         const rungLen = halfSpread * 2 + POLE_WIDTH;
-        addSubBox(`${prefix}_rung_${r}`, cx - halfSpread - POLE_WIDTH/2, ry - RUNG_HEIGHT/2, cz - RUNG_DEPTH/2, rungLen, RUNG_HEIGHT, RUNG_DEPTH, uv, true);
+        addSubBox(`${prefix}_rung_${r}`, cx - halfSpread - POLE_WIDTH/2, ry - RUNG_HEIGHT/2, cz - RUNG_DEPTH/2, rungLen, RUNG_HEIGHT, RUNG_DEPTH, uv, false);
       }
     }
   }
