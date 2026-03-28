@@ -159,7 +159,7 @@ export async function exportToObj(data, config, outputDir, baseName) {
   objLines.push('# Mordheim Map Generator - subdivided');
   objLines.push('');
 
-  function addSubBox(name, x0, y0, z0, sizeX, sizeY, sizeZ, uv, showEdges = false) {
+  function addSubBox(name, x0, y0, z0, sizeX, sizeY, sizeZ, uv, showEdges = false, rotateUV = false) {
     const isFloor = sizeY < 1;
     const isWallX = sizeX < 1;
     const isWallZ = sizeZ < 1;
@@ -195,10 +195,18 @@ export async function exportToObj(data, config, outputDir, baseName) {
 
           const uOff = (sx % SEGS_PER_TILE) * uvStep, vOff = (sz % SEGS_PER_TILE) * uvStepV;
           for (let f = 0; f < 2; f++) {
-            objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
-            objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
-            objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
-            objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+            if (rotateUV) {
+              // Rotated: U maps to Z, V maps to X — verts are (x,z): 0=(-,-) 1=(+,-) 2=(+,+) 3=(-,+)
+              objLines.push(`vt ${(uv.uMin+vOff).toFixed(6)} ${(uv.vMin+uOff).toFixed(6)}`);             // v0: U=z, V=x
+              objLines.push(`vt ${(uv.uMin+vOff).toFixed(6)} ${(uv.vMin+uOff+uvStep).toFixed(6)}`);       // v1: U=z, V=x+
+              objLines.push(`vt ${(uv.uMin+vOff+uvStepV).toFixed(6)} ${(uv.vMin+uOff+uvStep).toFixed(6)}`); // v2: U=z+, V=x+
+              objLines.push(`vt ${(uv.uMin+vOff+uvStepV).toFixed(6)} ${(uv.vMin+uOff).toFixed(6)}`);       // v3: U=z+, V=x
+            } else {
+              objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+              objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+              objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+              objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+            }
           }
 
           objLines.push(`vn 0 -1 0`);
@@ -567,7 +575,7 @@ export async function exportToObj(data, config, outputDir, baseName) {
   const walkways = data.connections ? data.connections.walkways : [];
   for (let i = 0; i < walkways.length; i++) {
     const w = walkways[i];
-    addSubBox(`walkway_${i}`, w.x, w.y, w.z, w.w, 0.3, w.d, getUV(walkwayIdx), true);
+    addSubBox(`walkway_${i}`, w.x, w.y, w.z, w.w, 0.3, w.d, getUV(walkwayIdx), true, w.w > w.d);
   }
 
   // Cover

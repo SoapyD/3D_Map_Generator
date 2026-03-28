@@ -151,7 +151,7 @@ export function buildScene(data, config) {
       } else {
         material = pickFromPool(pools.walkways, i);
       }
-      const mesh = createFloorSlab({ x: w.x, z: w.z, w: w.w, d: w.d }, w.y, 0.3, material);
+      const mesh = createFloorSlab({ x: w.x, z: w.z, w: w.w, d: w.d }, w.y, 0.3, material, { rotateUV: w.w > w.d });
       mesh.name = w.blocked ? `walkway_BLOCKED_${i}` : `walkway_${i}`;
       scene.add(mesh);
     }

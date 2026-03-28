@@ -17,7 +17,7 @@ import { GEOMETRY } from '../config.js';
 
 const TILE_SIZE = GEOMETRY.glbTileSize;
 
-export function createSlab(x, y, z, width, height, depth, material) {
+export function createSlab(x, y, z, width, height, depth, material, { rotateUV = false } = {}) {
   const geometry = new THREE.BoxGeometry(width, height, depth);
 
   // Scale UVs so textures tile at a fixed real-world scale
@@ -26,11 +26,14 @@ export function createSlab(x, y, z, width, height, depth, material) {
     // BoxGeometry has 6 faces. Each face's UVs map 0-1.
     // We scale them by the face dimensions / TILE_SIZE.
     // Face order: +x, -x, +y, -y, +z, -z (4 verts each = 24 total)
+    // rotateUV swaps U/V on top/bottom faces so textures run along the other axis
+    const topU = rotateUV ? depth : width;
+    const topV = rotateUV ? width : depth;
     const scales = [
       [depth / TILE_SIZE, height / TILE_SIZE],  // +x face
       [depth / TILE_SIZE, height / TILE_SIZE],  // -x face
-      [width / TILE_SIZE, depth / TILE_SIZE],   // +y face (top)
-      [width / TILE_SIZE, depth / TILE_SIZE],   // -y face (bottom)
+      [topU / TILE_SIZE, topV / TILE_SIZE],     // +y face (top)
+      [topU / TILE_SIZE, topV / TILE_SIZE],     // -y face (bottom)
       [width / TILE_SIZE, height / TILE_SIZE],  // +z face
       [width / TILE_SIZE, height / TILE_SIZE],  // -z face
     ];
@@ -62,7 +65,7 @@ export function createSlab(x, y, z, width, height, depth, material) {
  * @param {THREE.Material} material
  * @returns {THREE.Mesh}
  */
-export function createFloorSlab(rect, y, thickness, material) {
+export function createFloorSlab(rect, y, thickness, material, opts) {
   return createSlab(
     rect.x + rect.w / 2,
     y + thickness / 2,
@@ -71,6 +74,7 @@ export function createFloorSlab(rect, y, thickness, material) {
     thickness,
     rect.d,
     material,
+    opts,
   );
 }
 
