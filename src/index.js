@@ -74,7 +74,7 @@ async function main() {
   await exportToGlb(scene, outputPath);
 
   const { dir, baseName } = getObjOutputPath(config);
-  const objPath = await exportToObj(scene, dir, baseName);
+  const objPath = await exportToObj(coverData, config, dir, baseName);
   const collisionPath = await exportCollisionObj(scene, dir, baseName);
 
   console.log(`\nDone!`);

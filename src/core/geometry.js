@@ -15,9 +15,9 @@ import * as THREE from 'three';
  */
 import { GEOMETRY } from '../config.js';
 
-const TILE_SIZE = GEOMETRY.tileSize;
+const TILE_SIZE = GEOMETRY.glbTileSize;
 
-export function createSlab(x, y, z, width, height, depth, material) {
+export function createSlab(x, y, z, width, height, depth, material, { rotateUV = false } = {}) {
   const geometry = new THREE.BoxGeometry(width, height, depth);
 
   // Scale UVs so textures tile at a fixed real-world scale
@@ -26,11 +26,14 @@ export function createSlab(x, y, z, width, height, depth, material) {
     // BoxGeometry has 6 faces. Each face's UVs map 0-1.
     // We scale them by the face dimensions / TILE_SIZE.
     // Face order: +x, -x, +y, -y, +z, -z (4 verts each = 24 total)
+    // rotateUV swaps U/V on top/bottom faces so textures run along the other axis
+    const topU = rotateUV ? depth : width;
+    const topV = rotateUV ? width : depth;
     const scales = [
       [depth / TILE_SIZE, height / TILE_SIZE],  // +x face
       [depth / TILE_SIZE, height / TILE_SIZE],  // -x face
-      [width / TILE_SIZE, depth / TILE_SIZE],   // +y face (top)
-      [width / TILE_SIZE, depth / TILE_SIZE],   // -y face (bottom)
+      [topU / TILE_SIZE, topV / TILE_SIZE],     // +y face (top)
+      [topU / TILE_SIZE, topV / TILE_SIZE],     // -y face (bottom)
       [width / TILE_SIZE, height / TILE_SIZE],  // +z face
       [width / TILE_SIZE, height / TILE_SIZE],  // -z face
     ];
@@ -62,7 +65,7 @@ export function createSlab(x, y, z, width, height, depth, material) {
  * @param {THREE.Material} material
  * @returns {THREE.Mesh}
  */
-export function createFloorSlab(rect, y, thickness, material) {
+export function createFloorSlab(rect, y, thickness, material, opts) {
   return createSlab(
     rect.x + rect.w / 2,
     y + thickness / 2,
@@ -71,6 +74,7 @@ export function createFloorSlab(rect, y, thickness, material) {
     thickness,
     rect.d,
     material,
+    opts,
   );
 }
 
@@ -166,76 +170,6 @@ function mergeBufferGeometries(geometries) {
   return merged;
 }
 
-/**
- * Create a pillar with configurable roof and decoration.
- *
- * @param {number} cx - Centre X
- * @param {number} y - Base Y
- * @param {number} cz - Centre Z
- * @param {number} w - Width
- * @param {number} d - Depth
- * @param {number} height - Total height
- * @param {THREE.Material} bodyMaterial
- * @param {object} opts
- * @param {string} opts.roof - 'none' | 'dome' | 'spire'
- * @param {THREE.Material} [opts.roofMaterial] - Material for dome/spire
- * @param {string} opts.decoration - 'none' | 'skirt' | 'cube'
- * @param {THREE.Material} [opts.decoMaterial] - Material for skirt/cube
- * @returns {THREE.Group}
- */
-export function createPillar(cx, y, cz, w, d, height, bodyMaterial, opts = {}) {
-  const group = new THREE.Group();
-  const radius = Math.min(w, d) / 2;
-  const roofType = opts.roof || 'none';
-  const decoType = opts.decoration || 'none';
-  const roofMat = opts.roofMaterial || bodyMaterial;
-  const decoMat = opts.decoMaterial || bodyMaterial;
-
-  // Calculate roof height
-  let roofHeight = 0;
-  if (roofType === 'dome') roofHeight = radius * 0.6;
-  else if (roofType === 'spire') roofHeight = radius * 2;
-
-  const columnHeight = height - roofHeight;
-
-  // Column body
-  const columnGeo = new THREE.CylinderGeometry(radius, radius, columnHeight, 8);
-  const column = new THREE.Mesh(columnGeo, bodyMaterial);
-  column.position.set(cx, y + columnHeight / 2, cz);
-  group.add(column);
-
-  // Roof
-  if (roofType === 'dome') {
-    const domeGeo = new THREE.SphereGeometry(radius, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2);
-    const dome = new THREE.Mesh(domeGeo, roofMat);
-    dome.position.set(cx, y + columnHeight, cz);
-    group.add(dome);
-  } else if (roofType === 'spire') {
-    const spireGeo = new THREE.ConeGeometry(radius, roofHeight, 8);
-    const spire = new THREE.Mesh(spireGeo, roofMat);
-    spire.position.set(cx, y + columnHeight + roofHeight / 2, cz);
-    group.add(spire);
-  }
-
-  // Decoration — top flush with top of column
-  if (decoType === 'skirt') {
-    const skirtRadius = w * 0.65;
-    const skirtHeight = 0.3;
-    const skirtGeo = new THREE.CylinderGeometry(skirtRadius, skirtRadius, skirtHeight, 12);
-    const skirt = new THREE.Mesh(skirtGeo, roofMat); // same colour as dome/spire
-    skirt.position.set(cx, y + columnHeight - skirtHeight / 2, cz);
-    group.add(skirt);
-  } else if (decoType === 'cube') {
-    const cubeSize = w * 1.3;
-    const cubeHeight = height * 0.25;
-    const cubeGeo = new THREE.BoxGeometry(cubeSize, cubeHeight, cubeSize);
-    const cube = new THREE.Mesh(cubeGeo, bodyMaterial); // same colour as pillar body
-    cube.position.set(cx, y + columnHeight - cubeHeight / 2, cz);
-    group.add(cube);
-  }
-
-  return group;
-}
 
 /**
  * Create a detailed ladder mesh: two vertical poles with horizontal rungs.

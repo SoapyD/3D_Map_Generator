@@ -82,20 +82,10 @@ export const CONNECTIVITY = {
 export const COVER = {
   thin: 1.5,               // standard cover dimension (inches)
   types: [
-    { height: 0.75, chance: 0.6 }, // low rubble/debris
-    { height: 1.5, chance: 0.2 },  // low wall
-    { height: 3.0, chance: 0.1 },  // pillar
-    { height: 6.0, chance: 0.1 },  // tall pillar
+    { height: 0.75, chance: 0.75 }, // low rubble/debris
+    { height: 1.5, chance: 0.25 },  // low wall
   ],
-  maxTall: 3,              // max tall objects total
   rooftopChance: 0.5,      // chance per rooftop quadrant
-  maxHeightUnderBuilding: 3.0, // cap for cover under big buildings
-  // 3" pillar roof: 'none' | 'dome' | 'spire'
-  roof3Chances: { none: 0.33, dome: 0.33, spire: 0.34 },
-  // 6" pillar roof: 'dome' | 'spire' (always has one)
-  roof6Chances: { dome: 0.5, spire: 0.5 },
-  // 6" pillar decoration: 'none' | 'skirt' | 'cube'
-  deco6Chances: { none: 0.33, skirt: 0.33, cube: 0.34 },
   // Interior cover
   interiorMaxMedium: 1,    // max objects per mid-floor for medium buildings
   interiorMaxLarge: 3,     // max objects per mid-floor for large buildings
@@ -103,7 +93,9 @@ export const COVER = {
 
 // --- Geometry ---
 export const GEOMETRY = {
-  tileSize: 3,             // inches per texture repeat
+  glbTileSize: 3,            // GLB only: inches per texture repeat
+  objAtlasTileSize: 256,     // OBJ atlas: pixels per tile
+  objSegmentsPerTile: 4,     // OBJ atlas: how many 3" segments map to one tile (64px each at 256px tile)
 };
 
 // --- Ladder Display ---
