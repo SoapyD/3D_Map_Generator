@@ -83,5 +83,7 @@ Procedural generator for ruined city maps optimized for Mordheim gameplay. Outpu
 - `docs/PROJECT_OVERVIEW.md` — problem statement, design principles
 - `docs/plans/VERTEX_LIMIT_PLAN.md` — vertex budget strategy
 - `docs/plans/PACKAGE_INTEGRATION_PLAN.md` — wyrdwars integration plan
+- `docs/plans/BUILDING_ADDITIONS_PLAN.md` — towers, bridges, shapes, interior walls, preview tool
+- `docs/plans/WATERWAYS_PLAN.md` — canal waterways with edge variants and bridges
 - `docs/plans/FUTURE_FEATURES.md` — feature roadmap
 - `docs/plans/archive/VERTEX_OPTIMISATION_PLAN.md` — completed vertex optimisation (24,672 → 13,943)
