@@ -957,6 +957,24 @@ export async function exportToObj(data, config, outputDir, baseName) {
   }
 
   // Flat ladder meshes
+  // Emit a double-sided vertical quad (4 verts, front + back faces)
+  function addVerticalQuad(name, v0, v1, v2, v3, nx, ny, nz, uv) {
+    const cu = ((uv.uMin + uv.uMax) / 2).toFixed(6);
+    const cv = ((uv.vMin + uv.vMax) / 2).toFixed(6);
+    const vo = vertOff;
+    objLines.push(`o ${name}`);
+    for (const v of [v0,v1,v2,v3]) objLines.push(`v ${v[0].toFixed(6)} ${v[1].toFixed(6)} ${v[2].toFixed(6)}`);
+    for (let i = 0; i < 4; i++) objLines.push(`vt ${cu} ${cv}`);
+    objLines.push(`vn ${nx} ${ny} ${nz}`);
+    objLines.push(`vn ${-nx} ${-ny} ${-nz}`);
+    const uo = uvOff, no = normOff;
+    objLines.push(`f ${vo}/${uo}/${no} ${vo+1}/${uo+1}/${no} ${vo+2}/${uo+2}/${no}`);
+    objLines.push(`f ${vo}/${uo}/${no} ${vo+2}/${uo+2}/${no} ${vo+3}/${uo+3}/${no}`);
+    objLines.push(`f ${vo+2}/${uo+2}/${no+1} ${vo+1}/${uo+1}/${no+1} ${vo}/${uo}/${no+1}`);
+    objLines.push(`f ${vo+3}/${uo+3}/${no+1} ${vo+2}/${uo+2}/${no+1} ${vo}/${uo}/${no+1}`);
+    vertOff += 4; uvOff += 4; normOff += 2;
+  }
+
   function addLadderMesh(prefix, l, uv) {
     const height = l.y1 - l.y0;
     if (height <= 0) return;
@@ -966,25 +984,148 @@ export async function exportToObj(data, config, outputDir, baseName) {
     const cx = l.x + l.w / 2;
     const cz = l.z + l.d / 2;
     const halfSpread = (ladderWidth / 2) - POLE_WIDTH / 2 - RUNG_INSET;
+    const flat = GEOMETRY.flatLadders;
 
-    if (isThinX) {
-      addSubBox(`${prefix}_stile_L`, cx - POLE_DEPTH/2, l.y0, cz - halfSpread - POLE_WIDTH/2, POLE_DEPTH, height, POLE_WIDTH, uv, false);
-      addSubBox(`${prefix}_stile_R`, cx - POLE_DEPTH/2, l.y0, cz + halfSpread - POLE_WIDTH/2, POLE_DEPTH, height, POLE_WIDTH, uv, false);
-    } else {
-      addSubBox(`${prefix}_stile_L`, cx - halfSpread - POLE_WIDTH/2, l.y0, cz - POLE_DEPTH/2, POLE_WIDTH, height, POLE_DEPTH, uv, false);
-      addSubBox(`${prefix}_stile_R`, cx + halfSpread - POLE_WIDTH/2, l.y0, cz - POLE_DEPTH/2, POLE_WIDTH, height, POLE_DEPTH, uv, false);
-    }
+    if (flat) {
+      // Flat mode: front-facing quads, offset forward to avoid z-fighting with wall behind
+      // Determine offset direction: away from nearest wall on the thin axis
+      const FLAT_OFFSET = 0.15;
+      let offsetDir = 1;
+      // Find the nearest wall along the ladder's thin axis to determine which side the wall is on
+      let nearestWallDist = Infinity;
+      for (const wall of walls) {
+        const wx1 = wall.axis === 'x' ? wall.x + wall.length : wall.x + wall.thickness;
+        const wz1 = wall.axis === 'z' ? wall.z + wall.length : wall.z + wall.thickness;
+        // Check if wall overlaps ladder on the non-thin axes
+        if (isThinX) {
+          // Thin along X — check walls that overlap in Z and Y
+          if (cz >= wall.z - 0.5 && cz <= wz1 + 0.5) {
+            // Wall centre along X
+            const wallCx = (wall.x + wx1) / 2;
+            const dist = Math.abs(wallCx - cx);
+            if (dist < nearestWallDist) {
+              nearestWallDist = dist;
+              offsetDir = (cx >= wallCx) ? 1 : -1; // offset away from wall
+            }
+          }
+        } else {
+          // Thin along Z — check walls that overlap in X and Y
+          if (cx >= wall.x - 0.5 && cx <= wx1 + 0.5) {
+            const wallCz = (wall.z + wz1) / 2;
+            const dist = Math.abs(wallCz - cz);
+            if (dist < nearestWallDist) {
+              nearestWallDist = dist;
+              offsetDir = (cz >= wallCz) ? 1 : -1; // offset away from wall
+            }
+          }
+        }
+      }
 
-    const rungCount = Math.floor(height / RUNG_SPACING);
-    for (let r = 1; r <= rungCount; r++) {
-      const ry = l.y0 + r * RUNG_SPACING;
-      if (ry >= l.y1 - RUNG_SPACING * 0.3) break;
       if (isThinX) {
-        const rungLen = halfSpread * 2 + POLE_WIDTH;
-        addSubBox(`${prefix}_rung_${r}`, cx - RUNG_DEPTH/2, ry - RUNG_HEIGHT/2, cz - halfSpread - POLE_WIDTH/2, RUNG_DEPTH, RUNG_HEIGHT, rungLen, uv, false);
+        const fx = cx + FLAT_OFFSET * offsetDir;
+        const lz = cz - halfSpread - POLE_WIDTH/2;
+        const rz = cz + halfSpread - POLE_WIDTH/2;
+        addVerticalQuad(`${prefix}_stile_L`,
+          [fx, l.y0, lz], [fx, l.y0, lz + POLE_WIDTH], [fx, l.y0 + height, lz + POLE_WIDTH], [fx, l.y0 + height, lz],
+          1, 0, 0, uv);
+        addVerticalQuad(`${prefix}_stile_R`,
+          [fx, l.y0, rz], [fx, l.y0, rz + POLE_WIDTH], [fx, l.y0 + height, rz + POLE_WIDTH], [fx, l.y0 + height, rz],
+          1, 0, 0, uv);
+        const rungCount = Math.floor(height / RUNG_SPACING);
+        for (let r = 1; r <= rungCount; r++) {
+          const ry = l.y0 + r * RUNG_SPACING;
+          if (ry >= l.y1 - RUNG_SPACING * 0.3) break;
+          const rungLen = halfSpread * 2 + POLE_WIDTH;
+          addVerticalQuad(`${prefix}_rung_${r}`,
+            [fx, ry - RUNG_HEIGHT/2, lz], [fx, ry - RUNG_HEIGHT/2, lz + rungLen],
+            [fx, ry + RUNG_HEIGHT/2, lz + rungLen], [fx, ry + RUNG_HEIGHT/2, lz],
+            1, 0, 0, uv);
+        }
       } else {
-        const rungLen = halfSpread * 2 + POLE_WIDTH;
-        addSubBox(`${prefix}_rung_${r}`, cx - halfSpread - POLE_WIDTH/2, ry - RUNG_HEIGHT/2, cz - RUNG_DEPTH/2, rungLen, RUNG_HEIGHT, RUNG_DEPTH, uv, false);
+        const fz = cz + FLAT_OFFSET * offsetDir;
+        const lx = cx - halfSpread - POLE_WIDTH/2;
+        const rx = cx + halfSpread - POLE_WIDTH/2;
+        addVerticalQuad(`${prefix}_stile_L`,
+          [lx, l.y0, fz], [lx + POLE_WIDTH, l.y0, fz], [lx + POLE_WIDTH, l.y0 + height, fz], [lx, l.y0 + height, fz],
+          0, 0, 1, uv);
+        addVerticalQuad(`${prefix}_stile_R`,
+          [rx, l.y0, fz], [rx + POLE_WIDTH, l.y0, fz], [rx + POLE_WIDTH, l.y0 + height, fz], [rx, l.y0 + height, fz],
+          0, 0, 1, uv);
+        const rungCount = Math.floor(height / RUNG_SPACING);
+        for (let r = 1; r <= rungCount; r++) {
+          const ry = l.y0 + r * RUNG_SPACING;
+          if (ry >= l.y1 - RUNG_SPACING * 0.3) break;
+          const rungLen = halfSpread * 2 + POLE_WIDTH;
+          addVerticalQuad(`${prefix}_rung_${r}`,
+            [lx, ry - RUNG_HEIGHT/2, fz], [lx + rungLen, ry - RUNG_HEIGHT/2, fz],
+            [lx + rungLen, ry + RUNG_HEIGHT/2, fz], [lx, ry + RUNG_HEIGHT/2, fz],
+            0, 0, 1, uv);
+        }
+      }
+    } else {
+      // 3D mode: emit full 6-face boxes directly (bypasses addSubBox thin-axis detection)
+      function addLadderBox(name, bx, by, bz, bw, bh, bd) {
+        const cu = ((uv.uMin + uv.uMax) / 2).toFixed(6);
+        const cv = ((uv.vMin + uv.vMax) / 2).toFixed(6);
+        const vo = vertOff;
+        const x1 = bx + bw, y1 = by + bh, z1 = bz + bd;
+        objLines.push(`o ${name}`);
+        // 8 corner verts
+        objLines.push(`v ${bx.toFixed(6)} ${by.toFixed(6)} ${bz.toFixed(6)}`);  // 0: ---
+        objLines.push(`v ${x1.toFixed(6)} ${by.toFixed(6)} ${bz.toFixed(6)}`);  // 1: +--
+        objLines.push(`v ${x1.toFixed(6)} ${by.toFixed(6)} ${z1.toFixed(6)}`);  // 2: +-+
+        objLines.push(`v ${bx.toFixed(6)} ${by.toFixed(6)} ${z1.toFixed(6)}`);  // 3: --+
+        objLines.push(`v ${bx.toFixed(6)} ${y1.toFixed(6)} ${bz.toFixed(6)}`);  // 4: -+-
+        objLines.push(`v ${x1.toFixed(6)} ${y1.toFixed(6)} ${bz.toFixed(6)}`);  // 5: ++-
+        objLines.push(`v ${x1.toFixed(6)} ${y1.toFixed(6)} ${z1.toFixed(6)}`);  // 6: +++
+        objLines.push(`v ${bx.toFixed(6)} ${y1.toFixed(6)} ${z1.toFixed(6)}`);  // 7: -++
+        // 6 UVs (one per face, centre-point)
+        for (let i = 0; i < 6; i++) objLines.push(`vt ${cu} ${cv}`);
+        // 6 normals
+        objLines.push('vn 0 -1 0'); objLines.push('vn 0 1 0');
+        objLines.push('vn 0 0 -1'); objLines.push('vn 0 0 1');
+        objLines.push('vn -1 0 0'); objLines.push('vn 1 0 0');
+        const u = uvOff, n = normOff;
+        // Bottom (-Y)
+        objLines.push(`f ${vo}/${u}/${n} ${vo+1}/${u}/${n} ${vo+2}/${u}/${n}`);
+        objLines.push(`f ${vo}/${u}/${n} ${vo+2}/${u}/${n} ${vo+3}/${u}/${n}`);
+        // Top (+Y)
+        objLines.push(`f ${vo+6}/${u+1}/${n+1} ${vo+5}/${u+1}/${n+1} ${vo+4}/${u+1}/${n+1}`);
+        objLines.push(`f ${vo+7}/${u+1}/${n+1} ${vo+6}/${u+1}/${n+1} ${vo+4}/${u+1}/${n+1}`);
+        // Front (-Z)
+        objLines.push(`f ${vo}/${u+2}/${n+2} ${vo+4}/${u+2}/${n+2} ${vo+5}/${u+2}/${n+2}`);
+        objLines.push(`f ${vo}/${u+2}/${n+2} ${vo+5}/${u+2}/${n+2} ${vo+1}/${u+2}/${n+2}`);
+        // Back (+Z)
+        objLines.push(`f ${vo+2}/${u+3}/${n+3} ${vo+6}/${u+3}/${n+3} ${vo+7}/${u+3}/${n+3}`);
+        objLines.push(`f ${vo+2}/${u+3}/${n+3} ${vo+7}/${u+3}/${n+3} ${vo+3}/${u+3}/${n+3}`);
+        // Left (-X)
+        objLines.push(`f ${vo+3}/${u+4}/${n+4} ${vo+7}/${u+4}/${n+4} ${vo+4}/${u+4}/${n+4}`);
+        objLines.push(`f ${vo+3}/${u+4}/${n+4} ${vo+4}/${u+4}/${n+4} ${vo}/${u+4}/${n+4}`);
+        // Right (+X)
+        objLines.push(`f ${vo+1}/${u+5}/${n+5} ${vo+5}/${u+5}/${n+5} ${vo+6}/${u+5}/${n+5}`);
+        objLines.push(`f ${vo+1}/${u+5}/${n+5} ${vo+6}/${u+5}/${n+5} ${vo+2}/${u+5}/${n+5}`);
+        vertOff += 8; uvOff += 6; normOff += 6;
+      }
+
+      if (isThinX) {
+        addLadderBox(`${prefix}_stile_L`, cx - POLE_DEPTH/2, l.y0, cz - halfSpread - POLE_WIDTH/2, POLE_DEPTH, height, POLE_WIDTH);
+        addLadderBox(`${prefix}_stile_R`, cx - POLE_DEPTH/2, l.y0, cz + halfSpread - POLE_WIDTH/2, POLE_DEPTH, height, POLE_WIDTH);
+      } else {
+        addLadderBox(`${prefix}_stile_L`, cx - halfSpread - POLE_WIDTH/2, l.y0, cz - POLE_DEPTH/2, POLE_WIDTH, height, POLE_DEPTH);
+        addLadderBox(`${prefix}_stile_R`, cx + halfSpread - POLE_WIDTH/2, l.y0, cz - POLE_DEPTH/2, POLE_WIDTH, height, POLE_DEPTH);
+      }
+
+      const rungCount = Math.floor(height / RUNG_SPACING);
+      for (let r = 1; r <= rungCount; r++) {
+        const ry = l.y0 + r * RUNG_SPACING;
+        if (ry >= l.y1 - RUNG_SPACING * 0.3) break;
+        if (isThinX) {
+          const rungLen = halfSpread * 2 + POLE_WIDTH;
+          addLadderBox(`${prefix}_rung_${r}`, cx - RUNG_DEPTH/2, ry - RUNG_HEIGHT/2, cz - halfSpread - POLE_WIDTH/2, RUNG_DEPTH, RUNG_HEIGHT, rungLen);
+        } else {
+          const rungLen = halfSpread * 2 + POLE_WIDTH;
+          addLadderBox(`${prefix}_rung_${r}`, cx - halfSpread - POLE_WIDTH/2, ry - RUNG_HEIGHT/2, cz - RUNG_DEPTH/2, rungLen, RUNG_HEIGHT, RUNG_DEPTH);
+        }
       }
     }
   }

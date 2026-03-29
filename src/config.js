@@ -119,6 +119,7 @@ export const GEOMETRY = {
   ladderRungDepth: 0.18,
   ladderRungSpacing: 0.75,
   ladderRungInset: 0.05,
+  flatLadders: true,        // true = flat front-facing quads, false = 3D boxes
   // Courtyard slab
   courtyardY: 0.55,          // Y position of courtyard slab
   courtyardThickness: 0.1,   // thickness of courtyard slab
