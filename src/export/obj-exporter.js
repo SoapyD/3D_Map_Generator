@@ -394,6 +394,32 @@ export async function exportToObj(data, config, outputDir, baseName) {
     objLines.push('');
   }
 
+  // Full perimeter edge faces for a freestanding flat object (cover, scatter, etc.)
+  function addPerimeterEdges(x0, y0, z0, sizeX, sizeY, sizeZ, uv) {
+    const x1 = x0 + sizeX, y1 = y0 + sizeY, z1 = z0 + sizeZ;
+    const cu = ((uv.uMin + uv.uMax) / 2).toFixed(6);
+    const cv = ((uv.vMin + uv.vMax) / 2).toFixed(6);
+
+    function addEdgeFace(v0, v1, v2, v3, nx, ny, nz) {
+      const vo = vertOff;
+      for (const v of [v0,v1,v2,v3]) objLines.push(`v ${v[0].toFixed(6)} ${v[1].toFixed(6)} ${v[2].toFixed(6)}`);
+      for (let i = 0; i < 4; i++) objLines.push(`vt ${cu} ${cv}`);
+      objLines.push(`vn ${nx} ${ny} ${nz}`);
+      objLines.push(`vn ${-nx} ${-ny} ${-nz}`);
+      const uo = uvOff, no = normOff;
+      objLines.push(`f ${vo}/${uo}/${no} ${vo+1}/${uo+1}/${no} ${vo+2}/${uo+2}/${no}`);
+      objLines.push(`f ${vo}/${uo}/${no} ${vo+2}/${uo+2}/${no} ${vo+3}/${uo+3}/${no}`);
+      objLines.push(`f ${vo+2}/${uo+2}/${no+1} ${vo+1}/${uo+1}/${no+1} ${vo}/${uo}/${no+1}`);
+      objLines.push(`f ${vo+3}/${uo+3}/${no+1} ${vo+2}/${uo+2}/${no+1} ${vo}/${uo}/${no+1}`);
+      vertOff += 4; uvOff += 4; normOff += 2;
+    }
+
+    addEdgeFace([x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0], 0,0,-1);
+    addEdgeFace([x1,y0,z1],[x0,y0,z1],[x0,y1,z1],[x1,y1,z1], 0,0,1);
+    addEdgeFace([x0,y0,z1],[x0,y0,z0],[x0,y1,z0],[x0,y1,z1], -1,0,0);
+    addEdgeFace([x1,y0,z0],[x1,y0,z1],[x1,y1,z1],[x1,y1,z0], 1,0,0);
+  }
+
   // --- Edge coverage helpers ---
 
   function getEdgeCoverage(section, side, allSections) {
@@ -509,24 +535,295 @@ export async function exportToObj(data, config, outputDir, baseName) {
     return false;
   }
 
+  // Shared-vertex flat surface: grid of position verts, per-tile UVs via separate indices
+  // emitBottom: whether to emit the bottom face (skip for ground/courtyards)
+  function addSharedFlat(name, x0, y0, z0, sizeX, sizeY, sizeZ, uv, emitBottom = true, rotateUV = false) {
+    const segsX = Math.max(1, Math.ceil(sizeX / SEG_SIZE));
+    const segsZ = Math.max(1, Math.ceil(sizeZ / SEG_SIZE));
+    const stepX = sizeX / segsX;
+    const stepZ = sizeZ / segsZ;
+
+    const tileW = uv.uMax - uv.uMin;
+    const tileH = uv.vMax - uv.vMin;
+    const uvStep = tileW / SEGS_PER_TILE;
+    const uvStepV = tileH / SEGS_PER_TILE;
+
+    const fract = (v) => v - Math.floor(v);
+    const [hu0, hu1] = GEOMETRY.uvHashU;
+    const [hv0, hv1, hv2] = GEOMETRY.uvHashV;
+    const baseSegU = Math.floor(fract(x0 * hu0 + z0 * hu1) * SEGS_PER_TILE);
+    const baseSegV = Math.floor(fract(x0 * hv0 + z0 * hv1 + y0 * hv2) * SEGS_PER_TILE);
+
+    const yTop = y0 + sizeY;
+
+    objLines.push(`o ${name}`);
+
+    // Emit grid of position verts for top face: (segsX+1) * (segsZ+1)
+    const voTop = vertOff;
+    for (let gz = 0; gz <= segsZ; gz++) {
+      for (let gx = 0; gx <= segsX; gx++) {
+        objLines.push(`v ${(x0 + gx * stepX).toFixed(6)} ${yTop.toFixed(6)} ${(z0 + gz * stepZ).toFixed(6)}`);
+      }
+    }
+    const topGridW = segsX + 1;
+    vertOff += topGridW * (segsZ + 1);
+
+    // Emit grid of position verts for bottom face (if needed)
+    let voBot = -1;
+    let botGridW = 0;
+    if (emitBottom) {
+      voBot = vertOff;
+      for (let gz = 0; gz <= segsZ; gz++) {
+        for (let gx = 0; gx <= segsX; gx++) {
+          objLines.push(`v ${(x0 + gx * stepX).toFixed(6)} ${y0.toFixed(6)} ${(z0 + gz * stepZ).toFixed(6)}`);
+        }
+      }
+      botGridW = topGridW;
+      vertOff += botGridW * (segsZ + 1);
+    }
+
+    // Normals
+    objLines.push(`vn 0 1 0`);
+    const noTop = normOff;
+    normOff += 1;
+    let noBot = -1;
+    if (emitBottom) {
+      objLines.push(`vn 0 -1 0`);
+      noBot = normOff;
+      normOff += 1;
+    }
+
+    // Emit per-tile faces with their own UVs, referencing grid positions
+    for (let sx = 0; sx < segsX; sx++) {
+      for (let sz = 0; sz < segsZ; sz++) {
+        const uOff = ((sx + baseSegU) % SEGS_PER_TILE) * uvStep;
+        const vOff = ((sz + baseSegV) % SEGS_PER_TILE) * uvStepV;
+
+        // Grid vertex indices for this tile's 4 corners (top face)
+        const v00 = voTop + sz * topGridW + sx;
+        const v10 = v00 + 1;
+        const v01 = v00 + topGridW;
+        const v11 = v01 + 1;
+
+        // Top face UVs
+        const uo = uvOff;
+        if (rotateUV) {
+          objLines.push(`vt ${(uv.uMin+vOff).toFixed(6)} ${(uv.vMin+uOff).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+vOff).toFixed(6)} ${(uv.vMin+uOff+uvStep).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+vOff+uvStepV).toFixed(6)} ${(uv.vMin+uOff+uvStep).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+vOff+uvStepV).toFixed(6)} ${(uv.vMin+uOff).toFixed(6)}`);
+        } else {
+          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+        }
+        uvOff += 4;
+
+        // Top face: v00=SW, v10=SE, v11=NE, v01=NW
+        objLines.push(`f ${v00}/${uo}/${noTop} ${v01}/${uo+3}/${noTop} ${v11}/${uo+2}/${noTop}`);
+        objLines.push(`f ${v00}/${uo}/${noTop} ${v11}/${uo+2}/${noTop} ${v10}/${uo+1}/${noTop}`);
+
+        // Bottom face
+        if (emitBottom) {
+          const b00 = voBot + sz * botGridW + sx;
+          const b10 = b00 + 1;
+          const b01 = b00 + botGridW;
+          const b11 = b01 + 1;
+
+          const uob = uvOff;
+          if (rotateUV) {
+            objLines.push(`vt ${(uv.uMin+vOff).toFixed(6)} ${(uv.vMin+uOff).toFixed(6)}`);
+            objLines.push(`vt ${(uv.uMin+vOff).toFixed(6)} ${(uv.vMin+uOff+uvStep).toFixed(6)}`);
+            objLines.push(`vt ${(uv.uMin+vOff+uvStepV).toFixed(6)} ${(uv.vMin+uOff+uvStep).toFixed(6)}`);
+            objLines.push(`vt ${(uv.uMin+vOff+uvStepV).toFixed(6)} ${(uv.vMin+uOff).toFixed(6)}`);
+          } else {
+            objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+            objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+            objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+            objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+          }
+          uvOff += 4;
+          objLines.push(`f ${b00}/${uob}/${noBot} ${b10}/${uob+1}/${noBot} ${b11}/${uob+2}/${noBot}`);
+          objLines.push(`f ${b00}/${uob}/${noBot} ${b11}/${uob+2}/${noBot} ${b01}/${uob+3}/${noBot}`);
+        }
+      }
+    }
+
+    objLines.push('');
+  }
+
+  // Shared-vertex wall surface: grid of position verts for front+back, per-tile UVs
+  function addSharedWall(name, wall, uv) {
+    const { x, z, length, height, baseY, thickness, axis } = wall;
+    const segsL = Math.max(1, Math.ceil(length / SEG_SIZE));
+    const segsH = Math.max(1, Math.ceil(height / SEG_SIZE));
+    const stepL = length / segsL;
+    const stepH = height / segsH;
+
+    const tileW = uv.uMax - uv.uMin;
+    const tileH = uv.vMax - uv.vMin;
+    const uvStep = tileW / SEGS_PER_TILE;
+    const uvStepV = tileH / SEGS_PER_TILE;
+
+    const fract = (v) => v - Math.floor(v);
+    const [hu0, hu1] = GEOMETRY.uvHashU;
+    const [hv0, hv1, hv2] = GEOMETRY.uvHashV;
+    const baseSegU = Math.floor(fract(x * hu0 + z * hu1) * SEGS_PER_TILE);
+    const baseSegV = Math.floor(fract(x * hv0 + z * hv1 + baseY * hv2) * SEGS_PER_TILE);
+
+    objLines.push(`o ${name}`);
+
+    const gridW = segsL + 1;
+    const gridH = segsH + 1;
+
+    if (axis === 'z') {
+      // Wall runs along Z — front face at x, back face at x+thickness
+      // Front grid
+      const voFront = vertOff;
+      for (let gh = 0; gh < gridH; gh++) {
+        for (let gl = 0; gl < gridW; gl++) {
+          objLines.push(`v ${(x + gl * stepL).toFixed(6)} ${(baseY + gh * stepH).toFixed(6)} ${z.toFixed(6)}`);
+        }
+      }
+      vertOff += gridW * gridH;
+
+      // Back grid
+      const voBack = vertOff;
+      const z1 = z + thickness;
+      for (let gh = 0; gh < gridH; gh++) {
+        for (let gl = 0; gl < gridW; gl++) {
+          objLines.push(`v ${(x + gl * stepL).toFixed(6)} ${(baseY + gh * stepH).toFixed(6)} ${z1.toFixed(6)}`);
+        }
+      }
+      vertOff += gridW * gridH;
+
+      objLines.push(`vn 0 0 -1`);
+      objLines.push(`vn 0 0 1`);
+      const noFront = normOff;
+      const noBack = normOff + 1;
+      normOff += 2;
+
+      for (let sl = 0; sl < segsL; sl++) {
+        for (let sh = 0; sh < segsH; sh++) {
+          const uOff = ((sl + baseSegU) % SEGS_PER_TILE) * uvStep;
+          const vOff = ((sh + baseSegV) % SEGS_PER_TILE) * uvStepV;
+
+          // Front face UVs + faces
+          const uo = uvOff;
+          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+          uvOff += 4;
+
+          const f00 = voFront + sh * gridW + sl;
+          const f10 = f00 + 1;
+          const f01 = f00 + gridW;
+          const f11 = f01 + 1;
+          objLines.push(`f ${f00}/${uo}/${noFront} ${f01}/${uo+3}/${noFront} ${f11}/${uo+2}/${noFront}`);
+          objLines.push(`f ${f00}/${uo}/${noFront} ${f11}/${uo+2}/${noFront} ${f10}/${uo+1}/${noFront}`);
+
+          // Back face UVs + faces
+          const uob = uvOff;
+          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+          uvOff += 4;
+
+          const b00 = voBack + sh * gridW + sl;
+          const b10 = b00 + 1;
+          const b01 = b00 + gridW;
+          const b11 = b01 + 1;
+          objLines.push(`f ${b00}/${uob}/${noBack} ${b10}/${uob+1}/${noBack} ${b11}/${uob+2}/${noBack}`);
+          objLines.push(`f ${b00}/${uob}/${noBack} ${b11}/${uob+2}/${noBack} ${b01}/${uob+3}/${noBack}`);
+        }
+      }
+    } else {
+      // Wall runs along X — front face at z, back face at z+thickness
+      const voFront = vertOff;
+      for (let gh = 0; gh < gridH; gh++) {
+        for (let gl = 0; gl < gridW; gl++) {
+          objLines.push(`v ${x.toFixed(6)} ${(baseY + gh * stepH).toFixed(6)} ${(z + gl * stepL).toFixed(6)}`);
+        }
+      }
+      vertOff += gridW * gridH;
+
+      const voBack = vertOff;
+      const x1 = x + thickness;
+      for (let gh = 0; gh < gridH; gh++) {
+        for (let gl = 0; gl < gridW; gl++) {
+          objLines.push(`v ${x1.toFixed(6)} ${(baseY + gh * stepH).toFixed(6)} ${(z + gl * stepL).toFixed(6)}`);
+        }
+      }
+      vertOff += gridW * gridH;
+
+      objLines.push(`vn -1 0 0`);
+      objLines.push(`vn 1 0 0`);
+      const noFront = normOff;
+      const noBack = normOff + 1;
+      normOff += 2;
+
+      for (let sl = 0; sl < segsL; sl++) {
+        for (let sh = 0; sh < segsH; sh++) {
+          const uOff = ((sl + baseSegU) % SEGS_PER_TILE) * uvStep;
+          const vOff = ((sh + baseSegV) % SEGS_PER_TILE) * uvStepV;
+
+          const uo = uvOff;
+          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+          uvOff += 4;
+
+          const f00 = voFront + sh * gridW + sl;
+          const f10 = f00 + 1;
+          const f01 = f00 + gridW;
+          const f11 = f01 + 1;
+          objLines.push(`f ${f00}/${uo}/${noFront} ${f10}/${uo+1}/${noFront} ${f11}/${uo+2}/${noFront}`);
+          objLines.push(`f ${f00}/${uo}/${noFront} ${f11}/${uo+2}/${noFront} ${f01}/${uo+3}/${noFront}`);
+
+          const uob = uvOff;
+          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+          uvOff += 4;
+
+          const b00 = voBack + sh * gridW + sl;
+          const b10 = b00 + 1;
+          const b01 = b00 + gridW;
+          const b11 = b01 + 1;
+          objLines.push(`f ${b00}/${uob}/${noBack} ${b01}/${uob+3}/${noBack} ${b11}/${uob+2}/${noBack}`);
+          objLines.push(`f ${b00}/${uob}/${noBack} ${b11}/${uob+2}/${noBack} ${b10}/${uob+1}/${noBack}`);
+        }
+      }
+    }
+
+    objLines.push('');
+  }
+
   // --- Export geometry ---
 
-  // Base floor
+  // Base floor (shared verts, top only — bottom sits on nothing)
   const floorData = data.floors || [];
   if (floorData.length > 0 && floorData[0].sections.length > 0) {
     const baseFloor = floorData[0].sections[0];
-    addSubBox('base_floor', baseFloor.x, 0, baseFloor.z, baseFloor.w, config.slabThickness, baseFloor.d, getUV(baseIdx), true);
+    addSharedFlat('base_floor', baseFloor.x, 0, baseFloor.z, baseFloor.w, config.slabThickness, baseFloor.d, getUV(baseIdx), true);
+    // Base floor edges (still needed for the visible thickness around the perimeter)
+    addFloorEdges(baseFloor, 0, config.slabThickness, [baseFloor], getUV(baseIdx));
   }
 
-  // Building floors (tier 1+)
+  // Building floors (tier 1+) — shared verts, top + bottom (players look up)
   for (let t = 1; t < floorData.length; t++) {
     const tier = floorData[t];
     for (const section of tier.sections) {
       const bi = findBuilding(section);
       const texIdx = bi >= 0 ? buildingFloorIdx[bi] : baseIdx;
-      addSubBox(`floor_t${tier.tier}_${Math.round(section.x)}_${Math.round(section.z)}`,
+      addSharedFlat(`floor_t${tier.tier}_${Math.round(section.x)}_${Math.round(section.z)}`,
         section.x, tier.tier * config.tierHeight, section.z,
-        section.w, config.slabThickness, section.d, getUV(texIdx));
+        section.w, config.slabThickness, section.d, getUV(texIdx), true);
       addFloorEdges(section, tier.tier * config.tierHeight, config.slabThickness, tier.sections, getUV(texIdx));
     }
   }
@@ -586,35 +883,40 @@ export async function exportToObj(data, config, outputDir, baseName) {
   const walkways = data.connections ? data.connections.walkways : [];
   for (let i = 0; i < walkways.length; i++) {
     const w = walkways[i];
-    addSubBox(`walkway_${i}`, w.x, w.y, w.z, w.w, GEOMETRY.walkwayThickness, w.d, getUV(walkwayIdx), true, w.w > w.d);
+    addSharedFlat(`walkway_${i}`, w.x, w.y, w.z, w.w, GEOMETRY.walkwayThickness, w.d, getUV(walkwayIdx), true, w.w > w.d);
+    addPerimeterEdges(w.x, w.y, w.z, w.w, GEOMETRY.walkwayThickness, w.d, getUV(walkwayIdx));
   }
 
   // Cover
   const cover = data.cover || [];
   for (let i = 0; i < cover.length; i++) {
     const c = cover[i];
-    addSubBox(`cover_${i}`, c.x, c.y, c.z, c.w, c.height, c.d, getUV(objectIdx), true);
+    addSharedFlat(`cover_${i}`, c.x, c.y, c.z, c.w, c.height, c.d, getUV(objectIdx), false);
+    addPerimeterEdges(c.x, c.y, c.z, c.w, c.height, c.d, getUV(objectIdx));
   }
 
   // Interior cover
   const interiorCover = data.interiorCover || [];
   for (let i = 0; i < interiorCover.length; i++) {
     const c = interiorCover[i];
-    addSubBox(`interior_cover_${i}`, c.x, c.y, c.z, c.w, c.height, c.d, getUV(objectIdx), true);
+    addSharedFlat(`interior_cover_${i}`, c.x, c.y, c.z, c.w, c.height, c.d, getUV(objectIdx), false);
+    addPerimeterEdges(c.x, c.y, c.z, c.w, c.height, c.d, getUV(objectIdx));
   }
 
   // Deleted footprints (courtyards)
   const deletedFootprints = data.deletedFootprints || [];
   for (let i = 0; i < deletedFootprints.length; i++) {
     const df = deletedFootprints[i];
-    addSubBox(`deleted_${i}`, df.x, GEOMETRY.courtyardY, df.z, df.w, GEOMETRY.courtyardThickness, df.d, getUV(courtyardIdx), true);
+    addSharedFlat(`deleted_${i}`, df.x, GEOMETRY.courtyardY, df.z, df.w, GEOMETRY.courtyardThickness, df.d, getUV(courtyardIdx), false);
+    addPerimeterEdges(df.x, GEOMETRY.courtyardY, df.z, df.w, GEOMETRY.courtyardThickness, df.d, getUV(courtyardIdx));
   }
 
   // Street scatter
   const streetScatter = data.streetScatter || [];
   for (let i = 0; i < streetScatter.length; i++) {
     const c = streetScatter[i];
-    addSubBox(`street_scatter_${i}`, c.x, c.y, c.z, c.w, c.height, c.d, getUV(objectIdx), true);
+    addSharedFlat(`street_scatter_${i}`, c.x, c.y, c.z, c.w, c.height, c.d, getUV(objectIdx), false);
+    addPerimeterEdges(c.x, c.y, c.z, c.w, c.height, c.d, getUV(objectIdx));
   }
 
   // Flat ladder meshes
@@ -670,7 +972,8 @@ export async function exportToObj(data, config, outputDir, baseName) {
   // Ladder platforms
   for (let i = 0; i < (conn.ladderPlatforms || []).length; i++) {
     const p = conn.ladderPlatforms[i];
-    addSubBox(`ladder_platform_${i}`, p.x, p.y, p.z, p.w, GEOMETRY.platformThickness, p.d, getUV(walkwayIdx), true);
+    addSharedFlat(`ladder_platform_${i}`, p.x, p.y, p.z, p.w, GEOMETRY.platformThickness, p.d, getUV(walkwayIdx), true);
+    addPerimeterEdges(p.x, p.y, p.z, p.w, GEOMETRY.platformThickness, p.d, getUV(walkwayIdx));
   }
 
   // Write OBJ
