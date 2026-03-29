@@ -959,12 +959,15 @@ export async function exportToObj(data, config, outputDir, baseName) {
   // Flat ladder meshes
   // Emit a double-sided vertical quad (4 verts, front + back faces)
   function addVerticalQuad(name, v0, v1, v2, v3, nx, ny, nz, uv) {
-    const cu = ((uv.uMin + uv.uMax) / 2).toFixed(6);
-    const cv = ((uv.vMin + uv.vMax) / 2).toFixed(6);
     const vo = vertOff;
     objLines.push(`o ${name}`);
     for (const v of [v0,v1,v2,v3]) objLines.push(`v ${v[0].toFixed(6)} ${v[1].toFixed(6)} ${v[2].toFixed(6)}`);
-    for (let i = 0; i < 4; i++) objLines.push(`vt ${cu} ${cv}`);
+    // Map UVs across the quad so texture tiles properly
+    // v0=BL, v1=BR, v2=TR, v3=TL in the quad's local space
+    objLines.push(`vt ${uv.uMin.toFixed(6)} ${uv.vMin.toFixed(6)}`);
+    objLines.push(`vt ${uv.uMax.toFixed(6)} ${uv.vMin.toFixed(6)}`);
+    objLines.push(`vt ${uv.uMax.toFixed(6)} ${uv.vMax.toFixed(6)}`);
+    objLines.push(`vt ${uv.uMin.toFixed(6)} ${uv.vMax.toFixed(6)}`);
     objLines.push(`vn ${nx} ${ny} ${nz}`);
     objLines.push(`vn ${-nx} ${-ny} ${-nz}`);
     const uo = uvOff, no = normOff;
@@ -1065,10 +1068,10 @@ export async function exportToObj(data, config, outputDir, baseName) {
     } else {
       // 3D mode: emit full 6-face boxes directly (bypasses addSubBox thin-axis detection)
       function addLadderBox(name, bx, by, bz, bw, bh, bd) {
-        const cu = ((uv.uMin + uv.uMax) / 2).toFixed(6);
-        const cv = ((uv.vMin + uv.vMax) / 2).toFixed(6);
         const vo = vertOff;
         const x1 = bx + bw, y1 = by + bh, z1 = bz + bd;
+        const uMin = uv.uMin.toFixed(6), uMax = uv.uMax.toFixed(6);
+        const vMin = uv.vMin.toFixed(6), vMax = uv.vMax.toFixed(6);
         objLines.push(`o ${name}`);
         // 8 corner verts
         objLines.push(`v ${bx.toFixed(6)} ${by.toFixed(6)} ${bz.toFixed(6)}`);  // 0: ---
@@ -1079,32 +1082,37 @@ export async function exportToObj(data, config, outputDir, baseName) {
         objLines.push(`v ${x1.toFixed(6)} ${y1.toFixed(6)} ${bz.toFixed(6)}`);  // 5: ++-
         objLines.push(`v ${x1.toFixed(6)} ${y1.toFixed(6)} ${z1.toFixed(6)}`);  // 6: +++
         objLines.push(`v ${bx.toFixed(6)} ${y1.toFixed(6)} ${z1.toFixed(6)}`);  // 7: -++
-        // 6 UVs (one per face, centre-point)
-        for (let i = 0; i < 6; i++) objLines.push(`vt ${cu} ${cv}`);
+        // 4 UVs per face × 6 faces = 24 UVs (spanning full tile on each face)
+        for (let i = 0; i < 6; i++) {
+          objLines.push(`vt ${uMin} ${vMin}`);
+          objLines.push(`vt ${uMax} ${vMin}`);
+          objLines.push(`vt ${uMax} ${vMax}`);
+          objLines.push(`vt ${uMin} ${vMax}`);
+        }
         // 6 normals
         objLines.push('vn 0 -1 0'); objLines.push('vn 0 1 0');
         objLines.push('vn 0 0 -1'); objLines.push('vn 0 0 1');
         objLines.push('vn -1 0 0'); objLines.push('vn 1 0 0');
         const u = uvOff, n = normOff;
-        // Bottom (-Y)
-        objLines.push(`f ${vo}/${u}/${n} ${vo+1}/${u}/${n} ${vo+2}/${u}/${n}`);
-        objLines.push(`f ${vo}/${u}/${n} ${vo+2}/${u}/${n} ${vo+3}/${u}/${n}`);
-        // Top (+Y)
-        objLines.push(`f ${vo+6}/${u+1}/${n+1} ${vo+5}/${u+1}/${n+1} ${vo+4}/${u+1}/${n+1}`);
-        objLines.push(`f ${vo+7}/${u+1}/${n+1} ${vo+6}/${u+1}/${n+1} ${vo+4}/${u+1}/${n+1}`);
-        // Front (-Z)
-        objLines.push(`f ${vo}/${u+2}/${n+2} ${vo+4}/${u+2}/${n+2} ${vo+5}/${u+2}/${n+2}`);
-        objLines.push(`f ${vo}/${u+2}/${n+2} ${vo+5}/${u+2}/${n+2} ${vo+1}/${u+2}/${n+2}`);
-        // Back (+Z)
-        objLines.push(`f ${vo+2}/${u+3}/${n+3} ${vo+6}/${u+3}/${n+3} ${vo+7}/${u+3}/${n+3}`);
-        objLines.push(`f ${vo+2}/${u+3}/${n+3} ${vo+7}/${u+3}/${n+3} ${vo+3}/${u+3}/${n+3}`);
-        // Left (-X)
-        objLines.push(`f ${vo+3}/${u+4}/${n+4} ${vo+7}/${u+4}/${n+4} ${vo+4}/${u+4}/${n+4}`);
-        objLines.push(`f ${vo+3}/${u+4}/${n+4} ${vo+4}/${u+4}/${n+4} ${vo}/${u+4}/${n+4}`);
-        // Right (+X)
-        objLines.push(`f ${vo+1}/${u+5}/${n+5} ${vo+5}/${u+5}/${n+5} ${vo+6}/${u+5}/${n+5}`);
-        objLines.push(`f ${vo+1}/${u+5}/${n+5} ${vo+6}/${u+5}/${n+5} ${vo+2}/${u+5}/${n+5}`);
-        vertOff += 8; uvOff += 6; normOff += 6;
+        // Bottom (-Y): verts 0,1,2,3
+        objLines.push(`f ${vo}/${u}/${n} ${vo+1}/${u+1}/${n} ${vo+2}/${u+2}/${n}`);
+        objLines.push(`f ${vo}/${u}/${n} ${vo+2}/${u+2}/${n} ${vo+3}/${u+3}/${n}`);
+        // Top (+Y): verts 4,5,6,7
+        objLines.push(`f ${vo+6}/${u+6}/${n+1} ${vo+5}/${u+5}/${n+1} ${vo+4}/${u+4}/${n+1}`);
+        objLines.push(`f ${vo+7}/${u+7}/${n+1} ${vo+6}/${u+6}/${n+1} ${vo+4}/${u+4}/${n+1}`);
+        // Front (-Z): verts 0,4,5,1
+        objLines.push(`f ${vo}/${u+8}/${n+2} ${vo+4}/${u+11}/${n+2} ${vo+5}/${u+10}/${n+2}`);
+        objLines.push(`f ${vo}/${u+8}/${n+2} ${vo+5}/${u+10}/${n+2} ${vo+1}/${u+9}/${n+2}`);
+        // Back (+Z): verts 2,6,7,3
+        objLines.push(`f ${vo+2}/${u+12}/${n+3} ${vo+6}/${u+14}/${n+3} ${vo+7}/${u+15}/${n+3}`);
+        objLines.push(`f ${vo+2}/${u+12}/${n+3} ${vo+7}/${u+15}/${n+3} ${vo+3}/${u+13}/${n+3}`);
+        // Left (-X): verts 3,7,4,0
+        objLines.push(`f ${vo+3}/${u+16}/${n+4} ${vo+7}/${u+19}/${n+4} ${vo+4}/${u+18}/${n+4}`);
+        objLines.push(`f ${vo+3}/${u+16}/${n+4} ${vo+4}/${u+18}/${n+4} ${vo}/${u+17}/${n+4}`);
+        // Right (+X): verts 1,5,6,2
+        objLines.push(`f ${vo+1}/${u+20}/${n+5} ${vo+5}/${u+23}/${n+5} ${vo+6}/${u+22}/${n+5}`);
+        objLines.push(`f ${vo+1}/${u+20}/${n+5} ${vo+6}/${u+22}/${n+5} ${vo+2}/${u+21}/${n+5}`);
+        vertOff += 8; uvOff += 24; normOff += 6;
       }
 
       if (isThinX) {
