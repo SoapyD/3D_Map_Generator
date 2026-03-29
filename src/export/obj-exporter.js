@@ -653,13 +653,18 @@ export async function exportToObj(data, config, outputDir, baseName) {
     objLines.push('');
   }
 
-  // Shared-vertex wall surface: grid of position verts for front+back, per-tile UVs
-  function addSharedWall(name, wall, uv) {
-    const { x, z, length, height, baseY, thickness, axis } = wall;
-    const segsL = Math.max(1, Math.ceil(length / SEG_SIZE));
-    const segsH = Math.max(1, Math.ceil(height / SEG_SIZE));
-    const stepL = length / segsL;
-    const stepH = height / segsH;
+  // Shared-vertex wall: takes (x0, y0, z0, sizeX, sizeY, sizeZ) like addSubBox
+  // Detects thin axis to determine orientation — same logic as addSubBox
+  function addSharedWall(name, x0, y0, z0, sizeX, sizeY, sizeZ, uv) {
+    const isWallZ = sizeZ < 1; // thin along Z = faces -Z/+Z
+    const isWallX = sizeX < 1; // thin along X = faces -X/+X
+
+    // Length axis and segments
+    const lenAxis = isWallZ ? sizeX : sizeZ;
+    const segsL = Math.max(1, Math.ceil(lenAxis / SEG_SIZE));
+    const segsH = Math.max(1, Math.ceil(sizeY / SEG_SIZE));
+    const stepL = lenAxis / segsL;
+    const stepH = sizeY / segsH;
 
     const tileW = uv.uMax - uv.uMin;
     const tileH = uv.vMax - uv.vMin;
@@ -669,39 +674,37 @@ export async function exportToObj(data, config, outputDir, baseName) {
     const fract = (v) => v - Math.floor(v);
     const [hu0, hu1] = GEOMETRY.uvHashU;
     const [hv0, hv1, hv2] = GEOMETRY.uvHashV;
-    const baseSegU = Math.floor(fract(x * hu0 + z * hu1) * SEGS_PER_TILE);
-    const baseSegV = Math.floor(fract(x * hv0 + z * hv1 + baseY * hv2) * SEGS_PER_TILE);
+    const baseSegU = Math.floor(fract(x0 * hu0 + z0 * hu1) * SEGS_PER_TILE);
+    const baseSegV = Math.floor(fract(x0 * hv0 + z0 * hv1 + y0 * hv2) * SEGS_PER_TILE);
 
     objLines.push(`o ${name}`);
 
     const gridW = segsL + 1;
     const gridH = segsH + 1;
 
-    if (axis === 'z') {
-      // Wall runs along Z — front face at x, back face at x+thickness
-      // Front grid
+    if (isWallZ) {
+      // Thin along Z: front face at z0, back face at z0+sizeZ
+      // Grid runs along X (length) and Y (height)
       const voFront = vertOff;
       for (let gh = 0; gh < gridH; gh++) {
         for (let gl = 0; gl < gridW; gl++) {
-          objLines.push(`v ${(x + gl * stepL).toFixed(6)} ${(baseY + gh * stepH).toFixed(6)} ${z.toFixed(6)}`);
+          objLines.push(`v ${(x0 + gl * stepL).toFixed(6)} ${(y0 + gh * stepH).toFixed(6)} ${z0.toFixed(6)}`);
         }
       }
       vertOff += gridW * gridH;
 
-      // Back grid
       const voBack = vertOff;
-      const z1 = z + thickness;
+      const z1 = z0 + sizeZ;
       for (let gh = 0; gh < gridH; gh++) {
         for (let gl = 0; gl < gridW; gl++) {
-          objLines.push(`v ${(x + gl * stepL).toFixed(6)} ${(baseY + gh * stepH).toFixed(6)} ${z1.toFixed(6)}`);
+          objLines.push(`v ${(x0 + gl * stepL).toFixed(6)} ${(y0 + gh * stepH).toFixed(6)} ${z1.toFixed(6)}`);
         }
       }
       vertOff += gridW * gridH;
 
       objLines.push(`vn 0 0 -1`);
       objLines.push(`vn 0 0 1`);
-      const noFront = normOff;
-      const noBack = normOff + 1;
+      const noFront = normOff, noBack = normOff + 1;
       normOff += 2;
 
       for (let sl = 0; sl < segsL; sl++) {
@@ -709,7 +712,7 @@ export async function exportToObj(data, config, outputDir, baseName) {
           const uOff = ((sl + baseSegU) % SEGS_PER_TILE) * uvStep;
           const vOff = ((sh + baseSegV) % SEGS_PER_TILE) * uvStepV;
 
-          // Front face UVs + faces
+          // Front face (-Z): winding matches addSubBox wallZ front
           const uo = uvOff;
           objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
           objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
@@ -717,14 +720,17 @@ export async function exportToObj(data, config, outputDir, baseName) {
           objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
           uvOff += 4;
 
+          // Grid: gl=length, gh=height. f00=(sl,sh), f10=(sl+1,sh), f01=(sl,sh+1), f11=(sl+1,sh+1)
           const f00 = voFront + sh * gridW + sl;
           const f10 = f00 + 1;
           const f01 = f00 + gridW;
           const f11 = f01 + 1;
+          // addSubBox wallZ front: f ${vo}/${uo}/${no} ${vo+3}/${uo+3}/${no} ${vo+2}/${uo+2}/${no}
+          // vo+0=BL, vo+1=BR, vo+2=TR, vo+3=TL → f00=BL, f10=BR, f11=TR, f01=TL
           objLines.push(`f ${f00}/${uo}/${noFront} ${f01}/${uo+3}/${noFront} ${f11}/${uo+2}/${noFront}`);
           objLines.push(`f ${f00}/${uo}/${noFront} ${f11}/${uo+2}/${noFront} ${f10}/${uo+1}/${noFront}`);
 
-          // Back face UVs + faces
+          // Back face (+Z): winding matches addSubBox wallZ back
           const uob = uvOff;
           objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
           objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
@@ -736,33 +742,35 @@ export async function exportToObj(data, config, outputDir, baseName) {
           const b10 = b00 + 1;
           const b01 = b00 + gridW;
           const b11 = b01 + 1;
+          // addSubBox wallZ back: f ${vo+4}/${uo+4}/${no+1} ${vo+5}/${uo+5}/${no+1} ${vo+6}/${uo+6}/${no+1}
+          // vo+4=BL, vo+5=BR, vo+6=TR, vo+7=TL → b00=BL, b10=BR, b11=TR, b01=TL
           objLines.push(`f ${b00}/${uob}/${noBack} ${b10}/${uob+1}/${noBack} ${b11}/${uob+2}/${noBack}`);
           objLines.push(`f ${b00}/${uob}/${noBack} ${b11}/${uob+2}/${noBack} ${b01}/${uob+3}/${noBack}`);
         }
       }
-    } else {
-      // Wall runs along X — front face at z, back face at z+thickness
+    } else if (isWallX) {
+      // Thin along X: front face at x0, back face at x0+sizeX
+      // Grid runs along Z (length) and Y (height)
       const voFront = vertOff;
       for (let gh = 0; gh < gridH; gh++) {
         for (let gl = 0; gl < gridW; gl++) {
-          objLines.push(`v ${x.toFixed(6)} ${(baseY + gh * stepH).toFixed(6)} ${(z + gl * stepL).toFixed(6)}`);
+          objLines.push(`v ${x0.toFixed(6)} ${(y0 + gh * stepH).toFixed(6)} ${(z0 + gl * stepL).toFixed(6)}`);
         }
       }
       vertOff += gridW * gridH;
 
       const voBack = vertOff;
-      const x1 = x + thickness;
+      const x1 = x0 + sizeX;
       for (let gh = 0; gh < gridH; gh++) {
         for (let gl = 0; gl < gridW; gl++) {
-          objLines.push(`v ${x1.toFixed(6)} ${(baseY + gh * stepH).toFixed(6)} ${(z + gl * stepL).toFixed(6)}`);
+          objLines.push(`v ${x1.toFixed(6)} ${(y0 + gh * stepH).toFixed(6)} ${(z0 + gl * stepL).toFixed(6)}`);
         }
       }
       vertOff += gridW * gridH;
 
       objLines.push(`vn -1 0 0`);
       objLines.push(`vn 1 0 0`);
-      const noFront = normOff;
-      const noBack = normOff + 1;
+      const noFront = normOff, noBack = normOff + 1;
       normOff += 2;
 
       for (let sl = 0; sl < segsL; sl++) {
@@ -770,6 +778,7 @@ export async function exportToObj(data, config, outputDir, baseName) {
           const uOff = ((sl + baseSegU) % SEGS_PER_TILE) * uvStep;
           const vOff = ((sh + baseSegV) % SEGS_PER_TILE) * uvStepV;
 
+          // Front face (-X): winding matches addSubBox wallX front
           const uo = uvOff;
           objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
           objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
@@ -777,13 +786,17 @@ export async function exportToObj(data, config, outputDir, baseName) {
           objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
           uvOff += 4;
 
+          // Grid: gl=Z-length, gh=height. f00=(sl,sh), etc.
           const f00 = voFront + sh * gridW + sl;
           const f10 = f00 + 1;
           const f01 = f00 + gridW;
           const f11 = f01 + 1;
+          // addSubBox wallX front: f ${vo}/${uo}/${no} ${vo+1}/${uo+1}/${no} ${vo+2}/${uo+2}/${no}
+          // vo+0=(z,y), vo+1=(z+,y), vo+2=(z+,y+), vo+3=(z,y+) → f00=BL, f10=BR, f11=TR, f01=TL
           objLines.push(`f ${f00}/${uo}/${noFront} ${f10}/${uo+1}/${noFront} ${f11}/${uo+2}/${noFront}`);
           objLines.push(`f ${f00}/${uo}/${noFront} ${f11}/${uo+2}/${noFront} ${f01}/${uo+3}/${noFront}`);
 
+          // Back face (+X): winding matches addSubBox wallX back
           const uob = uvOff;
           objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
           objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
@@ -795,6 +808,8 @@ export async function exportToObj(data, config, outputDir, baseName) {
           const b10 = b00 + 1;
           const b01 = b00 + gridW;
           const b11 = b01 + 1;
+          // addSubBox wallX back: f ${vo+4}/${uo+4}/${no+1} ${vo+7}/${uo+7}/${no+1} ${vo+6}/${uo+6}/${no+1}
+          // Reversed winding: b00=BL, b01=TL, b10=BR, b11=TR
           objLines.push(`f ${b00}/${uob}/${noBack} ${b01}/${uob+3}/${noBack} ${b11}/${uob+2}/${noBack}`);
           objLines.push(`f ${b00}/${uob}/${noBack} ${b11}/${uob+2}/${noBack} ${b10}/${uob+1}/${noBack}`);
         }
@@ -836,7 +851,7 @@ export async function exportToObj(data, config, outputDir, baseName) {
     const texIdx = bi >= 0 ? buildingWallIdx[bi] : buildingWallIdx[0];
     const wx = wall.axis === 'x' ? wall.length : wall.thickness;
     const wz = wall.axis === 'z' ? wall.length : wall.thickness;
-    addSubBox(`wall_${i}`, wall.x, wall.baseY, wall.z, wx, wall.height, wz, getUV(texIdx));
+    addSharedWall(`wall_${i}`, wall.x, wall.baseY, wall.z, wx, wall.height, wz, getUV(texIdx));
 
     // Wall edges
     const uvc = getUV(texIdx);
