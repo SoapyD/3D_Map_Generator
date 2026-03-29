@@ -64,7 +64,75 @@ export function generateWalls(data, config, rng) {
     }
   }
 
+  // Interior walls for medium/large buildings on mid-floors
+  const interiorWalls = [];
+  for (let bi = 0; bi < data.buildings.length; bi++) {
+    const building = data.buildings[bi];
+    if (building.size !== 'medium' && building.size !== 'large') continue;
+    const bq = data.buildingQuadrants[bi];
+    const forceInterior = building.interiorWalls === true;
+    if (building.interiorWalls === false) continue;
+    const chance = forceInterior ? 1.0 : (WALL.interiorWallChance[building.size] || 0);
+
+    for (let tier = 1; tier < building.maxTier; tier++) {
+      if (!rng.chance(chance)) continue;
+
+      const aboveQuadrants = bq.tiers[tier + 1];
+      if (!aboveQuadrants || aboveQuadrants.size < 2) continue;
+
+      const baseY = tier * tierHeight + slabThickness;
+      const wallHeight = tierHeight - slabThickness;
+      const { x, z, w, d } = building;
+      const mx = x + w / 2;
+      const mz = z + d / 2;
+
+      // Pick a variant
+      const variant = pickInteriorVariant(rng);
+
+      const defs = [];
+      if (variant === 'cross') {
+        // N-S wall through centre (half room length, centred)
+        defs.push({ x: mx - wallThickness / 2, z: z + d / 4, length: d / 2, height: wallHeight, baseY, thickness: wallThickness, axis: 'z' });
+        // E-W wall through centre (half room width, centred)
+        defs.push({ x: x + w / 4, z: mz - wallThickness / 2, length: w / 2, height: wallHeight, baseY, thickness: wallThickness, axis: 'x' });
+      } else if (variant === 'centreNS') {
+        // Wall from north edge midpoint toward centre
+        defs.push({ x: mx - wallThickness / 2, z, length: d / 2, height: wallHeight, baseY, thickness: wallThickness, axis: 'z' });
+      } else if (variant === 'centreSN') {
+        // Wall from south edge midpoint toward centre
+        defs.push({ x: mx - wallThickness / 2, z: mz, length: d / 2, height: wallHeight, baseY, thickness: wallThickness, axis: 'z' });
+      } else if (variant === 'centreEW') {
+        // Wall from west edge midpoint toward centre
+        defs.push({ x, z: mz - wallThickness / 2, length: w / 2, height: wallHeight, baseY, thickness: wallThickness, axis: 'x' });
+      } else if (variant === 'centreWE') {
+        // Wall from east edge midpoint toward centre
+        defs.push({ x: mx, z: mz - wallThickness / 2, length: w / 2, height: wallHeight, baseY, thickness: wallThickness, axis: 'x' });
+      }
+
+      for (const def of defs) {
+        const segments = applyWallDamage(def, rng);
+        interiorWalls.push(...segments);
+      }
+    }
+  }
+
+  walls.push(...interiorWalls);
+
   return { ...data, walls };
+}
+
+function pickInteriorVariant(rng) {
+  const variants = WALL.interiorWallVariants;
+  if (!variants) return 'centreNS';
+  const entries = Object.entries(variants);
+  const totalWeight = entries.reduce((sum, [, v]) => sum + v.weight, 0);
+  const roll = rng.random() * totalWeight;
+  let cumulative = 0;
+  for (const [name, v] of entries) {
+    cumulative += v.weight;
+    if (roll < cumulative) return name;
+  }
+  return entries[0][0];
 }
 
 /**

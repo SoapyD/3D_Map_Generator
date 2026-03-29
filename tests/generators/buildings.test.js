@@ -45,7 +45,7 @@ describe('generateBuildings', () => {
     const rng = createRng(42);
     const gridData = generateGrid(baseConfig, rng);
     const result = generateBuildings(gridData, baseConfig, rng);
-    const validSizes = ['small', 'medium', 'large'];
+    const validSizes = ['small', 'medium', 'large', 'tower'];
     for (const b of result.buildings) {
       expect(validSizes).toContain(b.size);
     }

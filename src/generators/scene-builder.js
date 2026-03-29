@@ -109,6 +109,40 @@ export function buildScene(data, config) {
     }
   }
 
+  // Pyramid roofs for towers
+  if (data.buildings) {
+    for (let bi = 0; bi < data.buildings.length; bi++) {
+      const b = data.buildings[bi];
+      if (!b.pyramidRoof) continue;
+
+      const topY = b.maxTier * config.tierHeight + config.slabThickness;
+      const apexY = topY + Math.min(b.w, b.d) * 0.6;
+      const cx = b.x + b.w / 2;
+      const cz = b.z + b.d / 2;
+
+      // 4 triangular faces using BufferGeometry
+      const positions = new Float32Array([
+        // Triangle 1: front (-Z)
+        b.x, topY, b.z,  b.x + b.w, topY, b.z,  cx, apexY, cz,
+        // Triangle 2: right (+X)
+        b.x + b.w, topY, b.z,  b.x + b.w, topY, b.z + b.d,  cx, apexY, cz,
+        // Triangle 3: back (+Z)
+        b.x + b.w, topY, b.z + b.d,  b.x, topY, b.z + b.d,  cx, apexY, cz,
+        // Triangle 4: left (-X)
+        b.x, topY, b.z + b.d,  b.x, topY, b.z,  cx, apexY, cz,
+      ]);
+
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geo.computeVertexNormals();
+
+      const material = debug ? DEBUG_MATERIALS.wall : pickFromPool(pools.walls, bi + 200);
+      const mesh = new THREE.Mesh(geo, material);
+      mesh.name = `pyramid_roof_${bi}`;
+      scene.add(mesh);
+    }
+  }
+
   // Build connections
   if (data.connections) {
     const { ladders, walkways } = data.connections;

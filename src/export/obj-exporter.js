@@ -956,6 +956,57 @@ export async function exportToObj(data, config, outputDir, baseName) {
     addPerimeterEdges(c.x, c.y, c.z, c.w, c.height, c.d, getUV(objectIdx));
   }
 
+  // Pyramid roofs for towers
+  for (let bi = 0; bi < buildings.length; bi++) {
+    const b = buildings[bi];
+    if (!b.pyramidRoof) continue;
+
+    const topY = b.maxTier * config.tierHeight + config.slabThickness;
+    const apexY = topY + Math.min(b.w, b.d) * 0.6;
+    const cx = b.x + b.w / 2;
+    const cz = b.z + b.d / 2;
+    const texIdx = bi >= 0 ? buildingWallIdx[bi] : buildingWallIdx[0];
+    const ruv = getUV(texIdx);
+    const cu = ((ruv.uMin + ruv.uMax) / 2).toFixed(6);
+    const cv = ((ruv.vMin + ruv.vMax) / 2).toFixed(6);
+
+    objLines.push(`o pyramid_roof_${bi}`);
+
+    // 5 verts: 4 base corners + 1 apex
+    const vo = vertOff;
+    objLines.push(`v ${b.x.toFixed(6)} ${topY.toFixed(6)} ${b.z.toFixed(6)}`);           // 0: front-left
+    objLines.push(`v ${(b.x + b.w).toFixed(6)} ${topY.toFixed(6)} ${b.z.toFixed(6)}`);   // 1: front-right
+    objLines.push(`v ${(b.x + b.w).toFixed(6)} ${topY.toFixed(6)} ${(b.z + b.d).toFixed(6)}`); // 2: back-right
+    objLines.push(`v ${b.x.toFixed(6)} ${topY.toFixed(6)} ${(b.z + b.d).toFixed(6)}`);   // 3: back-left
+    objLines.push(`v ${cx.toFixed(6)} ${apexY.toFixed(6)} ${cz.toFixed(6)}`);             // 4: apex
+
+    // UVs (centre-point for each triangle — roof is small, uniform texture fine)
+    for (let i = 0; i < 5; i++) objLines.push(`vt ${cu} ${cv}`);
+
+    // 4 triangle faces
+    const uo = uvOff;
+    // Front (-Z)
+    objLines.push(`vn 0 0.5 -1`);
+    objLines.push(`f ${vo}/${uo}/${normOff} ${vo+1}/${uo+1}/${normOff} ${vo+4}/${uo+4}/${normOff}`);
+    normOff++;
+    // Right (+X)
+    objLines.push(`vn 1 0.5 0`);
+    objLines.push(`f ${vo+1}/${uo+1}/${normOff} ${vo+2}/${uo+2}/${normOff} ${vo+4}/${uo+4}/${normOff}`);
+    normOff++;
+    // Back (+Z)
+    objLines.push(`vn 0 0.5 1`);
+    objLines.push(`f ${vo+2}/${uo+2}/${normOff} ${vo+3}/${uo+3}/${normOff} ${vo+4}/${uo+4}/${normOff}`);
+    normOff++;
+    // Left (-X)
+    objLines.push(`vn -1 0.5 0`);
+    objLines.push(`f ${vo+3}/${uo+3}/${normOff} ${vo}/${uo}/${normOff} ${vo+4}/${uo+4}/${normOff}`);
+    normOff++;
+
+    vertOff += 5;
+    uvOff += 5;
+    objLines.push('');
+  }
+
   // Flat ladder meshes
   // Emit a double-sided vertical quad (4 verts, front + back faces)
   function addVerticalQuad(name, v0, v1, v2, v3, nx, ny, nz, uv) {

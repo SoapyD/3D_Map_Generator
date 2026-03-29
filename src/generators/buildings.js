@@ -15,6 +15,24 @@ const HEIGHTS = BUILDING.heights;
 const BUILDING_GAP = BUILDING.gap;
 
 /**
+ * Pick a building shape using weighted random selection.
+ */
+function pickShape(rng) {
+  const shapes = BUILDING.shapes;
+  if (!shapes) return 'full';
+
+  const entries = Object.entries(shapes);
+  const totalWeight = entries.reduce((sum, [, s]) => sum + s.weight, 0);
+  const roll = rng.random() * totalWeight;
+  let cumulative = 0;
+  for (const [name, s] of entries) {
+    cumulative += s.weight;
+    if (roll < cumulative) return name;
+  }
+  return 'full';
+}
+
+/**
  * @param {{ blocks: Array<{x,z,w,d}> }} gridData
  * @param {object} config
  * @param {object} rng
@@ -39,18 +57,31 @@ export function generateBuildings(gridData, config, rng) {
       const cellX = col * cellW;
       const cellZ = row * cellD;
 
-      // Building fills most of the cell, centred
-      const w = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
-      const d = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
-      const x = cellX + (cellW - w) / 2;
-      const z = cellZ + (cellD - d) / 2;
+      // Chance to place a tower instead of a small building
+      if (BUILDING.towerChance && rng.chance(BUILDING.towerChance)) {
+        const tFp = FOOTPRINTS.tower || { min: 2, max: 3 };
+        const w = rng.float(tFp.min, tFp.max);
+        const d = rng.float(tFp.min, tFp.max);
+        const x = cellX + (cellW - w) / 2;
+        const z = cellZ + (cellD - d) / 2;
+        const pyramidRoof = rng.chance(BUILDING.pyramidRoofChance);
+        buildings.push({ x, z, w, d, maxTier: tiers, size: 'tower', height: 'tall', blockIndex: 0, pyramidRoof });
+      } else {
+        // Standard small building
+        const w = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
+        const d = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
+        const x = cellX + (cellW - w) / 2;
+        const z = cellZ + (cellD - d) / 2;
 
-      // Random height
-      const heightKey = rng.pick(['short', 'medium', 'tall']);
-      const height = HEIGHTS[heightKey];
-      const maxTier = rng.int(Math.min(height.tierMin, tiers), Math.min(height.tierMax, tiers));
+        const heightKey = rng.pick(['short', 'medium', 'tall']);
+        const height = HEIGHTS[heightKey];
+        const maxTier = rng.int(Math.min(height.tierMin, tiers), Math.min(height.tierMax, tiers));
 
-      buildings.push({ x, z, w, d, maxTier, size: 'small', height: heightKey, blockIndex: 0 });
+        // Pick a building shape
+        const shape = pickShape(rng);
+
+        buildings.push({ x, z, w, d, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape });
+      }
     }
   }
 

@@ -33,9 +33,24 @@ export const BUILDING = {
     medium: { tierMin: 2, tierMax: 3 },
     tall:   { tierMin: 3, tierMax: 4 },
   },
+  tower: { min: 2, max: 3 }, // tower footprint range
   gap: 0.5,                // minimum gap between buildings (inches)
   cellSizeMultiplier: 1.5,// grid cell = avg small footprint × this
   deleteRatio: 0.20,       // fraction of small buildings randomly deleted
+  towerChance: 0.3,        // chance of a tower replacing a small building in placement
+  pyramidRoofChance: 0.5,  // chance a tower gets a pyramid roof
+  // Building shapes — which quadrants are initially removed
+  // Each shape is an array of quadrant indices to remove at tier 1
+  // Quadrants: 0=NW, 1=NE, 2=SW, 3=SE
+  shapes: {
+    full:     { removed: [], weight: 0.4 },       // all 4 quadrants present (rectangle)
+    corner0:  { removed: [3], weight: 0.075 },    // missing SE
+    corner1:  { removed: [2], weight: 0.075 },    // missing SW
+    corner2:  { removed: [1], weight: 0.075 },    // missing NE
+    corner3:  { removed: [0], weight: 0.075 },    // missing NW
+    diagA:    { removed: [1, 2], weight: 0.05 },  // missing NE + SW (diagonal)
+    diagB:    { removed: [0, 3], weight: 0.05 },  // missing NW + SE (diagonal)
+  },
 };
 
 // --- Walls ---
@@ -43,6 +58,15 @@ export const WALL = {
   quadSize: 1.5,           // inches per wall quadrant column
   upperRemovalRatio: 0.7,  // max fraction of upper row removed
   lowerRemovalRatio: 0.5,  // max fraction of lower row removed
+  // Interior walls (medium/large buildings, mid-floors)
+  interiorWallChance: { medium: 0.2, large: 1.0 }, // chance per eligible floor
+  interiorWallVariants: {
+    centreNS:  { weight: 0.25 },  // wall from north edge midpoint toward centre
+    centreEW:  { weight: 0.25 },  // wall from west edge midpoint toward centre
+    centreSN:  { weight: 0.125 }, // wall from south edge midpoint toward centre
+    centreWE:  { weight: 0.125 }, // wall from east edge midpoint toward centre
+    cross:     { weight: 0.25 },  // cross shape in centre
+  },
 };
 
 // --- Floors ---

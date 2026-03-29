@@ -16,7 +16,7 @@
  * Max 2 floors at removal tier 0.
  */
 
-import { FLOOR } from '../config.js';
+import { FLOOR, BUILDING } from '../config.js';
 
 const ADJACENT = {
   0: [1, 2],
@@ -44,6 +44,14 @@ export function generateFloors(data, config, rng) {
     const bq = { tiers: {} };
     const removed = new Set();
     let tier0Count = 0;
+    const isTower = building.size === 'tower';
+
+    // Pre-remove quadrants based on building shape
+    if (building.shape && BUILDING.shapes && BUILDING.shapes[building.shape]) {
+      for (const q of BUILDING.shapes[building.shape].removed) {
+        removed.add(q);
+      }
+    }
 
     for (let tier = 1; tier <= building.maxTier; tier++) {
       const removalCount = removed.size;
@@ -51,7 +59,7 @@ export function generateFloors(data, config, rng) {
       if (removalCount === 0) {
         // Currently at removal tier 0
         tier0Count++;
-        if (tier0Count > FLOOR.maxTier0Floors || (tier > 1 && rng.chance(FLOOR.tier1EscalateChance))) {
+        if (!isTower && (tier0Count > FLOOR.maxTier0Floors || (tier > 1 && rng.chance(FLOOR.tier1EscalateChance)))) {
           // Escalate to removal tier 1: remove 1 random quadrant
           const available = [0, 1, 2, 3].filter((q) => !removed.has(q));
           removed.add(rng.pick(available));
