@@ -537,7 +537,7 @@ export async function exportToObj(data, config, outputDir, baseName) {
 
   // Shared-vertex flat surface: grid of position verts, per-tile UVs via separate indices
   // emitBottom: whether to emit the bottom face (skip for ground/courtyards)
-  function addSharedFlat(name, x0, y0, z0, sizeX, sizeY, sizeZ, uv, emitBottom = true, rotateUV = false) {
+  function addSharedFlat(name, x0, y0, z0, sizeX, sizeY, sizeZ, uv, emitBottom = true, rotateUV = false, simpleBottom = false) {
     const segsX = Math.max(1, Math.ceil(sizeX / SEG_SIZE));
     const segsZ = Math.max(1, Math.ceil(sizeZ / SEG_SIZE));
     const stepX = sizeX / segsX;
@@ -568,18 +568,29 @@ export async function exportToObj(data, config, outputDir, baseName) {
     const topGridW = segsX + 1;
     vertOff += topGridW * (segsZ + 1);
 
-    // Emit grid of position verts for bottom face (if needed)
+    // Emit bottom face verts (if needed)
     let voBot = -1;
     let botGridW = 0;
+    let botSimple = false;
     if (emitBottom) {
       voBot = vertOff;
-      for (let gz = 0; gz <= segsZ; gz++) {
-        for (let gx = 0; gx <= segsX; gx++) {
-          objLines.push(`v ${(x0 + gx * stepX).toFixed(6)} ${y0.toFixed(6)} ${(z0 + gz * stepZ).toFixed(6)}`);
+      if (simpleBottom) {
+        // Single quad — 4 corner verts, no subdivision
+        objLines.push(`v ${x0.toFixed(6)} ${y0.toFixed(6)} ${z0.toFixed(6)}`);
+        objLines.push(`v ${(x0+sizeX).toFixed(6)} ${y0.toFixed(6)} ${z0.toFixed(6)}`);
+        objLines.push(`v ${(x0+sizeX).toFixed(6)} ${y0.toFixed(6)} ${(z0+sizeZ).toFixed(6)}`);
+        objLines.push(`v ${x0.toFixed(6)} ${y0.toFixed(6)} ${(z0+sizeZ).toFixed(6)}`);
+        vertOff += 4;
+        botSimple = true;
+      } else {
+        for (let gz = 0; gz <= segsZ; gz++) {
+          for (let gx = 0; gx <= segsX; gx++) {
+            objLines.push(`v ${(x0 + gx * stepX).toFixed(6)} ${y0.toFixed(6)} ${(z0 + gz * stepZ).toFixed(6)}`);
+          }
         }
+        botGridW = topGridW;
+        vertOff += botGridW * (segsZ + 1);
       }
-      botGridW = topGridW;
-      vertOff += botGridW * (segsZ + 1);
     }
 
     // Normals
@@ -624,8 +635,8 @@ export async function exportToObj(data, config, outputDir, baseName) {
         objLines.push(`f ${v00}/${uo}/${noTop} ${v01}/${uo+3}/${noTop} ${v11}/${uo+2}/${noTop}`);
         objLines.push(`f ${v00}/${uo}/${noTop} ${v11}/${uo+2}/${noTop} ${v10}/${uo+1}/${noTop}`);
 
-        // Bottom face
-        if (emitBottom) {
+        // Bottom face (per-tile, skip if simple bottom)
+        if (emitBottom && !botSimple) {
           const b00 = voBot + sz * botGridW + sx;
           const b10 = b00 + 1;
           const b01 = b00 + botGridW;
@@ -648,6 +659,17 @@ export async function exportToObj(data, config, outputDir, baseName) {
           objLines.push(`f ${b00}/${uob}/${noBot} ${b11}/${uob+2}/${noBot} ${b01}/${uob+3}/${noBot}`);
         }
       }
+    }
+
+    // Simple bottom: single quad emitted once after tile loop
+    if (emitBottom && botSimple) {
+      const cu = ((uv.uMin + uv.uMax) / 2).toFixed(6);
+      const cv = ((uv.vMin + uv.vMax) / 2).toFixed(6);
+      const uob = uvOff;
+      for (let i = 0; i < 4; i++) objLines.push(`vt ${cu} ${cv}`);
+      uvOff += 4;
+      objLines.push(`f ${voBot}/${uob}/${noBot} ${voBot+1}/${uob+1}/${noBot} ${voBot+2}/${uob+2}/${noBot}`);
+      objLines.push(`f ${voBot}/${uob}/${noBot} ${voBot+2}/${uob+2}/${noBot} ${voBot+3}/${uob+3}/${noBot}`);
     }
 
     objLines.push('');
@@ -825,7 +847,7 @@ export async function exportToObj(data, config, outputDir, baseName) {
   const floorData = data.floors || [];
   if (floorData.length > 0 && floorData[0].sections.length > 0) {
     const baseFloor = floorData[0].sections[0];
-    addSharedFlat('base_floor', baseFloor.x, 0, baseFloor.z, baseFloor.w, config.slabThickness, baseFloor.d, getUV(baseIdx), true);
+    addSharedFlat('base_floor', baseFloor.x, 0, baseFloor.z, baseFloor.w, config.slabThickness, baseFloor.d, getUV(baseIdx), true, false, true);
     // Base floor edges (still needed for the visible thickness around the perimeter)
     addFloorEdges(baseFloor, 0, config.slabThickness, [baseFloor], getUV(baseIdx));
   }
