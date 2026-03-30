@@ -934,6 +934,53 @@ export async function exportToObj(data, config, outputDir, baseName) {
     addPerimeterEdges(w.x, w.y, w.z, w.w, GEOMETRY.walkwayThickness, w.d, getUV(walkwayIdx));
   }
 
+  // Bridges
+  const bridgesData = data.connections ? data.connections.bridges : [];
+  // Use landmark wall texture for bridges (stone look)
+  const bridgeTexIdx = buildingWallIdx.length > 0 ? buildingWallIdx[0] : baseIdx;
+  const bridgeUV = getUV(bridgeTexIdx);
+  for (let i = 0; i < bridgesData.length; i++) {
+    const b = bridgesData[i];
+    const bThick = GEOMETRY.walkwayThickness + 0.2; // slightly thicker than walkway
+    const wallH = 0.75;
+    const wallT = 0.25;
+
+    // Bridge slab
+    addSharedFlat(`bridge_${i}`, b.x, b.y, b.z, b.w, bThick, b.d, bridgeUV, true, b.w > b.d);
+    addPerimeterEdges(b.x, b.y, b.z, b.w, bThick, b.d, bridgeUV);
+
+    // Side walls
+    const wallY = b.y + bThick;
+    if (b.axis === 'x') {
+      // Walls along the length (north and south sides)
+      addSubBox(`bridge_wall_${i}_L`, b.x, wallY, b.z, b.w, wallH, wallT, bridgeUV, false);
+      addSubBox(`bridge_wall_${i}_R`, b.x, wallY, b.z + b.d - wallT, b.w, wallH, wallT, bridgeUV, false);
+    } else {
+      addSubBox(`bridge_wall_${i}_L`, b.x, wallY, b.z, wallT, wallH, b.d, bridgeUV, false);
+      addSubBox(`bridge_wall_${i}_R`, b.x + b.w - wallT, wallY, b.z, wallT, wallH, b.d, bridgeUV, false);
+    }
+
+    // Battlement tall sections
+    if (b.variant === 'battlement') {
+      const battH = 1.5 - wallH;
+      const spacing = 1.5;
+      const gap = 0.75;
+      const pillarW = spacing - gap;
+      const battY = wallY + wallH;
+      const runLen = b.axis === 'x' ? b.w : b.d;
+
+      for (let pos = 0; pos < runLen - pillarW; pos += spacing) {
+        if (b.axis === 'x') {
+          addSubBox(`bridge_batt_${i}_L_${Math.round(pos)}`, b.x + pos, battY, b.z, pillarW, battH, wallT, bridgeUV, false);
+          addSubBox(`bridge_batt_${i}_R_${Math.round(pos)}`, b.x + pos, battY, b.z + b.d - wallT, pillarW, battH, wallT, bridgeUV, false);
+        } else {
+          addSubBox(`bridge_batt_${i}_L_${Math.round(pos)}`, b.x, battY, b.z + pos, wallT, battH, pillarW, bridgeUV, false);
+          addSubBox(`bridge_batt_${i}_R_${Math.round(pos)}`, b.x + b.w - wallT, battY, b.z + pos, wallT, battH, pillarW, bridgeUV, false);
+        }
+      }
+    }
+  }
+
   // Cover
   const cover = data.cover || [];
   for (let i = 0; i < cover.length; i++) {

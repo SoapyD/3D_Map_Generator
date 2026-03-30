@@ -82,6 +82,19 @@ export const FLOOR = {
 export const CONNECTIVITY = {
   walkwayWidth: 2.0,       // inches
   walkwayThickness: 0.3,   // inches
+  // Bridges — upgraded walkways at tier 2+
+  bridgeChance: 0.4,       // chance a tier 2+ walkway becomes a bridge
+  bridgeWidth: 3.0,        // inches (wider than walkway)
+  bridgeThickness: 0.5,    // inches (thicker than walkway)
+  bridgeWallHeight: 0.75,  // low wall height on both sides
+  bridgeWallThickness: 0.25,
+  bridgeBattlementHeight: 1.5, // tall section height for battlement variant
+  bridgeBattlementSpacing: 2.25, // spacing between tall sections
+  bridgeBattlementGap: 1.5,    // gap width between tall sections
+  bridgeVariants: {
+    low:        { weight: 0.5 },  // continuous low walls
+    battlement: { weight: 0.5 },  // low walls + spaced tall sections
+  },
   ladderWidth: 1.0,        // inches (half walkway width)
   ladderDepth: 0.5,        // inches
   ladderWallOffset: 0.3,   // offset from wall to prevent clashing

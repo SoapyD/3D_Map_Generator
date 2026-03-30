@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { createFloorSlab, createWallSlab, createSlab, createLadderMesh } from '../core/geometry.js';
 import { buildTexturePools, pickFromPool } from './textures.js';
-import { LADDER_DISPLAY, COVER, GEOMETRY } from '../config.js';
+import { LADDER_DISPLAY, COVER, GEOMETRY, CONNECTIVITY } from '../config.js';
 
 // Debug materials (flat colours)
 const DEBUG_MATERIALS = {
@@ -217,6 +217,73 @@ export function buildScene(data, config) {
       const mesh = createFloorSlab({ x: w.x, z: w.z, w: w.w, d: w.d }, w.y, GEOMETRY.walkwayThickness, material, { rotateUV: w.w > w.d });
       mesh.name = w.blocked ? `walkway_BLOCKED_${i}` : `walkway_${i}`;
       scene.add(mesh);
+    }
+
+    // Bridges
+    const bridges = data.connections.bridges || [];
+    for (let i = 0; i < bridges.length; i++) {
+      const b = bridges[i];
+      const bridgeThickness = CONNECTIVITY.bridgeThickness || 0.5;
+      const wallH = CONNECTIVITY.bridgeWallHeight || 0.75;
+      const wallT = CONNECTIVITY.bridgeWallThickness || 0.25;
+
+      // Bridge slab
+      const slabMat = debug ? DEBUG_MATERIALS.walkway : pickFromPool(pools.landmark_walls, i);
+      const slab = createFloorSlab({ x: b.x, z: b.z, w: b.w, d: b.d }, b.y, bridgeThickness, slabMat, { rotateUV: b.w > b.d });
+      slab.name = `bridge_${i}`;
+      scene.add(slab);
+
+      // Side walls
+      const wallMat = debug ? DEBUG_MATERIALS.wall : pickFromPool(pools.landmark_walls, i + 100);
+      const wallY = b.y + bridgeThickness;
+
+      if (b.axis === 'x') {
+        // Bridge runs along X — walls on north and south edges (along Z)
+        const wallL = createSlab(b.x + b.w / 2, wallY + wallH / 2, b.z + wallT / 2, b.w, wallH, wallT, wallMat);
+        wallL.name = `bridge_wall_${i}_L`;
+        scene.add(wallL);
+        const wallR = createSlab(b.x + b.w / 2, wallY + wallH / 2, b.z + b.d - wallT / 2, b.w, wallH, wallT, wallMat);
+        wallR.name = `bridge_wall_${i}_R`;
+        scene.add(wallR);
+      } else {
+        // Bridge runs along Z — walls on east and west edges (along X)
+        const wallL = createSlab(b.x + wallT / 2, wallY + wallH / 2, b.z + b.d / 2, wallT, wallH, b.d, wallMat);
+        wallL.name = `bridge_wall_${i}_L`;
+        scene.add(wallL);
+        const wallR = createSlab(b.x + b.w - wallT / 2, wallY + wallH / 2, b.z + b.d / 2, wallT, wallH, b.d, wallMat);
+        wallR.name = `bridge_wall_${i}_R`;
+        scene.add(wallR);
+      }
+
+      // Battlement variant — add tall sections on top of side walls
+      if (b.variant === 'battlement') {
+        const battH = CONNECTIVITY.bridgeBattlementHeight - wallH; // extra height above low wall
+        const spacing = CONNECTIVITY.bridgeBattlementSpacing || 1.5;
+        const gap = CONNECTIVITY.bridgeBattlementGap || 0.75;
+        const pillarW = spacing - gap;
+        const battY = wallY + wallH;
+        const runLen = b.axis === 'x' ? b.w : b.d;
+
+        for (let pos = 0; pos < runLen - pillarW; pos += spacing) {
+          if (b.axis === 'x') {
+            const px = b.x + pos;
+            const pL = createSlab(px + pillarW / 2, battY + battH / 2, b.z + wallT / 2, pillarW, battH, wallT, wallMat);
+            pL.name = `bridge_batt_${i}_L_${Math.round(pos)}`;
+            scene.add(pL);
+            const pR = createSlab(px + pillarW / 2, battY + battH / 2, b.z + b.d - wallT / 2, pillarW, battH, wallT, wallMat);
+            pR.name = `bridge_batt_${i}_R_${Math.round(pos)}`;
+            scene.add(pR);
+          } else {
+            const pz = b.z + pos;
+            const pL = createSlab(b.x + wallT / 2, battY + battH / 2, pz + pillarW / 2, wallT, battH, pillarW, wallMat);
+            pL.name = `bridge_batt_${i}_L_${Math.round(pos)}`;
+            scene.add(pL);
+            const pR = createSlab(b.x + b.w - wallT / 2, battY + battH / 2, pz + pillarW / 2, wallT, battH, pillarW, wallMat);
+            pR.name = `bridge_batt_${i}_R_${Math.round(pos)}`;
+            scene.add(pR);
+          }
+        }
+      }
     }
 
     // Red ground ladders

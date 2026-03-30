@@ -29,60 +29,8 @@ export function generateConnectivity(data, config, rng) {
   const ladders = [];
   const walkways = [];
 
-  // Tower ladders: ground to top accessible floor
-  const towerLadders = [];
-  for (let bi = 0; bi < data.buildings.length; bi++) {
-    const building = data.buildings[bi];
-    if (building.size !== 'tower') continue;
-
-    // Top accessible tier: maxTier for flat roof, maxTier-1 for pyramid (floor below pyramid)
-    const topTier = building.pyramidRoof ? building.maxTier - 1 : building.maxTier;
-    if (topTier < 1) continue;
-
-    const y0 = 0;
-    const y1 = topTier * tierHeight;
-
-    // Pick a random side outside the building
-    const side = rng.pick(['north', 'south', 'east', 'west']);
-    let lx, lz, lw, ld;
-    if (side === 'north') {
-      lx = building.x + building.w / 2 - LADDER_WIDTH / 2;
-      lz = building.z - LADDER_DEPTH;
-      lw = LADDER_WIDTH; ld = LADDER_DEPTH;
-    } else if (side === 'south') {
-      lx = building.x + building.w / 2 - LADDER_WIDTH / 2;
-      lz = building.z + building.d;
-      lw = LADDER_WIDTH; ld = LADDER_DEPTH;
-    } else if (side === 'west') {
-      lx = building.x - LADDER_DEPTH;
-      lz = building.z + building.d / 2 - LADDER_WIDTH / 2;
-      lw = LADDER_DEPTH; ld = LADDER_WIDTH;
-    } else {
-      lx = building.x + building.w;
-      lz = building.z + building.d / 2 - LADDER_WIDTH / 2;
-      lw = LADDER_DEPTH; ld = LADDER_WIDTH;
-    }
-
-    // Clamp to map bounds
-    lx = Math.max(0, Math.min(lx, config.mapWidth - lw));
-    lz = Math.max(0, Math.min(lz, config.mapDepth - ld));
-
-    towerLadders.push({ type: 'ground_ladder', x: lx, z: lz, w: lw, d: ld, y0, y1 });
-
-    // Delete wall segments that overlap the ladder at the termination floor
-    const exitY = topTier * tierHeight;
-    for (let wi = data.walls.length - 1; wi >= 0; wi--) {
-      const wall = data.walls[wi];
-      // Only walls at or above the exit floor level
-      if (wall.baseY < exitY) continue;
-      const wx1 = wall.axis === 'x' ? wall.x + wall.length : wall.x + wall.thickness;
-      const wz1 = wall.axis === 'z' ? wall.z + wall.length : wall.z + wall.thickness;
-      if (lx < wx1 + 0.3 && lx + lw > wall.x - 0.3 &&
-          lz < wz1 + 0.3 && lz + ld > wall.z - 0.3) {
-        data.walls.splice(wi, 1);
-      }
-    }
-  }
+  // Tower ladder data collected here, placed after all other ladders are finalised
+  const towerBuildings = data.buildings.filter(b => b.size === 'tower');
 
   // For each building, each tier, each floor quadrant:
   // try to connect quadrant centre to nearest floor on another building.
@@ -364,7 +312,7 @@ export function generateConnectivity(data, config, rng) {
   // Ground floor ladders: for each ground floor quadrant's outward-facing edges,
   // check if there's a wall. If so, place a red ladder from ground up to the
   // first tier with no wall. Skip edges near map boundary.
-  const groundLadders = [...towerLadders];
+  const groundLadders = [];
   const MAP_BOUNDARY_MARGIN = CONNECTIVITY.mapBoundaryMargin;
 
   for (let bi = 0; bi < data.buildings.length; bi++) {
@@ -960,7 +908,113 @@ export function generateConnectivity(data, config, rng) {
     return true;
   });
 
-  const connections = { ladders: survivingYellow, walkways: finalWalkways, groundLadders: finalRed, orangeLadders: finalOrange, interiorLadders: finalInterior, ladderPlatforms: filteredPlatforms };
+  // Tower ladders — placed last so they don't overlap existing ladders
+  // Collect all existing ladders for overlap checking
+  const allExistingLadders = [...survivingYellow, ...finalRed, ...finalOrange, ...finalInterior];
+
+  for (const building of towerBuildings) {
+    const topTier = building.pyramidRoof ? building.maxTier - 1 : building.maxTier;
+    if (topTier < 1) continue;
+
+    const y0 = 0;
+    const y1 = topTier * tierHeight;
+
+    // Try each side, pick one that doesn't overlap any existing ladder
+    const sides = rng.shuffle(['north', 'south', 'east', 'west']);
+    let placed = false;
+
+    for (const side of sides) {
+      let lx, lz, lw, ld;
+      if (side === 'north') {
+        lx = building.x + building.w / 2 - LADDER_WIDTH / 2;
+        lz = building.z - LADDER_DEPTH;
+        lw = LADDER_WIDTH; ld = LADDER_DEPTH;
+      } else if (side === 'south') {
+        lx = building.x + building.w / 2 - LADDER_WIDTH / 2;
+        lz = building.z + building.d;
+        lw = LADDER_WIDTH; ld = LADDER_DEPTH;
+      } else if (side === 'west') {
+        lx = building.x - LADDER_DEPTH;
+        lz = building.z + building.d / 2 - LADDER_WIDTH / 2;
+        lw = LADDER_DEPTH; ld = LADDER_WIDTH;
+      } else {
+        lx = building.x + building.w;
+        lz = building.z + building.d / 2 - LADDER_WIDTH / 2;
+        lw = LADDER_DEPTH; ld = LADDER_WIDTH;
+      }
+
+      // Check map bounds
+      if (lx < 0 || lz < 0 || lx + lw > config.mapWidth || lz + ld > config.mapDepth) continue;
+
+      // Check overlap with any existing ladder
+      let overlaps = false;
+      for (const el of allExistingLadders) {
+        if (lx < el.x + (el.w || 1) + 0.3 && lx + lw > el.x - 0.3 &&
+            lz < el.z + (el.d || 1) + 0.3 && lz + ld > el.z - 0.3) {
+          overlaps = true;
+          break;
+        }
+      }
+      if (overlaps) continue;
+
+      // Place the ladder
+      const ladder = { type: 'ground_ladder', x: lx, z: lz, w: lw, d: ld, y0, y1 };
+      finalRed.push(ladder);
+      allExistingLadders.push(ladder);
+      placed = true;
+
+      // Delete wall segments that overlap the ladder at the termination floor
+      const exitY = topTier * tierHeight;
+      for (let wi = data.walls.length - 1; wi >= 0; wi--) {
+        const wall = data.walls[wi];
+        if (wall.baseY < exitY) continue;
+        const wx1 = wall.axis === 'x' ? wall.x + wall.length : wall.x + wall.thickness;
+        const wz1 = wall.axis === 'z' ? wall.z + wall.length : wall.z + wall.thickness;
+        if (lx < wx1 + 0.3 && lx + lw > wall.x - 0.3 &&
+            lz < wz1 + 0.3 && lz + ld > wall.z - 0.3) {
+          data.walls.splice(wi, 1);
+        }
+      }
+      break;
+    }
+    // If no side is free, skip this tower's ladder
+  }
+
+  // Upgrade some tier 2+ walkways to bridges
+  const bridges = [];
+  const remainingWalkways = [];
+  const bridgeVariants = CONNECTIVITY.bridgeVariants;
+
+  for (const w of finalWalkways) {
+    const walkwayTier = Math.round(w.y / tierHeight);
+    if (walkwayTier >= 2 && rng.chance(CONNECTIVITY.bridgeChance)) {
+      // Pick variant
+      const entries = Object.entries(bridgeVariants);
+      const totalWeight = entries.reduce((sum, [, v]) => sum + v.weight, 0);
+      const roll = rng.random() * totalWeight;
+      let cum = 0, variant = entries[0][0];
+      for (const [name, v] of entries) {
+        cum += v.weight;
+        if (roll < cum) { variant = name; break; }
+      }
+
+      // Widen the bridge (centre it on the original walkway centre)
+      const bw = CONNECTIVITY.bridgeWidth;
+      let bridge;
+      if (w.axis === 'x') {
+        const centreZ = w.z + w.d / 2;
+        bridge = { ...w, type: 'bridge', z: centreZ - bw / 2, d: bw, variant };
+      } else {
+        const centreX = w.x + w.w / 2;
+        bridge = { ...w, type: 'bridge', x: centreX - bw / 2, w: bw, variant };
+      }
+      bridges.push(bridge);
+    } else {
+      remainingWalkways.push(w);
+    }
+  }
+
+  const connections = { ladders: survivingYellow, walkways: remainingWalkways, bridges, groundLadders: finalRed, orangeLadders: finalOrange, interiorLadders: finalInterior, ladderPlatforms: filteredPlatforms };
   return { ...data, connections };
 }
 
