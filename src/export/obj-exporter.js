@@ -85,6 +85,9 @@ export async function exportToObj(data, config, outputDir, baseName) {
   const ladderIdx = addTexture('ladder_0', ladderTextures[0]);
   const objectIdx = addTexture('object_0', objectTextures.length > 0 ? objectTextures[0] : wallTextures[0]);
   const courtyardIdx = addTexture('courtyard_0', courtyardTextures[0]);
+  const roofPool = loadTexPool(packDir, 'roofs');
+  const roofTextures = roofPool.length > 0 ? roofPool : floorTextures;
+  const roofIdx = addTexture('roof_0', roofTextures[0]);
 
   // Build atlas image with padding border
   const gridSz = Math.ceil(Math.sqrt(allTextures.length));
@@ -536,8 +539,9 @@ export async function exportToObj(data, config, outputDir, baseName) {
   }
 
   // Shared-vertex flat surface: grid of position verts, per-tile UVs via separate indices
+  // emitTop: whether to emit the top face (default true)
   // emitBottom: whether to emit the bottom face (skip for ground/courtyards)
-  function addSharedFlat(name, x0, y0, z0, sizeX, sizeY, sizeZ, uv, emitBottom = true, rotateUV = false, simpleBottom = false) {
+  function addSharedFlat(name, x0, y0, z0, sizeX, sizeY, sizeZ, uv, emitBottom = true, rotateUV = false, simpleBottom = false, emitTop = true) {
     const segsX = Math.max(1, Math.ceil(sizeX / SEG_SIZE));
     const segsZ = Math.max(1, Math.ceil(sizeZ / SEG_SIZE));
     const stepX = sizeX / segsX;
@@ -559,14 +563,17 @@ export async function exportToObj(data, config, outputDir, baseName) {
     objLines.push(`o ${name}`);
 
     // Emit grid of position verts for top face: (segsX+1) * (segsZ+1)
-    const voTop = vertOff;
-    for (let gz = 0; gz <= segsZ; gz++) {
-      for (let gx = 0; gx <= segsX; gx++) {
-        objLines.push(`v ${(x0 + gx * stepX).toFixed(6)} ${yTop.toFixed(6)} ${(z0 + gz * stepZ).toFixed(6)}`);
+    let voTop = -1;
+    let topGridW = segsX + 1;
+    if (emitTop) {
+      voTop = vertOff;
+      for (let gz = 0; gz <= segsZ; gz++) {
+        for (let gx = 0; gx <= segsX; gx++) {
+          objLines.push(`v ${(x0 + gx * stepX).toFixed(6)} ${yTop.toFixed(6)} ${(z0 + gz * stepZ).toFixed(6)}`);
+        }
       }
+      vertOff += topGridW * (segsZ + 1);
     }
-    const topGridW = segsX + 1;
-    vertOff += topGridW * (segsZ + 1);
 
     // Emit bottom face verts (if needed)
     let voBot = -1;
@@ -594,9 +601,12 @@ export async function exportToObj(data, config, outputDir, baseName) {
     }
 
     // Normals
-    objLines.push(`vn 0 1 0`);
-    const noTop = normOff;
-    normOff += 1;
+    let noTop = -1;
+    if (emitTop) {
+      objLines.push(`vn 0 1 0`);
+      noTop = normOff;
+      normOff += 1;
+    }
     let noBot = -1;
     if (emitBottom) {
       objLines.push(`vn 0 -1 0`);
@@ -610,30 +620,30 @@ export async function exportToObj(data, config, outputDir, baseName) {
         const uOff = ((sx + baseSegU) % SEGS_PER_TILE) * uvStep;
         const vOff = ((sz + baseSegV) % SEGS_PER_TILE) * uvStepV;
 
-        // Grid vertex indices for this tile's 4 corners (top face)
-        const v00 = voTop + sz * topGridW + sx;
-        const v10 = v00 + 1;
-        const v01 = v00 + topGridW;
-        const v11 = v01 + 1;
+        // Top face
+        if (emitTop) {
+          const v00 = voTop + sz * topGridW + sx;
+          const v10 = v00 + 1;
+          const v01 = v00 + topGridW;
+          const v11 = v01 + 1;
 
-        // Top face UVs
-        const uo = uvOff;
-        if (rotateUV) {
-          objLines.push(`vt ${(uv.uMin+vOff).toFixed(6)} ${(uv.vMin+uOff).toFixed(6)}`);
-          objLines.push(`vt ${(uv.uMin+vOff).toFixed(6)} ${(uv.vMin+uOff+uvStep).toFixed(6)}`);
-          objLines.push(`vt ${(uv.uMin+vOff+uvStepV).toFixed(6)} ${(uv.vMin+uOff+uvStep).toFixed(6)}`);
-          objLines.push(`vt ${(uv.uMin+vOff+uvStepV).toFixed(6)} ${(uv.vMin+uOff).toFixed(6)}`);
-        } else {
-          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
-          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
-          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
-          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+          const uo = uvOff;
+          if (rotateUV) {
+            objLines.push(`vt ${(uv.uMin+vOff).toFixed(6)} ${(uv.vMin+uOff).toFixed(6)}`);
+            objLines.push(`vt ${(uv.uMin+vOff).toFixed(6)} ${(uv.vMin+uOff+uvStep).toFixed(6)}`);
+            objLines.push(`vt ${(uv.uMin+vOff+uvStepV).toFixed(6)} ${(uv.vMin+uOff+uvStep).toFixed(6)}`);
+            objLines.push(`vt ${(uv.uMin+vOff+uvStepV).toFixed(6)} ${(uv.vMin+uOff).toFixed(6)}`);
+          } else {
+            objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+            objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+            objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+            objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+          }
+          uvOff += 4;
+
+          objLines.push(`f ${v00}/${uo}/${noTop} ${v01}/${uo+3}/${noTop} ${v11}/${uo+2}/${noTop}`);
+          objLines.push(`f ${v00}/${uo}/${noTop} ${v11}/${uo+2}/${noTop} ${v10}/${uo+1}/${noTop}`);
         }
-        uvOff += 4;
-
-        // Top face: v00=SW, v10=SE, v11=NE, v01=NW
-        objLines.push(`f ${v00}/${uo}/${noTop} ${v01}/${uo+3}/${noTop} ${v11}/${uo+2}/${noTop}`);
-        objLines.push(`f ${v00}/${uo}/${noTop} ${v11}/${uo+2}/${noTop} ${v10}/${uo+1}/${noTop}`);
 
         // Bottom face (per-tile, skip if simple bottom)
         if (emitBottom && !botSimple) {
@@ -956,55 +966,84 @@ export async function exportToObj(data, config, outputDir, baseName) {
     addPerimeterEdges(c.x, c.y, c.z, c.w, c.height, c.d, getUV(objectIdx));
   }
 
-  // Pyramid roofs for towers
-  for (let bi = 0; bi < buildings.length; bi++) {
-    const b = buildings[bi];
-    if (!b.pyramidRoof) continue;
+  // Roofs (flat and pyramid)
+  const roofUV = getUV(roofIdx);
+  const roofEntries = data.roofs || [];
+  for (let ri = 0; ri < roofEntries.length; ri++) {
+    const roof = roofEntries[ri];
 
-    const topY = b.maxTier * config.tierHeight + config.slabThickness;
-    const apexY = topY + Math.min(b.w, b.d) * 0.6;
-    const cx = b.x + b.w / 2;
-    const cz = b.z + b.d / 2;
-    const texIdx = bi >= 0 ? buildingWallIdx[bi] : buildingWallIdx[0];
-    const ruv = getUV(texIdx);
-    const cu = ((ruv.uMin + ruv.uMax) / 2).toFixed(6);
-    const cv = ((ruv.vMin + ruv.vMax) / 2).toFixed(6);
+    if (roof.type === 'flat') {
+      const bi = roof.buildingIndex;
+      const floorTexIdx = bi >= 0 && bi < buildingFloorIdx.length ? buildingFloorIdx[bi] : baseIdx;
+      const ceilingUV = getUV(floorTexIdx);
+      const ry = roof.tier * config.tierHeight;
+      const rs = roof.section;
+      // Top face — roof texture (emitTop=true, emitBottom=false)
+      addSharedFlat(`roof_${ri}`, rs.x, ry, rs.z, rs.w, config.slabThickness, rs.d, roofUV, false, false, false, true);
+      // Bottom face — floor/ceiling texture (emitTop=false, emitBottom=true)
+      addSharedFlat(`roof_ceiling_${ri}`, rs.x, ry, rs.z, rs.w, config.slabThickness, rs.d, ceilingUV, true, false, false, false);
+      addPerimeterEdges(rs.x, ry, rs.z, rs.w, config.slabThickness, rs.d, roofUV);
+    } else if (roof.type === 'pyramid') {
+      const b = roof.building;
+      const topY = roof.tier * config.tierHeight;
+      const apexY = topY + Math.min(b.w, b.d) * 0.6;
+      const cx = b.x + b.w / 2;
+      const cz = b.z + b.d / 2;
+      const ruv = roofUV;
+      const cu = ((ruv.uMin + ruv.uMax) / 2).toFixed(6);
+      const cv = ((ruv.vMin + ruv.vMax) / 2).toFixed(6);
 
-    objLines.push(`o pyramid_roof_${bi}`);
+      objLines.push(`o roof_pyramid_${ri}`);
+      const vo = vertOff;
+      objLines.push(`v ${b.x.toFixed(6)} ${topY.toFixed(6)} ${b.z.toFixed(6)}`);
+      objLines.push(`v ${(b.x + b.w).toFixed(6)} ${topY.toFixed(6)} ${b.z.toFixed(6)}`);
+      objLines.push(`v ${(b.x + b.w).toFixed(6)} ${topY.toFixed(6)} ${(b.z + b.d).toFixed(6)}`);
+      objLines.push(`v ${b.x.toFixed(6)} ${topY.toFixed(6)} ${(b.z + b.d).toFixed(6)}`);
+      objLines.push(`v ${cx.toFixed(6)} ${apexY.toFixed(6)} ${cz.toFixed(6)}`);
+      for (let i = 0; i < 5; i++) objLines.push(`vt ${cu} ${cv}`);
+      const uo = uvOff;
+      objLines.push(`vn 0 0.5 -1`);
+      objLines.push(`f ${vo+1}/${uo+1}/${normOff} ${vo}/${uo}/${normOff} ${vo+4}/${uo+4}/${normOff}`);
+      normOff++;
+      objLines.push(`vn 1 0.5 0`);
+      objLines.push(`f ${vo+2}/${uo+2}/${normOff} ${vo+1}/${uo+1}/${normOff} ${vo+4}/${uo+4}/${normOff}`);
+      normOff++;
+      objLines.push(`vn 0 0.5 1`);
+      objLines.push(`f ${vo+3}/${uo+3}/${normOff} ${vo+2}/${uo+2}/${normOff} ${vo+4}/${uo+4}/${normOff}`);
+      normOff++;
+      objLines.push(`vn -1 0.5 0`);
+      objLines.push(`f ${vo}/${uo}/${normOff} ${vo+3}/${uo+3}/${normOff} ${vo+4}/${uo+4}/${normOff}`);
+      normOff++;
+      vertOff += 5;
+      uvOff += 5;
+      objLines.push('');
 
-    // 5 verts: 4 base corners + 1 apex
-    const vo = vertOff;
-    objLines.push(`v ${b.x.toFixed(6)} ${topY.toFixed(6)} ${b.z.toFixed(6)}`);           // 0: front-left
-    objLines.push(`v ${(b.x + b.w).toFixed(6)} ${topY.toFixed(6)} ${b.z.toFixed(6)}`);   // 1: front-right
-    objLines.push(`v ${(b.x + b.w).toFixed(6)} ${topY.toFixed(6)} ${(b.z + b.d).toFixed(6)}`); // 2: back-right
-    objLines.push(`v ${b.x.toFixed(6)} ${topY.toFixed(6)} ${(b.z + b.d).toFixed(6)}`);   // 3: back-left
-    objLines.push(`v ${cx.toFixed(6)} ${apexY.toFixed(6)} ${cz.toFixed(6)}`);             // 4: apex
+      // Flat ceiling quad under pyramid — floor texture, downward-facing
+      const bi = roof.buildingIndex;
+      const floorTexIdx = bi >= 0 && bi < buildingFloorIdx.length ? buildingFloorIdx[bi] : baseIdx;
+      const ceilUV = getUV(floorTexIdx);
+      const ccu = ((ceilUV.uMin + ceilUV.uMax) / 2).toFixed(6);
+      const ccv = ((ceilUV.vMin + ceilUV.vMax) / 2).toFixed(6);
 
-    // UVs (centre-point for each triangle — roof is small, uniform texture fine)
-    for (let i = 0; i < 5; i++) objLines.push(`vt ${cu} ${cv}`);
-
-    // 4 triangle faces
-    const uo = uvOff;
-    // Front (-Z)
-    objLines.push(`vn 0 0.5 -1`);
-    objLines.push(`f ${vo}/${uo}/${normOff} ${vo+1}/${uo+1}/${normOff} ${vo+4}/${uo+4}/${normOff}`);
-    normOff++;
-    // Right (+X)
-    objLines.push(`vn 1 0.5 0`);
-    objLines.push(`f ${vo+1}/${uo+1}/${normOff} ${vo+2}/${uo+2}/${normOff} ${vo+4}/${uo+4}/${normOff}`);
-    normOff++;
-    // Back (+Z)
-    objLines.push(`vn 0 0.5 1`);
-    objLines.push(`f ${vo+2}/${uo+2}/${normOff} ${vo+3}/${uo+3}/${normOff} ${vo+4}/${uo+4}/${normOff}`);
-    normOff++;
-    // Left (-X)
-    objLines.push(`vn -1 0.5 0`);
-    objLines.push(`f ${vo+3}/${uo+3}/${normOff} ${vo}/${uo}/${normOff} ${vo+4}/${uo+4}/${normOff}`);
-    normOff++;
-
-    vertOff += 5;
-    uvOff += 5;
-    objLines.push('');
+      objLines.push(`o roof_pyramid_ceiling_${ri}`);
+      const voc = vertOff;
+      objLines.push(`v ${b.x.toFixed(6)} ${topY.toFixed(6)} ${b.z.toFixed(6)}`);
+      objLines.push(`v ${(b.x + b.w).toFixed(6)} ${topY.toFixed(6)} ${b.z.toFixed(6)}`);
+      objLines.push(`v ${(b.x + b.w).toFixed(6)} ${topY.toFixed(6)} ${(b.z + b.d).toFixed(6)}`);
+      objLines.push(`v ${b.x.toFixed(6)} ${topY.toFixed(6)} ${(b.z + b.d).toFixed(6)}`);
+      objLines.push(`vt ${ceilUV.uMin.toFixed(6)} ${ceilUV.vMin.toFixed(6)}`);
+      objLines.push(`vt ${ceilUV.uMax.toFixed(6)} ${ceilUV.vMin.toFixed(6)}`);
+      objLines.push(`vt ${ceilUV.uMax.toFixed(6)} ${ceilUV.vMax.toFixed(6)}`);
+      objLines.push(`vt ${ceilUV.uMin.toFixed(6)} ${ceilUV.vMax.toFixed(6)}`);
+      objLines.push(`vn 0 -1 0`);
+      const uoc = uvOff;
+      objLines.push(`f ${voc}/${uoc}/${normOff} ${voc+1}/${uoc+1}/${normOff} ${voc+2}/${uoc+2}/${normOff}`);
+      objLines.push(`f ${voc}/${uoc}/${normOff} ${voc+2}/${uoc+2}/${normOff} ${voc+3}/${uoc+3}/${normOff}`);
+      vertOff += 4;
+      uvOff += 4;
+      normOff++;
+      objLines.push('');
+    }
   }
 
   // Flat ladder meshes

@@ -72,11 +72,11 @@ describe('Snapshot regression — seed 42', () => {
   });
 
   it('walkway count is locked', () => {
-    expect(counts.walkways).toMatchInlineSnapshot(`21`);
+    expect(counts.walkways).toMatchInlineSnapshot(`10`);
   });
 
   it('cover count is locked', () => {
-    expect(counts.cover).toMatchInlineSnapshot(`10`);
+    expect(counts.cover).toMatchInlineSnapshot(`11`);
   });
 
   it('street scatter count is locked', () => {
@@ -88,9 +88,9 @@ describe('Snapshot regression — seed 42', () => {
       [
         1,
         30,
-        28,
-        22,
+        23,
         16,
+        0,
       ]
     `);
   });
@@ -123,11 +123,11 @@ describe('Snapshot regression — seed 100', () => {
   });
 
   it('cover count is locked', () => {
-    expect(counts.cover).toMatchInlineSnapshot(`19`);
+    expect(counts.cover).toMatchInlineSnapshot(`12`);
   });
 
   it('street scatter count is locked', () => {
-    expect(counts.streetScatter).toMatchInlineSnapshot(`8`);
+    expect(counts.streetScatter).toMatchInlineSnapshot(`10`);
   });
 
   it('floor sections per tier are locked', () => {

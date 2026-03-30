@@ -29,6 +29,61 @@ export function generateConnectivity(data, config, rng) {
   const ladders = [];
   const walkways = [];
 
+  // Tower ladders: ground to top accessible floor
+  const towerLadders = [];
+  for (let bi = 0; bi < data.buildings.length; bi++) {
+    const building = data.buildings[bi];
+    if (building.size !== 'tower') continue;
+
+    // Top accessible tier: maxTier for flat roof, maxTier-1 for pyramid (floor below pyramid)
+    const topTier = building.pyramidRoof ? building.maxTier - 1 : building.maxTier;
+    if (topTier < 1) continue;
+
+    const y0 = 0;
+    const y1 = topTier * tierHeight;
+
+    // Pick a random side outside the building
+    const side = rng.pick(['north', 'south', 'east', 'west']);
+    let lx, lz, lw, ld;
+    if (side === 'north') {
+      lx = building.x + building.w / 2 - LADDER_WIDTH / 2;
+      lz = building.z - LADDER_DEPTH;
+      lw = LADDER_WIDTH; ld = LADDER_DEPTH;
+    } else if (side === 'south') {
+      lx = building.x + building.w / 2 - LADDER_WIDTH / 2;
+      lz = building.z + building.d;
+      lw = LADDER_WIDTH; ld = LADDER_DEPTH;
+    } else if (side === 'west') {
+      lx = building.x - LADDER_DEPTH;
+      lz = building.z + building.d / 2 - LADDER_WIDTH / 2;
+      lw = LADDER_DEPTH; ld = LADDER_WIDTH;
+    } else {
+      lx = building.x + building.w;
+      lz = building.z + building.d / 2 - LADDER_WIDTH / 2;
+      lw = LADDER_DEPTH; ld = LADDER_WIDTH;
+    }
+
+    // Clamp to map bounds
+    lx = Math.max(0, Math.min(lx, config.mapWidth - lw));
+    lz = Math.max(0, Math.min(lz, config.mapDepth - ld));
+
+    towerLadders.push({ type: 'ground_ladder', x: lx, z: lz, w: lw, d: ld, y0, y1 });
+
+    // Delete wall segments that overlap the ladder at the termination floor
+    const exitY = topTier * tierHeight;
+    for (let wi = data.walls.length - 1; wi >= 0; wi--) {
+      const wall = data.walls[wi];
+      // Only walls at or above the exit floor level
+      if (wall.baseY < exitY) continue;
+      const wx1 = wall.axis === 'x' ? wall.x + wall.length : wall.x + wall.thickness;
+      const wz1 = wall.axis === 'z' ? wall.z + wall.length : wall.z + wall.thickness;
+      if (lx < wx1 + 0.3 && lx + lw > wall.x - 0.3 &&
+          lz < wz1 + 0.3 && lz + ld > wall.z - 0.3) {
+        data.walls.splice(wi, 1);
+      }
+    }
+  }
+
   // For each building, each tier, each floor quadrant:
   // try to connect quadrant centre to nearest floor on another building.
   // Drop if it hits a wall.
@@ -309,11 +364,12 @@ export function generateConnectivity(data, config, rng) {
   // Ground floor ladders: for each ground floor quadrant's outward-facing edges,
   // check if there's a wall. If so, place a red ladder from ground up to the
   // first tier with no wall. Skip edges near map boundary.
-  const groundLadders = [];
+  const groundLadders = [...towerLadders];
   const MAP_BOUNDARY_MARGIN = CONNECTIVITY.mapBoundaryMargin;
 
   for (let bi = 0; bi < data.buildings.length; bi++) {
     const b = data.buildings[bi];
+    if (b.size === 'tower') continue; // towers have their own ladder generation above
     const bq = data.buildingQuadrants[bi];
     const present = bq.tiers[1] || new Set([0, 1, 2, 3]);
 
@@ -445,6 +501,7 @@ export function generateConnectivity(data, config, rng) {
 
   for (let bi = 0; bi < data.buildings.length; bi++) {
     const b = data.buildings[bi];
+    if (b.size === 'tower') continue; // towers have their own ladder generation
     const bq = data.buildingQuadrants[bi];
 
     for (let tier = 0; tier < config.tiers; tier++) {

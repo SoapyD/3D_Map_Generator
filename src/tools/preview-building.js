@@ -16,6 +16,7 @@ import { createRng } from '../core/rng.js';
 import { BUILDING, FLOOR, WALL, CONNECTIVITY, GEOMETRY, LADDER_DISPLAY } from '../config.js';
 import { generateFloors } from '../generators/floors.js';
 import { generateWalls } from '../generators/walls.js';
+import { generateConnectivity } from '../generators/connectivity.js';
 import { buildScene } from '../generators/scene-builder.js';
 import { exportToGlb } from '../export/glb-exporter.js';
 import { exportToObj, getObjOutputPath } from '../export/obj-exporter.js';
@@ -163,18 +164,12 @@ async function main() {
   const wallData = generateWalls(floorData, config, rng);
   console.log(`    ${wallData.walls.length} wall segments`);
 
-  // Minimal connectivity data (no walkways/ladders for preview)
-  const connData = {
-    ...wallData,
-    connections: {
-      ladders: [],
-      walkways: [],
-      groundLadders: [],
-      orangeLadders: [],
-      interiorLadders: [],
-      ladderPlatforms: [],
-    },
-  };
+  // Run connectivity (generates tower ladders)
+  console.log('  Generating connectivity...');
+  const connData = generateConnectivity(wallData, config, rng);
+  const conn = connData.connections;
+  const ladderCount = conn.ladders.length + conn.groundLadders.length + conn.orangeLadders.length + conn.interiorLadders.length;
+  if (ladderCount > 0) console.log(`    ${ladderCount} ladders`);
 
   // Minimal cover data
   const coverData = {

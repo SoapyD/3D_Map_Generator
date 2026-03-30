@@ -39,6 +39,7 @@ export function generateFloors(data, config, rng) {
   }
 
   const buildingQuadrants = [];
+  const roofs = []; // { type: 'flat'|'pyramid', tier, sections, buildingIndex, building }
 
   for (const building of data.buildings) {
     const bq = { tiers: {} };
@@ -83,15 +84,37 @@ export function generateFloors(data, config, rng) {
 
       // Convert to sections
       const sections = quadrantsToSections(building, present);
-      for (const s of sections) {
-        floors[tier].sections.push(s);
+      const isRoofTier = tier === building.maxTier;
+
+      if (isRoofTier && building.pyramidRoof) {
+        // Pyramid roof replaces the flat roof — no floor sections at this tier
+        roofs.push({
+          type: 'pyramid',
+          tier,
+          building,
+          buildingIndex: data.buildings.indexOf(building),
+        });
+      } else if (isRoofTier) {
+        // Flat roof — sections go to roofs array, not floors
+        for (const s of sections) {
+          roofs.push({
+            type: 'flat',
+            tier,
+            section: s,
+            buildingIndex: data.buildings.indexOf(building),
+          });
+        }
+      } else {
+        for (const s of sections) {
+          floors[tier].sections.push(s);
+        }
       }
     }
 
     buildingQuadrants.push(bq);
   }
 
-  return { ...data, floors, buildingQuadrants };
+  return { ...data, floors, buildingQuadrants, roofs };
 }
 
 function pickAdjacentToRemoved(removed, rng) {
