@@ -81,11 +81,21 @@ export function generateWalls(data, config, rng) {
           for (const se of building.suppressEdges) {
             if (se.edge !== edgeLabel) continue;
             if (se.zMin !== undefined) {
-              // Remove segments whose Z range overlaps the suppressed zone
+              // Remove segments whose Z range overlaps the suppressed zone (east/west edges)
               for (let si = segments.length - 1; si >= 0; si--) {
                 const s = segments[si];
                 const sz1 = s.axis === 'z' ? s.z + s.length : s.z + s.thickness;
                 if (s.z < se.zMax + 0.1 && sz1 > se.zMin - 0.1) {
+                  segments.splice(si, 1);
+                }
+              }
+            }
+            if (se.xMin !== undefined) {
+              // Remove segments whose X range overlaps the suppressed zone (north/south edges)
+              for (let si = segments.length - 1; si >= 0; si--) {
+                const s = segments[si];
+                const sx1 = s.axis === 'x' ? s.x + s.length : s.x + s.thickness;
+                if (s.x < se.xMax + 0.1 && sx1 > se.xMin - 0.1) {
                   segments.splice(si, 1);
                 }
               }

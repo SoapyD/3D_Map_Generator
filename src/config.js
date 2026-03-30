@@ -52,10 +52,25 @@ export const BUILDING = {
     diagB:    { removed: [0, 3], weight: 0.05 },  // missing NW + SE (diagonal)
     // L-shapes: 2×1 strip + 1×1 extension, forming an L on a 2×3 grid
     // Named by which corner the elbow is at
-    lShapeSW: { weight: 0.025 },  // ##  (strip along top, extension bottom-left)
-    lShapeSE: { weight: 0.025 },  // ##  (strip along top, extension bottom-right)
-    lShapeNW: { weight: 0.025 },  // ##  (strip along bottom, extension top-left)
-    lShapeNE: { weight: 0.025 },  // ##  (strip along bottom, extension top-right)
+    lShapeSW: { weight: 0.025 },  // L-shape, elbow at SW
+    lShapeSE: { weight: 0.025 },  // L-shape, elbow at SE
+    lShapeNW: { weight: 0.025 },  // L-shape, elbow at NW
+    lShapeNE: { weight: 0.025 },  // L-shape, elbow at NE
+    // Wide U-shapes: 3×3 grid, two columns + connecting bar, open on one side
+    uShapeN:  { weight: 0.02 },   // open top (north)
+    uShapeS:  { weight: 0.02 },   // open bottom (south)
+    uShapeE:  { weight: 0.02 },   // open right (east)
+    uShapeW:  { weight: 0.02 },   // open left (west)
+    // Narrow U-shapes: 2×3 grid, full column + two stubs, indent on one side
+    uNarrowN: { weight: 0.02 },   // indent top-right
+    uNarrowS: { weight: 0.02 },   // indent bottom-right
+    uNarrowE: { weight: 0.02 },   // indent right-middle (rotated)
+    uNarrowW: { weight: 0.02 },   // indent left-middle (rotated)
+    // Small U-shapes: 2×3 grid, each cell is 1 segment, 5 of 6 filled
+    uSmallN:  { weight: 0.02 },   // gap at middle-right
+    uSmallS:  { weight: 0.02 },   // gap at middle-left
+    uSmallE:  { weight: 0.02 },   // gap at bottom-middle (rotated)
+    uSmallW:  { weight: 0.02 },   // gap at top-middle (rotated)
   },
 };
 

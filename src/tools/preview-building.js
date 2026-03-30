@@ -173,6 +173,134 @@ async function main() {
     for (const b of buildingsList) {
       console.log(`  Part: ${b.w.toFixed(1)} x ${b.d.toFixed(1)} at (${b.x.toFixed(1)}, ${b.z.toFixed(1)}), maxTier: ${b.maxTier}`);
     }
+  } else if (args.shape.startsWith('uShape')) {
+    const base = createBuilding(args.type, 'full', args.tiers, rng);
+    const { x, z } = base;
+    const segW = rng.float(BUILDING.footprints.small.min, BUILDING.footprints.small.max);
+    const segD = rng.float(BUILDING.footprints.small.min, BUILDING.footprints.small.max);
+    const mt = base.maxTier;
+    const ht = base.height;
+    const bProps = { maxTier: mt, size: 'small', height: ht, blockIndex: 0, shape: 'full', pyramidRoof: false };
+
+    let left, right, bar, leftSup, rightSup, barSup;
+    if (args.shape === 'uShapeN') {
+      left  = { x, z, w: segW, d: segD * 3 };
+      right = { x: x + segW * 2, z, w: segW, d: segD * 3 };
+      bar   = { x: x + segW, z: z + segD * 2, w: segW, d: segD };
+      leftSup  = [{ edge: 'east', zMin: bar.z, zMax: bar.z + bar.d }];
+      rightSup = [{ edge: 'west', zMin: bar.z, zMax: bar.z + bar.d }];
+      barSup   = [{ edge: 'west' }, { edge: 'east' }];
+    } else if (args.shape === 'uShapeS') {
+      left  = { x, z, w: segW, d: segD * 3 };
+      right = { x: x + segW * 2, z, w: segW, d: segD * 3 };
+      bar   = { x: x + segW, z, w: segW, d: segD };
+      leftSup  = [{ edge: 'east', zMin: bar.z, zMax: bar.z + bar.d }];
+      rightSup = [{ edge: 'west', zMin: bar.z, zMax: bar.z + bar.d }];
+      barSup   = [{ edge: 'west' }, { edge: 'east' }];
+    } else if (args.shape === 'uShapeE') {
+      left  = { x, z, w: segW * 3, d: segD };
+      right = { x, z: z + segD * 2, w: segW * 3, d: segD };
+      bar   = { x, z: z + segD, w: segW, d: segD };
+      leftSup  = [{ edge: 'south', xMin: bar.x, xMax: bar.x + bar.w }];
+      rightSup = [{ edge: 'north', xMin: bar.x, xMax: bar.x + bar.w }];
+      barSup   = [{ edge: 'north' }, { edge: 'south' }];
+    } else { // uShapeW
+      left  = { x, z, w: segW * 3, d: segD };
+      right = { x, z: z + segD * 2, w: segW * 3, d: segD };
+      bar   = { x: x + segW * 2, z: z + segD, w: segW, d: segD };
+      leftSup  = [{ edge: 'south', xMin: bar.x, xMax: bar.x + bar.w }];
+      rightSup = [{ edge: 'north', xMin: bar.x, xMax: bar.x + bar.w }];
+      barSup   = [{ edge: 'north' }, { edge: 'south' }];
+    }
+
+    buildingsList.push({ x: left.x, z: left.z, w: left.w, d: left.d, ...bProps, suppressEdges: leftSup });
+    buildingsList.push({ x: right.x, z: right.z, w: right.w, d: right.d, ...bProps, suppressEdges: rightSup });
+    buildingsList.push({ x: bar.x, z: bar.z, w: bar.w, d: bar.d, ...bProps, suppressEdges: barSup });
+
+    console.log(`Preview building: type=${args.type}, shape=${args.shape}, seed=${args.seed}, tiers=${args.tiers}`);
+    for (const b of buildingsList) {
+      console.log(`  Part: ${b.w.toFixed(1)} x ${b.d.toFixed(1)} at (${b.x.toFixed(1)}, ${b.z.toFixed(1)}), maxTier: ${b.maxTier}`);
+    }
+  } else if (args.shape.startsWith('uNarrow')) {
+    const base = createBuilding(args.type, 'full', args.tiers, rng);
+    const { x, z } = base;
+    const segW = rng.float(BUILDING.footprints.small.min, BUILDING.footprints.small.max);
+    const segD = rng.float(BUILDING.footprints.small.min, BUILDING.footprints.small.max);
+    const mt = base.maxTier;
+    const ht = base.height;
+    const bProps = { maxTier: mt, size: 'small', height: ht, blockIndex: 0, shape: 'full', pyramidRoof: false };
+
+    let col, top, bot, colSup, topSup, botSup;
+    if (args.shape === 'uNarrowN') {
+      col = { x, z, w: segW, d: segD * 3 };
+      top = { x: x + segW, z, w: segW, d: segD };
+      bot = { x: x + segW, z: z + segD * 2, w: segW, d: segD };
+      colSup = [{ edge: 'east', zMin: top.z, zMax: top.z + top.d }, { edge: 'east', zMin: bot.z, zMax: bot.z + bot.d }];
+      topSup = [{ edge: 'west' }]; botSup = [{ edge: 'west' }];
+    } else if (args.shape === 'uNarrowS') {
+      col = { x: x + segW, z, w: segW, d: segD * 3 };
+      top = { x, z, w: segW, d: segD };
+      bot = { x, z: z + segD * 2, w: segW, d: segD };
+      colSup = [{ edge: 'west', zMin: top.z, zMax: top.z + top.d }, { edge: 'west', zMin: bot.z, zMax: bot.z + bot.d }];
+      topSup = [{ edge: 'east' }]; botSup = [{ edge: 'east' }];
+    } else if (args.shape === 'uNarrowE') {
+      col = { x, z, w: segW * 3, d: segD };
+      top = { x, z: z + segD, w: segW, d: segD };
+      bot = { x: x + segW * 2, z: z + segD, w: segW, d: segD };
+      colSup = [{ edge: 'south', xMin: top.x, xMax: top.x + top.w }, { edge: 'south', xMin: bot.x, xMax: bot.x + bot.w }];
+      topSup = [{ edge: 'north' }]; botSup = [{ edge: 'north' }];
+    } else { // uNarrowW
+      col = { x, z: z + segD, w: segW * 3, d: segD };
+      top = { x, z, w: segW, d: segD };
+      bot = { x: x + segW * 2, z, w: segW, d: segD };
+      colSup = [{ edge: 'north', xMin: top.x, xMax: top.x + top.w }, { edge: 'north', xMin: bot.x, xMax: bot.x + bot.w }];
+      topSup = [{ edge: 'south' }]; botSup = [{ edge: 'south' }];
+    }
+
+    buildingsList.push({ x: col.x, z: col.z, w: col.w, d: col.d, ...bProps, suppressEdges: colSup });
+    buildingsList.push({ x: top.x, z: top.z, w: top.w, d: top.d, ...bProps, suppressEdges: topSup });
+    buildingsList.push({ x: bot.x, z: bot.z, w: bot.w, d: bot.d, ...bProps, suppressEdges: botSup });
+
+    console.log(`Preview building: type=${args.type}, shape=${args.shape}, seed=${args.seed}, tiers=${args.tiers}`);
+    for (const b of buildingsList) {
+      console.log(`  Part: ${b.w.toFixed(1)} x ${b.d.toFixed(1)} at (${b.x.toFixed(1)}, ${b.z.toFixed(1)}), maxTier: ${b.maxTier}`);
+    }
+  } else if (args.shape.startsWith('uSmall')) {
+    const base = createBuilding(args.type, 'full', args.tiers, rng);
+    const { x, z } = base;
+    const tFp = BUILDING.tower || { min: 2, max: 3 };
+    const segW = rng.float(tFp.min, tFp.max);
+    const segD = rng.float(tFp.min, tFp.max);
+    const bProps = { maxTier: base.maxTier, size: 'small', height: base.height, blockIndex: 0, shape: 'full', pyramidRoof: false };
+
+    let gapR, gapC;
+    if (args.shape === 'uSmallN') { gapR = 1; gapC = 1; }
+    else if (args.shape === 'uSmallS') { gapR = 1; gapC = 0; }
+    else if (args.shape === 'uSmallE') { gapR = 2; gapC = 1; }
+    else { gapR = 0; gapC = 1; }
+
+    const isRotated = args.shape === 'uSmallE' || args.shape === 'uSmallW';
+    const cols = isRotated ? 3 : 2;
+    const rows = isRotated ? 2 : 3;
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (r === gapR && c === gapC) continue;
+        const cx = x + c * segW;
+        const cz = z + r * segD;
+        const sup = [];
+        if (r > 0 && !(r - 1 === gapR && c === gapC)) sup.push({ edge: 'north' });
+        if (r < rows - 1 && !(r + 1 === gapR && c === gapC)) sup.push({ edge: 'south' });
+        if (c > 0 && !(r === gapR && c - 1 === gapC)) sup.push({ edge: 'west' });
+        if (c < cols - 1 && !(r === gapR && c + 1 === gapC)) sup.push({ edge: 'east' });
+        buildingsList.push({ x: cx, z: cz, w: segW, d: segD, ...bProps, suppressEdges: sup });
+      }
+    }
+
+    console.log(`Preview building: type=${args.type}, shape=${args.shape}, seed=${args.seed}, tiers=${args.tiers}`);
+    for (const b of buildingsList) {
+      console.log(`  Part: ${b.w.toFixed(1)} x ${b.d.toFixed(1)} at (${b.x.toFixed(1)}, ${b.z.toFixed(1)}), maxTier: ${b.maxTier}`);
+    }
   } else {
     const building = createBuilding(args.type, args.shape, args.tiers, rng);
     if (args.interiorWalls) building.interiorWalls = true;
