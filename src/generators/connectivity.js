@@ -1491,7 +1491,10 @@ function detectGapsAndConnect(data, existingWalkways, existingBridges, config, r
     const lenB = b.axis === 'x' ? b.w : b.d;
     return lenB - lenA;
   });
-  const maxForced = Math.min(deduped.length, CONNECTIVITY.forcedMaxCount || 15);
+  const countRange = CONNECTIVITY.forcedMaxCount;
+  const maxForced = Array.isArray(countRange)
+    ? Math.min(deduped.length, rng.int(countRange[0], countRange[1]))
+    : Math.min(deduped.length, countRange || 15);
   const result = deduped.slice(0, maxForced);
 
   if (result.length > 0) console.log('  Gap detection: ' + result.length + ' forced walkways');

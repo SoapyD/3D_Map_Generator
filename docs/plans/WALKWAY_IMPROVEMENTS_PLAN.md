@@ -31,13 +31,14 @@ Improve walkway and bridge generation to create more interesting, varied, and ta
 | 13 | Diagonal tolerance for gap detection | Done | `CONNECTIVITY.forcedDiagTolerance: 4` tries adjacent columns/rows |
 | 14 | `findFloorEdge` returns furthest edge for multi-section buildings | Done | Fixed bug where near edge was returned instead of far edge |
 | 15 | Orientation-aware passthrough check | Done | N/S connections don't block E/W and vice versa |
+| 16 | Wall clearing at forced connection endpoints | Done | If wall blocks >50% of walkway width at endpoint, wall segments are removed; ≤50% left as-is |
 
 ### Config Values
 
 | Setting | Default | Key |
 |---|---|---|
 | Minimum gap for forced connection | 6" | `CONNECTIVITY.forcedMinGap` |
-| Max forced connections per map | 15 | `CONNECTIVITY.forcedMaxCount` |
+| Forced connections kept per map | [3, 6] | `CONNECTIVITY.forcedMaxCount` — keeps top N longest, random within range |
 | Diagonal tolerance (cells) | 4 | `CONNECTIVITY.forcedDiagTolerance` |
 
 ### Known Issues

@@ -126,7 +126,7 @@ export const CONNECTIVITY = {
   minWalkwayLength: 3,     // inches
   // Forced connections (gap detection)
   forcedMinGap: 6,         // minimum gap size in inches to force a connection
-  forcedMaxCount: 15,      // max forced connections per map
+  forcedMaxCount: [3, 6],   // [min, max] longest forced connections kept per map
   forcedDiagTolerance: 4,  // max offset in cells to still connect diagonally
   walkwayKeepRatio: 0.6,   // fraction of walkways kept per tier
   ladderCullRatio: 0.6,    // fraction of red/orange ladders kept
