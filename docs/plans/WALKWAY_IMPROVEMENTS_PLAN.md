@@ -32,6 +32,12 @@ Improve walkway and bridge generation to create more interesting, varied, and ta
 | 14 | `findFloorEdge` returns furthest edge for multi-section buildings | Done | Fixed bug where near edge was returned instead of far edge |
 | 15 | Orientation-aware passthrough check | Done | N/S connections don't block E/W and vice versa |
 | 16 | Wall clearing at forced connection endpoints | Done | If wall blocks >50% of walkway width at endpoint, wall segments are removed; ≤50% left as-is |
+| 17 | Cross-axis clamping for forced connections | Done | Walkway Z/X clamped to overlap of both endpoint floor ranges |
+| 18 | Overhang rejection for regular walkways | Done | ≥50% cross-axis overlap required at both ends |
+| 19 | Forced connection count range | Done | `forcedMaxCount: [3, 6]` keeps top N longest |
+| 20 | Branching walkways (T-junctions) | Done | Off forced connections, max 2 per map, 3-14" length |
+| 21 | Branch inherits parent bridge type + texture | Done | `textureId` system, two-pass bridge upgrade |
+| 22 | Bridge wall gaps at branch entry points | Done | Side walls split into segments with gaps |
 
 ### Config Values
 
@@ -40,6 +46,9 @@ Improve walkway and bridge generation to create more interesting, varied, and ta
 | Minimum gap for forced connection | 6" | `CONNECTIVITY.forcedMinGap` |
 | Forced connections kept per map | [3, 6] | `CONNECTIVITY.forcedMaxCount` — keeps top N longest, random within range |
 | Diagonal tolerance (cells) | 4 | `CONNECTIVITY.forcedDiagTolerance` |
+| Max branches per map | 2 | `CONNECTIVITY.branchMaxPerMap` |
+| Branch min length | 3" | `CONNECTIVITY.branchMinLength` |
+| Branch max length | 14" | `CONNECTIVITY.branchMaxLength` |
 
 ### Known Issues
 
@@ -170,40 +179,40 @@ Improve walkway and bridge generation to create more interesting, varied, and ta
 | 2 | Platform generation at segment junctions | Pending | |
 | 3 | Optional ladders at platforms | Pending | |
 
-### 5. Branching Walkways (T and + Junctions)
+### 5. Branching Walkways (T-Junctions)
 
-**Problem:** Current walkways are point-to-point connections between two buildings. A long walkway passing near a third or fourth building has no way to branch off and connect to them.
+**Problem:** Forced connections are long spans that pass near buildings without connecting to them.
 
-**Solution:** After generating straight walkways, identify walkways that pass within range of additional buildings at the same tier. Add perpendicular branch segments that connect from the walkway midpoint to those buildings.
-
-**Variants:**
-- **T-junction:** One branch from the middle of a walkway to a third building (3 connections total)
-- **+ junction:** Two branches from the middle, connecting 4 buildings total (the original two endpoints + two branches)
-
-**Geometry:**
-- Branch segment: same width/thickness as the parent walkway
-- Junction platform: small square (2"×2") where the branch meets the main walkway
-- Branch inherits the parent's bridge variant (if the parent is a bridge, branch gets side walls too)
+**Solution:** After gap detection, scan each forced walkway perpendicular for nearby building floors at the same tier. Create a branch segment from the walkway to that building.
 
 **Implementation:**
-- After walkway generation, for each walkway find buildings within range that are perpendicular to the walkway axis
-- Generate branch segments from the walkway to those buildings
-- Add a junction platform at the branch point
-- Limit to 1-2 branches per walkway to avoid spider-web complexity
-- Branches must not overlap existing walkways or branches
+- `generateBranches()` runs after gap detection, before bridge upgrade
+- For each forced walkway, scan all floor/roof sections at the same tier
+- Target section must overlap the walkway's cross-axis range and be 3-14" away perpendicular
+- Branch meets parent flush (no junction platform needed)
+- Branch inherits parent's bridge upgrade decision and texture via `textureId`
+- Bridge side walls are split into segments with gaps where branches connect (both low wall and battlement variants)
+- Max 2 branches per map, preferring longest spans
+- Passthrough and overlap checks filter invalid branches (parent walkway excluded from overlap check)
+
+**Config:**
+- `CONNECTIVITY.branchMaxPerMap: 2`
+- `CONNECTIVITY.branchMinLength: 3`
+- `CONNECTIVITY.branchMaxLength: 14`
 
 **Complexity:** M
-**Impact:** High — creates more complex elevated route networks, more tactical options
+**Impact:** High — creates T-junction route networks off forced connections
+**Status:** Complete
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 1 | Identify candidate buildings perpendicular to existing walkways | Pending | Same tier, within range |
-| 2 | Branch segment generation (perpendicular to parent) | Pending | |
-| 3 | Junction platform at branch point | Pending | 2"×2" square |
-| 4 | Inherit bridge variant from parent | Pending | Side walls on branches |
-| 5 | Anti-overlap check against existing walkways/branches | Pending | |
-| 6 | Max 2 branches per walkway | Pending | Config value |
-| 7 | Render branches in GLB + OBJ | Pending | |
+| 1 | Scan forced walkways for perpendicular building floors | Done | All sections at same tier, cross-axis overlap check |
+| 2 | Branch segment generation | Done | Perpendicular to parent, clamped to target section |
+| 3 | Inherit bridge variant + texture from parent | Done | `textureId` system, two-pass bridge upgrade |
+| 4 | Bridge wall gaps at branch entry points | Done | Side walls split into segments, battlements respect gaps |
+| 5 | Anti-overlap + passthrough checks | Done | Parent excluded from overlap check |
+| 6 | Max 2 branches per map | Done | `branchMaxPerMap: 2`, keeps longest |
+| 7 | Render in GLB + collision mesh | Done | Walkway/bridge prefixes in collision exporter |
 
 ### 6. Tier-Spanning Ramps
 
@@ -224,11 +233,11 @@ Improve walkway and bridge generation to create more interesting, varied, and ta
 
 ## Implementation Order
 
-| Phase | Items | Notes |
-|---|---|---|
-| 1 | Gap detection (#1) | Highest impact, prevents dead zones |
-| 2 | Branching walkways (#5) | Creates route networks, high tactical value |
-| 3 | Pillar supports (#3) | Quick visual win |
-| 4 | Cornered walkways (#2) | Solves diagonal connections |
-| 5 | Walkway chains (#4) | Nice to have |
-| 6 | Tier-spanning ramps (#6) | Complex, save for later |
+| Phase | Items | Status | Notes |
+|---|---|---|---|
+| 1 | Gap detection (#1) | **Complete** | Grid-based, cross-axis clamping, wall clearing, overhang rejection |
+| 2 | Branching walkways (#5) | **Complete** | T-junctions off forced connections, texture + bridge inheritance |
+| 3 | Pillar supports (#3) | Pending | Quick visual win |
+| 4 | Cornered walkways (#2) | Pending | Solves diagonal connections |
+| 5 | Walkway chains (#4) | Pending | Nice to have |
+| 6 | Tier-spanning ramps (#6) | Pending | Complex, save for later |
