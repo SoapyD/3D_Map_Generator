@@ -30,30 +30,50 @@ Improve walkway and bridge generation to create more interesting, varied, and ta
 
 ## Planned Improvements
 
-### 1. Gap Detection — Connect Isolated Building Groups
+### 1. Gap Detection — Grid-Based Spatial Analysis
 
-**Problem:** Buildings can cluster on one side of the map leaving a big gap with no connections to buildings on the other side.
+**Problem:** Buildings can cluster on one side of the map leaving big gaps with no connections. The previous approach (flood-fill clusters + nearest-pair) was unreliable because it worked backwards from walkway endpoints.
 
-**Solution:** After initial walkway generation, run a reachability analysis:
-1. Group buildings into clusters based on which are connected (via walkways, ladders, or shared floors)
-2. If multiple disconnected clusters exist, force a walkway/bridge between the nearest pair of buildings across the gap
-3. Allow these forced connections to exceed the normal max length if needed
+**Solution:** Build a spatial grid per tier, then scan for gaps between occupied cells.
 
-**Implementation:**
-- Flood-fill reachability from each building using existing connections
-- Find unconnected clusters
-- For each gap, find the nearest building pair across clusters
-- Generate a forced walkway (ignore normal length limits, but cap at map diagonal)
-- Prefer bridge variant for long spans
+**Grid Structure:**
+- Grid cell size = smallest floor quadrant (half of smallest building footprint, ~2-3")
+- One grid per tier of elevation
+- Each cell stores:
+  - `floor`: boolean — whether a floor section covers this cell
+  - `buildingIndex`: which building this cell belongs to (-1 if none)
+  - `walls`: bitmask for which edges have walls (N=1, S=2, E=4, W=8)
 
-**Complexity:** M
-**Impact:** High — prevents dead zones on the map
+**Gap Scanning Algorithm:**
+1. After all building/floor/wall positions are resolved, populate the grid
+2. For each tier, scan rows (left to right) looking for runs of empty cells between two occupied cells from different buildings
+3. Do the same scanning columns (top to bottom)
+4. Each gap found = { tier, axis, startCell, endCell, buildingA, buildingB, gapWidth }
+5. Filter: ignore gaps < 2 cells (buildings touching) and gaps > half map width (too far)
+
+**Connection Point Selection:**
+- On each side of the gap, pick the cell that does NOT have a wall facing the gap direction
+- If both sides have wall-free edges = ideal bridge placement
+- If one side has a wall = blocked walkway (yellow ladder will be added)
+- Prefer connections where both endpoints have floors at the same tier
+
+**Implementation Steps:**
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 1 | Reachability analysis (flood-fill building clusters) | Pending | Post walkway generation |
-| 2 | Forced cross-gap walkway generation | Pending | Override length limits |
-| 3 | Prefer bridge variant for forced long spans | Pending | |
+| 1 | Create grid data structure (per tier, cell size from config) | Pending | Cell = { floor, buildingIndex, walls bitmask } |
+| 2 | Populate grid from floor sections | Pending | Map each floor section to grid cells |
+| 3 | Populate wall bitmask from wall segments | Pending | Check each wall against grid cells |
+| 4 | Row scanning: find horizontal gaps between occupied cells | Pending | Different buildings on each side |
+| 5 | Column scanning: find vertical gaps | Pending | Same logic, orthogonal |
+| 6 | Filter gaps by width (min 2 cells, max half map) | Pending | |
+| 7 | Select connection points (prefer wall-free edges) | Pending | |
+| 8 | Generate forced walkways/bridges at connection points | Pending | Use bridge variant for long spans |
+| 9 | Anti-stacking check against existing walkways | Pending | |
+| 10 | Per-tier grids (different floor layouts per tier) | Pending | |
+
+**Complexity:** M
+**Impact:** High — reliable gap detection, prevents dead zones
 
 ### 2. Cornered (L-shaped) Walkways
 

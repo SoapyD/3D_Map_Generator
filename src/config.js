@@ -124,6 +124,10 @@ export const CONNECTIVITY = {
   ladderWallOffset: 0.3,   // offset from wall to prevent clashing
   maxWalkwayLength: 24,    // inches (half map width)
   minWalkwayLength: 3,     // inches
+  // Forced connections (gap detection)
+  forcedMinGap: 6,         // minimum gap size in inches to force a connection
+  forcedMaxCount: 15,      // max forced connections per map
+  forcedDiagTolerance: 4,  // max offset in cells to still connect diagonally
   walkwayKeepRatio: 0.6,   // fraction of walkways kept per tier
   ladderCullRatio: 0.6,    // fraction of red/orange ladders kept
   proximity: 3,            // minimum distance between same-type connectors
