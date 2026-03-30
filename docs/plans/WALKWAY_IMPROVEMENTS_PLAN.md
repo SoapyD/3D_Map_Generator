@@ -17,14 +17,33 @@ Improve walkway and bridge generation to create more interesting, varied, and ta
 | # | Item | Status | Notes |
 |---|------|--------|-------|
 | 1 | Max walkway length increased to 24" (half map width) | Done | `CONNECTIVITY.maxWalkwayLength: 24` |
-| 2 | Anti-stacking — walkways on different tiers can't overlap in XZ if same axis | Partial | Check added at generation, but stacking still occurs in some seeds — needs investigation |
+| 2 | Anti-stacking for regular walkways (same axis, different tier) | Done | Check at walkway generation push |
 | 3 | Bridge walkways with low walls (0.75") | Done | `bridgeVariants.low` |
 | 4 | Bridge walkways with battlements (1.5" spaced sections) | Done | `bridgeVariants.battlement` |
 | 5 | Bridge chance for tier 2+ walkways (40%) | Done | `CONNECTIVITY.bridgeChance` |
+| 6 | Grid-based gap detection | Done | 1" grid per tier, scans rows + columns for gaps |
+| 7 | Forced connections span large gaps (min 6") | Done | `CONNECTIVITY.forcedMinGap: 6` |
+| 8 | Forced connections include roofs as valid endpoints | Done | Roofs populated in grid |
+| 9 | Forced connections go through bridge upgrade | Done | Moved gap detection before bridge step |
+| 10 | Building pair dedup (no duplicate connections) | Done | Uses textureGroup to identify composite parts |
+| 11 | Cross-axis criss-cross prevention (same tier) | Done | Grid marks walkways, blocks any crossing at same tier |
+| 12 | Forced connections can stack on regular walkways | Done | `isStackedOnForced` only blocks stacking on other forced connections |
+| 13 | Diagonal tolerance for gap detection | Done | `CONNECTIVITY.forcedDiagTolerance: 4` tries adjacent columns/rows |
+| 14 | `findFloorEdge` returns furthest edge for multi-section buildings | Done | Fixed bug where near edge was returned instead of far edge |
+| 15 | Orientation-aware passthrough check | Done | N/S connections don't block E/W and vice versa |
+
+### Config Values
+
+| Setting | Default | Key |
+|---|---|---|
+| Minimum gap for forced connection | 6" | `CONNECTIVITY.forcedMinGap` |
+| Max forced connections per map | 15 | `CONNECTIVITY.forcedMaxCount` |
+| Diagonal tolerance (cells) | 4 | `CONNECTIVITY.forcedDiagTolerance` |
 
 ### Known Issues
 
-- **Stacked walkways/bridges still occurring**: The anti-stacking check at walkway generation time prevents same-axis overlaps, but bridges are upgraded from walkways AFTER generation. Two walkways that don't overlap can both become wider bridges that DO overlap. The bridge upgrade step needs its own overlap check, or the stacking check needs to account for potential bridge widening.
+- **Bridge width stacking**: Regular walkways (2" wide) pass anti-stacking, but when upgraded to bridges (3" wide) they can overlap. Bridge upgrade step needs its own overlap check.
+- **Forced connections near ladder platforms**: Forced connections can visually appear to connect to a nearby ladder platform instead of the actual floor section. Not a bug — the floor IS there, the platform is just adjacent.
 
 ---
 
