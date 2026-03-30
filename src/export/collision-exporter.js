@@ -1,27 +1,32 @@
 /**
  * Collision Mesh Exporter — exports a simplified OBJ for TTS collider.
  *
- * Each surface is a single box (8 verts, 12 triangles) regardless of
- * how many texture tiles it has in the visual OBJ. No subdivision needed
- * for collision — just the bounding box of each walkable surface.
+ * Consumes geometry primitives from the handover (geometry-builder.js).
+ * Each collidable surface becomes a single box (8 verts, 12 triangles).
+ * No subdivision needed — just the bounding box of each walkable surface.
  *
  * Includes:
- * - Ground level map (floor_)
- * - All visible floor quadrants
+ * - Ground level map (base_floor)
+ * - All visible floor sections (floor_)
  * - Cover objects (cover_, interior_cover_)
  * - Ladder platforms (ladder_platform_)
+ * - Junction platforms (junction_platform_)
  * - Courtyards (deleted_)
  * - Walkways (walkway_)
+ * - Bridges (bridge_) — slab only, not walls/battlements
+ * - Pillar supports (pillar_)
  * - Street scatter (street_scatter_)
+ * - Flat roofs (roof_flat_)
+ * - Pyramid roofs (roof_pyramid_) — base bounding box
  *
- * Excludes walls, ladders — so units can move freely.
+ * Excludes walls, ladders, ceilings, edges — so units can move freely.
  */
 
-import * as THREE from 'three';
 import { writeFile } from 'fs/promises';
 import path from 'path';
 
-const INCLUDE_PREFIXES = [
+const COLLIDABLE_PREFIXES = [
+  'base_floor',
   'floor_',
   'cover_',
   'interior_cover_',
@@ -32,58 +37,34 @@ const INCLUDE_PREFIXES = [
   'bridge_',
   'pillar_',
   'street_scatter_',
+  'roof_flat_',
+  'roof_pyramid_',
 ];
 
 /**
- * Export collision mesh as OBJ — one box per surface, no subdivision.
+ * Export collision mesh as OBJ from geometry primitives.
  */
-export async function exportCollisionObj(scene, outputDir, baseName) {
-  const meshes = [];
-  scene.traverse((child) => {
-    if (!child.isMesh) return;
-    const name = child.name || '';
-    if (INCLUDE_PREFIXES.some((p) => name.startsWith(p))) {
-      meshes.push(child);
-    }
-    if (child.parent && child.parent.name && child.parent.name.startsWith('cover_')) {
-      meshes.push(child);
-    }
-  });
-
-  if (meshes.length === 0) {
-    console.log('  No collision meshes found');
-    return null;
-  }
-
-  const unique = [...new Set(meshes)];
-
+export async function exportCollisionObj(geometry, outputDir, baseName) {
   const objLines = [];
   let vo = 1;
 
-  objLines.push(`# Mordheim Collision Mesh`);
+  objLines.push('# Mordheim Collision Mesh');
   objLines.push('');
 
-  for (const mesh of unique) {
-    mesh.updateMatrixWorld(true);
-    const geo = mesh.geometry.clone();
-    geo.applyMatrix4(mesh.matrixWorld);
+  let count = 0;
 
-    const position = geo.getAttribute('position');
+  for (const prim of geometry.primitives) {
+    // Only include slab-type primitives with collidable names
+    if (prim.type !== 'slab') continue;
+    if (!COLLIDABLE_PREFIXES.some(prefix => prim.name.startsWith(prefix))) continue;
 
-    // Find bounding box
-    let minX = Infinity, minY = Infinity, minZ = Infinity;
-    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-    for (let i = 0; i < position.count; i++) {
-      const x = position.getX(i), y = position.getY(i), z = position.getZ(i);
-      if (x < minX) minX = x;
-      if (y < minY) minY = y;
-      if (z < minZ) minZ = z;
-      if (x > maxX) maxX = x;
-      if (y > maxY) maxY = y;
-      if (z > maxZ) maxZ = z;
-    }
+    // Skip bridge walls and battlements — only the bridge deck is collidable
+    if (prim.name.includes('_wall_') || prim.name.includes('_batt_')) continue;
 
-    objLines.push(`o ${mesh.name || 'collision'}`);
+    const minX = prim.x, minY = prim.y, minZ = prim.z;
+    const maxX = prim.x + prim.w, maxY = prim.y + prim.h, maxZ = prim.z + prim.d;
+
+    objLines.push(`o ${prim.name}`);
 
     // 8 corner verts of the bounding box
     const v = vo;
@@ -117,8 +98,13 @@ export async function exportCollisionObj(scene, outputDir, baseName) {
     objLines.push(`f ${v+1} ${v+6} ${v+2}`);
 
     vo += 8;
+    count++;
     objLines.push('');
-    geo.dispose();
+  }
+
+  if (count === 0) {
+    console.log('  No collision meshes found');
+    return null;
   }
 
   const collisionPath = path.join(outputDir, `${baseName}_collision.obj`);

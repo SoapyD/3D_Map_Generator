@@ -1095,6 +1095,45 @@ export function generateConnectivity(data, config, rng) {
     }
   }
 
+  // Adjust branch bridges to align with parent's new (wider) edges
+  for (const branch of bridges) {
+    if (!branch.branch || !branch.parentRef) continue;
+    const parent = bridges.find(b => !b.branch && b.textureId === branch.textureId);
+    if (!parent) continue;
+
+    if (branch.axis === 'x' && parent.axis !== 'x') {
+      // Branch runs along X; parent runs along Z — align branch X start/end to parent X edges
+      const parentEdgeW = parent.x;
+      const parentEdgeE = parent.x + parent.w;
+      if (branch.x < parentEdgeE && branch.x + branch.w > parentEdgeW) {
+        // Branch starts inside parent — push start to parent's far edge
+        if (branch.x >= parentEdgeW && branch.x < parentEdgeE) {
+          const oldStart = branch.x;
+          branch.x = parentEdgeE;
+          branch.w -= (branch.x - oldStart);
+        }
+        // Branch ends inside parent — pull end to parent's near edge
+        if (branch.x + branch.w > parentEdgeW && branch.x + branch.w <= parentEdgeE) {
+          branch.w = parentEdgeW - branch.x;
+        }
+      }
+    } else if (branch.axis === 'z' && parent.axis !== 'z') {
+      // Branch runs along Z; parent runs along X — align branch Z start/end to parent Z edges
+      const parentEdgeN = parent.z;
+      const parentEdgeS = parent.z + parent.d;
+      if (branch.z < parentEdgeS && branch.z + branch.d > parentEdgeN) {
+        if (branch.z >= parentEdgeN && branch.z < parentEdgeS) {
+          const oldStart = branch.z;
+          branch.z = parentEdgeS;
+          branch.d -= (branch.z - oldStart);
+        }
+        if (branch.z + branch.d > parentEdgeN && branch.z + branch.d <= parentEdgeS) {
+          branch.d = parentEdgeN - branch.z;
+        }
+      }
+    }
+  }
+
   // Generate pillar supports under long walkways/bridges
   const pillars = DELETIONS.pillarGeneration
     ? generatePillars(remainingWalkways, bridges, data, config)

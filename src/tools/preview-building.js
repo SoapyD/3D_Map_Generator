@@ -17,6 +17,7 @@ import { BUILDING, FLOOR, WALL, CONNECTIVITY, GEOMETRY, LADDER_DISPLAY } from '.
 import { generateFloors } from '../generators/floors.js';
 import { generateWalls } from '../generators/walls.js';
 import { generateConnectivity } from '../generators/connectivity.js';
+import { buildGeometry } from '../generators/geometry-builder.js';
 import { buildScene } from '../generators/scene-builder.js';
 import { exportToGlb } from '../export/glb-exporter.js';
 import { exportToObj, getObjOutputPath } from '../export/obj-exporter.js';
@@ -375,9 +376,10 @@ async function main() {
     streetScatter: [],
   };
 
-  // Build scene and export
+  // Build geometry primitives and scene
   console.log('  Exporting...');
-  const scene = buildScene(coverData, config);
+  const geometry = buildGeometry(coverData, config);
+  const scene = buildScene(geometry, config);
 
   await mkdir(config.outputDir, { recursive: true });
 
@@ -392,7 +394,7 @@ async function main() {
   }
 
   if (fmt === 'obj' || fmt === 'both') {
-    objPath = await exportToObj(coverData, config, config.outputDir, baseName);
+    objPath = await exportToObj(geometry, config, config.outputDir, baseName);
     const { readFileSync } = await import('fs');
     const objContent = readFileSync(objPath, 'utf8');
     vertCount = (objContent.match(/^v /gm) || []).length;
