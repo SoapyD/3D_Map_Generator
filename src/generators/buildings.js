@@ -9,7 +9,7 @@
  */
 
 import { BUILDING, DELETIONS } from '../config.js';
-import { placeBigLayout } from './building-layouts.js';
+import { getLayoutSpecs, generateBigBuilding } from './building-layouts.js';
 
 const FOOTPRINTS = BUILDING.footprints;
 const HEIGHTS = BUILDING.heights;
@@ -306,45 +306,115 @@ export function generateBuildings(gridData, config, rng) {
     }
   }
 
-  // Pick a layout for larger buildings
+  // Place larger buildings one at a time, validating each against existing buildings.
+  // Small buildings earmarked for displacement are restored if the big building can't be placed.
   const layout = rng.int(0, 4);
-  const bigBuildings = placeBigLayout(layout, config, tiers, rng);
+  const specs = getLayoutSpecs(layout, config);
 
-  // Remove small buildings that touch any big building — track them
-  const surviving = [];
-  const displacedByBig = [];
-  if (DELETIONS.buildingDisplaceByLarge) {
-    for (const b of buildings) {
-      let displaced = false;
-      for (const big of bigBuildings) {
-        if (b.x < big.x + big.w + BUILDING_GAP && b.x + b.w > big.x - BUILDING_GAP &&
-            b.z < big.z + big.d + BUILDING_GAP && b.z + b.d > big.z - BUILDING_GAP) {
-          displaced = true;
-          break;
+  const placedBig = [];       // successfully placed big building segments
+  const displacedByBig = [];  // small buildings confirmed displaced
+
+  function overlapsAny(segments, checkAgainst) {
+    for (const seg of segments) {
+      for (const other of checkAgainst) {
+        // Skip members of the same texture group
+        if (seg.textureGroup !== undefined && seg.textureGroup === other.textureGroup) continue;
+        if (seg._groupMarker && seg._groupMarker === other._groupMarker) continue;
+        if (seg.x < other.x + other.w && seg.x + seg.w > other.x &&
+            seg.z < other.z + other.d && seg.z + seg.d > other.z) {
+          return true;
         }
       }
-      if (displaced) displacedByBig.push(b);
-      else surviving.push(b);
     }
-  } else {
-    surviving.push(...buildings);
+    return false;
   }
+
+  for (const spec of specs) {
+    const MAX_ATTEMPTS = 4; // 1 initial + 3 retries
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const candidate = generateBigBuilding(spec.sizeKey, spec.pos, config, tiers, rng);
+
+      // Earmark small buildings that would be displaced by this candidate
+      const earmarked = [];
+      const notEarmarked = [];
+      if (DELETIONS.buildingDisplaceByLarge) {
+        for (const b of buildings) {
+          // Skip buildings already displaced by a previous big building
+          if (displacedByBig.includes(b)) continue;
+          let touches = false;
+          for (const seg of candidate) {
+            if (b.x < seg.x + seg.w + BUILDING_GAP && b.x + b.w > seg.x - BUILDING_GAP &&
+                b.z < seg.z + seg.d + BUILDING_GAP && b.z + b.d > seg.z - BUILDING_GAP) {
+              touches = true;
+              break;
+            }
+          }
+          if (touches) earmarked.push(b);
+          else notEarmarked.push(b);
+        }
+      }
+
+      // Check candidate against: already-placed big buildings + non-earmarked small buildings
+      const checkAgainst = [...placedBig, ...notEarmarked];
+      if (!overlapsAny(candidate, checkAgainst)) {
+        // Success — confirm this placement
+        placedBig.push(...candidate);
+        displacedByBig.push(...earmarked);
+        break;
+      }
+      // Overlap detected — retry with a different shape/size
+    }
+    // If all attempts failed, earmarked buildings are NOT displaced (restored implicitly)
+  }
+
+  // Resolve texture groups for placed big buildings
+  const groups = new Map();
+  for (let i = 0; i < placedBig.length; i++) {
+    const b = placedBig[i];
+    if (b._groupMarker) {
+      if (!groups.has(b._groupMarker)) groups.set(b._groupMarker, i);
+      b.textureGroup = groups.get(b._groupMarker);
+      delete b._groupMarker;
+    }
+  }
+
+  // Surviving small buildings = all except those displaced by big buildings
+  const surviving = buildings.filter(b => !displacedByBig.includes(b));
+
+  // Remove overlapping small buildings (complex shapes can overflow cell boundaries)
+  const noOverlap = [];
+  for (let i = 0; i < surviving.length; i++) {
+    const a = surviving[i];
+    let dominated = false;
+    for (let j = 0; j < surviving.length; j++) {
+      if (i === j) continue;
+      if (a.textureGroup !== undefined && a.textureGroup === surviving[j].textureGroup) continue;
+      const b = surviving[j];
+      if (a.x < b.x + b.w && a.x + a.w > b.x &&
+          a.z < b.z + b.d && a.z + a.d > b.z) {
+        if (i > j) { dominated = true; break; }
+      }
+    }
+    if (!dominated) noOverlap.push(a);
+  }
+  const displacedByOverlap = surviving.filter(b => !noOverlap.includes(b));
 
   // Delete 15% of remaining small buildings — track deleted positions for cover placement
   let culled, randomlyDeleted;
   if (DELETIONS.buildingRandomCull) {
     const deleteRatio = BUILDING.deleteRatio;
-    rng.shuffle(surviving);
-    const keepCount = Math.ceil(surviving.length * (1 - deleteRatio));
-    culled = surviving.slice(0, keepCount);
-    randomlyDeleted = surviving.slice(keepCount);
+    rng.shuffle(noOverlap);
+    const keepCount = Math.ceil(noOverlap.length * (1 - deleteRatio));
+    culled = noOverlap.slice(0, keepCount);
+    randomlyDeleted = noOverlap.slice(keepCount);
   } else {
-    culled = surviving;
+    culled = noOverlap;
     randomlyDeleted = [];
   }
 
-  // All deleted buildings = displaced by big + randomly culled
-  const deletedBuildings = [...displacedByBig, ...randomlyDeleted];
+  // All deleted buildings = displaced by big + overlap + randomly culled
+  const deletedBuildings = [...displacedByBig, ...displacedByOverlap, ...randomlyDeleted];
 
-  return { ...gridData, buildings: [...bigBuildings, ...culled], deletedBuildings };
+  return { ...gridData, buildings: [...placedBig, ...culled], deletedBuildings };
 }
