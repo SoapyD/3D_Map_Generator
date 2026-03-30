@@ -214,14 +214,17 @@ export function buildScene(data, config) {
       addLadder(ladders[i], material, `ladder_${i}`);
     }
 
-    // Walkways
+    // Walkways — branches share their parent's texture via textureId
     for (let i = 0; i < walkways.length; i++) {
       const w = walkways[i];
       let material;
       if (debug) {
         material = w.blocked ? DEBUG_MATERIALS.ramp : DEBUG_MATERIALS.walkway;
       } else {
-        material = pickFromPool(pools.walkways, i);
+        const texIdx = (w.textureId !== undefined && w.branch)
+          ? walkways.findIndex(ww => ww.textureId === w.textureId && !ww.branch)
+          : i;
+        material = pickFromPool(pools.walkways, texIdx >= 0 ? texIdx : i);
       }
       const mesh = createFloorSlab({ x: w.x, z: w.z, w: w.w, d: w.d }, w.y, GEOMETRY.walkwayThickness, material, { rotateUV: w.w > w.d });
       mesh.name = w.blocked ? `walkway_BLOCKED_${i}` : `walkway_${i}`;
@@ -236,8 +239,9 @@ export function buildScene(data, config) {
       const wallH = CONNECTIVITY.bridgeWallHeight || 0.75;
       const wallT = CONNECTIVITY.bridgeWallThickness || 0.25;
 
-      // Bridge slab
-      const slabMat = debug ? DEBUG_MATERIALS.walkway : pickFromPool(pools.landmark_walls, i);
+      // Bridge slab — branches use their parent's texture via textureId
+      const bridgeTexIdx = (b.textureId !== undefined) ? bridges.findIndex(br => br.textureId === b.textureId && !br.branch) : i;
+      const slabMat = debug ? DEBUG_MATERIALS.walkway : pickFromPool(pools.landmark_walls, bridgeTexIdx >= 0 ? bridgeTexIdx : i);
       const slab = createFloorSlab({ x: b.x, z: b.z, w: b.w, d: b.d }, b.y, bridgeThickness, slabMat, { rotateUV: b.w > b.d });
       slab.name = `bridge_${i}`;
       scene.add(slab);
@@ -327,6 +331,8 @@ export function buildScene(data, config) {
       mesh.name = `ladder_platform_${i}`;
       scene.add(mesh);
     }
+
+
   }
 
   // Cover pieces

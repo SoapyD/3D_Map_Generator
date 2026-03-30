@@ -81,19 +81,23 @@ Improve walkway and bridge generation to create more interesting, varied, and ta
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 1 | Create grid data structure (per tier, cell size from config) | Pending | Cell = { floor, buildingIndex, walls bitmask } |
-| 2 | Populate grid from floor sections | Pending | Map each floor section to grid cells |
-| 3 | Populate wall bitmask from wall segments | Pending | Check each wall against grid cells |
-| 4 | Row scanning: find horizontal gaps between occupied cells | Pending | Different buildings on each side |
-| 5 | Column scanning: find vertical gaps | Pending | Same logic, orthogonal |
-| 6 | Filter gaps by width (min 2 cells, max half map) | Pending | |
-| 7 | Select connection points (prefer wall-free edges) | Pending | |
-| 8 | Generate forced walkways/bridges at connection points | Pending | Use bridge variant for long spans |
-| 9 | Anti-stacking check against existing walkways | Pending | |
-| 10 | Per-tier grids (different floor layouts per tier) | Pending | |
+| 1 | Create grid data structure (per tier, cell size from config) | Done | 1" cell grid per tier |
+| 2 | Populate grid from floor sections | Done | Floor + roof sections marked |
+| 3 | Populate wall bitmask from wall segments | N/A | Wall check done via clearBlockingWalls instead |
+| 4 | Row scanning: find horizontal gaps between occupied cells | Done | Different buildings on each side |
+| 5 | Column scanning: find vertical gaps | Done | Same logic, orthogonal |
+| 6 | Filter gaps by width (min 2 cells, max half map) | Done | `forcedMinGap: 6` |
+| 7 | Select connection points (prefer wall-free edges) | Done | Cross-axis clamping to floor overlap + wall clearing at endpoints |
+| 8 | Generate forced walkways/bridges at connection points | Done | Bridge upgrade for tier 2+ |
+| 9 | Anti-stacking check against existing walkways | Done | `isStackedOnForced` + `crossesWalkway` |
+| 10 | Per-tier grids (different floor layouts per tier) | Done | One grid per tier |
+| 11 | Keep only top N longest forced connections | Done | `forcedMaxCount: [3, 6]` random range |
+| 12 | Cross-axis clamping to endpoint floor ranges | Done | Prevents overhang at endpoints |
+| 13 | Overhang rejection for regular walkways | Done | ≥50% cross-axis overlap required at both ends |
 
 **Complexity:** M
 **Impact:** High — reliable gap detection, prevents dead zones
+**Status:** Complete
 
 ### 2. Cornered (L-shaped) Walkways
 
