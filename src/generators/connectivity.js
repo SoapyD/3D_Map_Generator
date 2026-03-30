@@ -160,6 +160,34 @@ export function generateConnectivity(data, config, rng) {
           }
           if (DELETIONS.walkwayBothEndsCheck && (!startTouches || !endTouches)) continue;
 
+          // Reject walkways that overhang — cross-axis overlap with floor must be ≥50% of walkway width
+          let startOverlap = 0, endOverlap = 0;
+          const wSpan = walkway.axis === 'x' ? walkway.d : walkway.w;
+          for (const s of floorData.sections) {
+            if (walkway.axis === 'x') {
+              // Start end: floor edge flush with walkway.x
+              if (Math.abs(s.x + s.w - walkway.x) < 0.5) {
+                const ov = Math.min(walkway.z + walkway.d, s.z + s.d) - Math.max(walkway.z, s.z);
+                if (ov > startOverlap) startOverlap = ov;
+              }
+              // End end: floor edge flush with walkway.x + walkway.w
+              if (Math.abs(s.x - (walkway.x + walkway.w)) < 0.5) {
+                const ov = Math.min(walkway.z + walkway.d, s.z + s.d) - Math.max(walkway.z, s.z);
+                if (ov > endOverlap) endOverlap = ov;
+              }
+            } else {
+              if (Math.abs(s.z + s.d - walkway.z) < 0.5) {
+                const ov = Math.min(walkway.x + walkway.w, s.x + s.w) - Math.max(walkway.x, s.x);
+                if (ov > startOverlap) startOverlap = ov;
+              }
+              if (Math.abs(s.z - (walkway.z + walkway.d)) < 0.5) {
+                const ov = Math.min(walkway.x + walkway.w, s.x + s.w) - Math.max(walkway.x, s.x);
+                if (ov > endOverlap) endOverlap = ov;
+              }
+            }
+          }
+          if (startOverlap / wSpan < 0.5 || endOverlap / wSpan < 0.5) continue;
+
           // Prevent stacking — reject if an existing walkway on a different tier
           // runs the same axis and overlaps in XZ position
           let stacked = false;
@@ -1359,6 +1387,36 @@ function detectGapsAndConnect(data, existingWalkways, existingBridges, config, r
       return true;
     }
 
+    // Helper: find the cross-axis range of floor/roof sections at a building's endpoint edge
+    // Returns { min, max } or null if no floor found at that edge
+    function findCrossAxisRange(bi, edgeAxis, edgeSide, edgePos) {
+      const bld = buildings[bi];
+      if (!bld) return null;
+      const allSections = [...(tierFloors ? tierFloors.sections : [])];
+      if (data.roofs) {
+        for (const r of data.roofs) {
+          if (r.tier === tier && r.section) allSections.push(r.section);
+        }
+      }
+      let rangeMin = Infinity, rangeMax = -Infinity;
+      for (const s of allSections) {
+        if (s.x < bld.x - 0.5 || s.x + s.w > bld.x + bld.w + 0.5 ||
+            s.z < bld.z - 0.5 || s.z + s.d > bld.z + bld.d + 0.5) continue;
+        if (edgeAxis === 'x') {
+          const sEdge = edgeSide === 'end' ? s.x + s.w : s.x;
+          if (Math.abs(sEdge - edgePos) > 0.5) continue;
+          if (s.z < rangeMin) rangeMin = s.z;
+          if (s.z + s.d > rangeMax) rangeMax = s.z + s.d;
+        } else {
+          const sEdge = edgeSide === 'end' ? s.z + s.d : s.z;
+          if (Math.abs(sEdge - edgePos) > 0.5) continue;
+          if (s.x < rangeMin) rangeMin = s.x;
+          if (s.x + s.w > rangeMax) rangeMax = s.x + s.w;
+        }
+      }
+      return rangeMin < rangeMax ? { min: rangeMin, max: rangeMax } : null;
+    }
+
     // Helper: try to place a forced connection, return true if placed
     function tryForceConnection(axis, startBI, endBI, scanPos) {
       // Try the exact scan position first, then nearby rows/cols within diagonal tolerance
@@ -1377,9 +1435,17 @@ function detectGapsAndConnect(data, existingWalkways, existingBridges, config, r
           if (startX === null || endX === null || endX - startX < minGap) continue;
           if (endX - startX > config.mapWidth / 2) continue;
 
-          const gapZ = pos * cellSize;
+          // Clamp walkway Z to the overlap of both endpoint floor ranges
+          const startRange = findCrossAxisRange(startBI, 'x', 'end', startX);
+          const endRange = findCrossAxisRange(endBI, 'x', 'start', endX);
+          if (!startRange || !endRange) continue;
+          const overlapMin = Math.max(startRange.min, endRange.min);
+          const overlapMax = Math.min(startRange.max, endRange.max);
+          if (overlapMax - overlapMin < WALKWAY_WIDTH) continue; // not enough shared range
+          const clampedZ = Math.max(overlapMin + WALKWAY_WIDTH / 2, Math.min(pos * cellSize + cellSize / 2, overlapMax - WALKWAY_WIDTH / 2));
+
           const candidate = {
-            type: 'walkway', x: startX, z: gapZ + cellSize / 2 - WALKWAY_WIDTH / 2,
+            type: 'walkway', x: startX, z: clampedZ - WALKWAY_WIDTH / 2,
             w: endX - startX, d: WALKWAY_WIDTH, y: tier * tierHeight, axis: 'x', forced: true,
           };
 
@@ -1399,9 +1465,17 @@ function detectGapsAndConnect(data, existingWalkways, existingBridges, config, r
           if (startZ === null || endZ === null || endZ - startZ < minGap) continue;
           if (endZ - startZ > config.mapWidth / 2) continue;
 
-          const gapX = pos * cellSize;
+          // Clamp walkway X to the overlap of both endpoint floor ranges
+          const startRange = findCrossAxisRange(startBI, 'z', 'end', startZ);
+          const endRange = findCrossAxisRange(endBI, 'z', 'start', endZ);
+          if (!startRange || !endRange) continue;
+          const overlapMin = Math.max(startRange.min, endRange.min);
+          const overlapMax = Math.min(startRange.max, endRange.max);
+          if (overlapMax - overlapMin < WALKWAY_WIDTH) continue;
+          const clampedX = Math.max(overlapMin + WALKWAY_WIDTH / 2, Math.min(pos * cellSize + cellSize / 2, overlapMax - WALKWAY_WIDTH / 2));
+
           const candidate = {
-            type: 'walkway', x: gapX + cellSize / 2 - WALKWAY_WIDTH / 2, z: startZ,
+            type: 'walkway', x: clampedX - WALKWAY_WIDTH / 2, z: startZ,
             w: WALKWAY_WIDTH, d: endZ - startZ, y: tier * tierHeight, axis: 'z', forced: true,
           };
 
