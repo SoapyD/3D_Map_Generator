@@ -80,7 +80,27 @@ export function generateBuildings(gridData, config, rng) {
         // Pick a building shape
         const shape = pickShape(rng);
 
-        buildings.push({ x, z, w, d, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape });
+        if (shape === 'diagA' || shape === 'diagB') {
+          // Diagonal: two independent single-quadrant buildings
+          const hw = w / 2;
+          const hd = d / 2;
+          // Each half gets its own random height
+          const hk2 = rng.pick(['short', 'medium', 'tall']);
+          const h2 = HEIGHTS[hk2];
+          const mt2 = rng.int(Math.min(h2.tierMin, tiers), Math.min(h2.tierMax, tiers));
+
+          if (shape === 'diagA') {
+            // Quadrant 0 (NW) and 3 (SE)
+            buildings.push({ x, z, w: hw, d: hd, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full' });
+            buildings.push({ x: x + hw, z: z + hd, w: hw, d: hd, maxTier: mt2, size: 'small', height: hk2, blockIndex: 0, shape: 'full' });
+          } else {
+            // Quadrant 1 (NE) and 2 (SW)
+            buildings.push({ x: x + hw, z, w: hw, d: hd, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full' });
+            buildings.push({ x, z: z + hd, w: hw, d: hd, maxTier: mt2, size: 'small', height: hk2, blockIndex: 0, shape: 'full' });
+          }
+        } else {
+          buildings.push({ x, z, w, d, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape });
+        }
       }
     }
   }

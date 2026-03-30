@@ -116,14 +116,40 @@ async function main() {
 
   console.log(`Preview building: type=${args.type}, shape=${args.shape}, seed=${args.seed}, tiers=${args.tiers}`);
 
-  // Create the single building
-  const building = createBuilding(args.type, args.shape, args.tiers, rng);
-  if (args.interiorWalls) building.interiorWalls = true;
-  console.log(`  Size: ${building.w.toFixed(1)} x ${building.d.toFixed(1)}, maxTier: ${building.maxTier}${building.interiorWalls ? ', interior walls' : ''}`);
+  // Create building(s) — diagonals produce two separate buildings
+  const buildingsList = [];
+  if (args.shape === 'diagA' || args.shape === 'diagB') {
+    const base = createBuilding(args.type, 'full', args.tiers, rng);
+    const hw = base.w / 2;
+    const hd = base.d / 2;
+    const hk2 = rng.pick(['short', 'medium', 'tall']);
+    const h2 = BUILDING.heights[hk2];
+    const mt2 = rng.int(Math.min(h2.tierMin, args.tiers), Math.min(h2.tierMax, args.tiers));
 
-  // Map dimensions = building + margins
-  const mapW = building.x + building.w + 4;
-  const mapD = building.z + building.d + 4;
+    if (args.shape === 'diagA') {
+      buildingsList.push({ ...base, w: hw, d: hd, shape: 'full' });
+      buildingsList.push({ x: base.x + hw, z: base.z + hd, w: hw, d: hd, maxTier: mt2, size: 'small', height: hk2, blockIndex: 0, shape: 'full', pyramidRoof: false });
+    } else {
+      buildingsList.push({ x: base.x + hw, z: base.z, w: hw, d: hd, maxTier: base.maxTier, size: 'small', height: base.height, blockIndex: 0, shape: 'full', pyramidRoof: false });
+      buildingsList.push({ x: base.x, z: base.z + hd, w: hw, d: hd, maxTier: mt2, size: 'small', height: hk2, blockIndex: 0, shape: 'full', pyramidRoof: false });
+    }
+    console.log(`Preview building: type=${args.type}, shape=${args.shape}, seed=${args.seed}, tiers=${args.tiers}`);
+    for (const b of buildingsList) {
+      console.log(`  Part: ${b.w.toFixed(1)} x ${b.d.toFixed(1)} at (${b.x.toFixed(1)}, ${b.z.toFixed(1)}), maxTier: ${b.maxTier}`);
+    }
+  } else {
+    const building = createBuilding(args.type, args.shape, args.tiers, rng);
+    if (args.interiorWalls) building.interiorWalls = true;
+    buildingsList.push(building);
+    console.log(`Preview building: type=${args.type}, shape=${args.shape}, seed=${args.seed}, tiers=${args.tiers}`);
+    console.log(`  Size: ${building.w.toFixed(1)} x ${building.d.toFixed(1)}, maxTier: ${building.maxTier}${building.interiorWalls ? ', interior walls' : ''}`);
+  }
+
+  // Map dimensions = encompass all buildings + margins
+  let maxX = 0, maxZ = 0;
+  for (const b of buildingsList) { maxX = Math.max(maxX, b.x + b.w); maxZ = Math.max(maxZ, b.z + b.d); }
+  const mapW = maxX + 4;
+  const mapD = maxZ + 4;
 
   const config = {
     seed: args.seed,
@@ -148,7 +174,7 @@ async function main() {
 
   const buildingData = {
     ...gridData,
-    buildings: [building],
+    buildings: buildingsList,
     deletedBuildings: [],
   };
 

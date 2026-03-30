@@ -49,9 +49,10 @@ export function generateWalls(data, config, rng) {
         }
       }
 
-      // Pick up to 2 edges
+      // Diagonal/shaped buildings use all edges; full rectangles pick up to 2
+      const hasShape = building.shape && building.shape !== 'full';
       const allEdges = rng.shuffle([...edgeSet]);
-      const chosen = allEdges.slice(0, 2);
+      const chosen = hasShape ? allEdges : allEdges.slice(0, 2);
 
       for (const edgeLabel of chosen) {
         const wallDef = buildWall(building, edgeLabel, aboveQuadrants, baseY, wallHeight, wallThickness);

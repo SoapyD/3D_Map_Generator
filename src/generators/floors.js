@@ -54,7 +54,24 @@ export function generateFloors(data, config, rng) {
       }
     }
 
+    const hasShape = building.shape && BUILDING.shapes && BUILDING.shapes[building.shape] && BUILDING.shapes[building.shape].removed.length > 0;
     for (let tier = 1; tier <= building.maxTier; tier++) {
+      // Tier 1 is protected when building has a non-full shape — the shape IS the tier 1 footprint
+      if (hasShape && tier === 1) {
+        const present = new Set([0, 1, 2, 3].filter((q) => !removed.has(q)));
+        bq.tiers[tier] = present;
+        const sections = quadrantsToSections(building, present);
+        const isRoofTier = tier === building.maxTier;
+        if (isRoofTier && building.pyramidRoof) {
+          roofs.push({ type: 'pyramid', tier, building, buildingIndex: data.buildings.indexOf(building) });
+        } else if (isRoofTier) {
+          for (const s of sections) roofs.push({ type: 'flat', tier, section: s, buildingIndex: data.buildings.indexOf(building) });
+        } else {
+          for (const s of sections) floors[tier].sections.push(s);
+        }
+        continue;
+      }
+
       const removalCount = removed.size;
 
       if (removalCount === 0) {
