@@ -9,6 +9,7 @@
  */
 
 import { BUILDING, DELETIONS } from '../config.js';
+import { getLayoutSpecs, generateBigBuilding } from './building-layouts.js';
 
 const FOOTPRINTS = BUILDING.footprints;
 const HEIGHTS = BUILDING.heights;
@@ -17,7 +18,7 @@ const BUILDING_GAP = BUILDING.gap;
 /**
  * Pick a building shape using weighted random selection for a given size category.
  */
-function pickShape(rng, sizeCategory = 'small') {
+export function pickShape(rng, sizeCategory = 'small') {
   const shapeMap = {
     small: BUILDING.smallShapes,
     medium: BUILDING.mediumShapes,
@@ -305,211 +306,72 @@ export function generateBuildings(gridData, config, rng) {
     }
   }
 
-  // Pick a layout for larger buildings
+  // Place larger buildings one at a time, validating each against existing buildings.
+  // Small buildings earmarked for displacement are restored if the big building can't be placed.
   const layout = rng.int(0, 4);
-  const bigBuildings = placeBigLayout(layout, config, tiers, rng);
+  const specs = getLayoutSpecs(layout, config);
 
-  // Remove small buildings that touch any big building — track them
-  const surviving = [];
-  const displacedByBig = [];
-  if (DELETIONS.buildingDisplaceByLarge) {
-    for (const b of buildings) {
-      let displaced = false;
-      for (const big of bigBuildings) {
-        if (b.x < big.x + big.w + BUILDING_GAP && b.x + b.w > big.x - BUILDING_GAP &&
-            b.z < big.z + big.d + BUILDING_GAP && b.z + b.d > big.z - BUILDING_GAP) {
-          displaced = true;
-          break;
+  const placedBig = [];       // successfully placed big building segments
+  const displacedByBig = [];  // small buildings confirmed displaced
+
+  function overlapsAny(segments, checkAgainst) {
+    for (const seg of segments) {
+      for (const other of checkAgainst) {
+        // Skip members of the same texture group
+        if (seg.textureGroup !== undefined && seg.textureGroup === other.textureGroup) continue;
+        if (seg._groupMarker && seg._groupMarker === other._groupMarker) continue;
+        if (seg.x < other.x + other.w && seg.x + seg.w > other.x &&
+            seg.z < other.z + other.d && seg.z + seg.d > other.z) {
+          return true;
         }
       }
-      if (displaced) displacedByBig.push(b);
-      else surviving.push(b);
     }
-  } else {
-    surviving.push(...buildings);
+    return false;
   }
 
-  // Delete 15% of remaining small buildings — track deleted positions for cover placement
-  let culled, randomlyDeleted;
-  if (DELETIONS.buildingRandomCull) {
-    const deleteRatio = BUILDING.deleteRatio;
-    rng.shuffle(surviving);
-    const keepCount = Math.ceil(surviving.length * (1 - deleteRatio));
-    culled = surviving.slice(0, keepCount);
-    randomlyDeleted = surviving.slice(keepCount);
-  } else {
-    culled = surviving;
-    randomlyDeleted = [];
-  }
+  for (const spec of specs) {
+    const MAX_ATTEMPTS = 4; // 1 initial + 3 retries
 
-  // All deleted buildings = displaced by big + randomly culled
-  const deletedBuildings = [...displacedByBig, ...randomlyDeleted];
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const candidate = generateBigBuilding(spec.sizeKey, spec.pos, config, tiers, rng);
 
-  return { ...gridData, buildings: [...bigBuildings, ...culled], deletedBuildings };
-}
-
-/**
- * Place larger buildings according to one of 5 layout options.
- *
- * 0: 1 large in centre
- * 1: 2 large — top-left + bottom-right
- * 2: 3 medium — top-left + bottom-right + top-right
- * 3: 3 medium — top-left + bottom-left + top-right
- * 4: 4 medium — 2 in top-left + bottom-right + top-right
- */
-function placeBigLayout(layout, config, maxTiers, rng) {
-  const mw = config.mapWidth;
-  const md = config.mapDepth;
-  const margin = 2; // keep away from map edge
-
-  // Quadrant centres
-  const TL = { x: mw * 0.25, z: md * 0.25 };
-  const TR = { x: mw * 0.75, z: md * 0.25 };
-  const BL = { x: mw * 0.25, z: md * 0.75 };
-  const BR = { x: mw * 0.75, z: md * 0.75 };
-  const C  = { x: mw * 0.5, z: md * 0.5 };
-
-  function makeBig(sizeKey, pos) {
-    const fp = FOOTPRINTS[sizeKey];
-    const w = rng.float(fp.min, fp.max);
-    const d = rng.float(fp.min, fp.max);
-    const x = Math.max(margin, Math.min(pos.x - w / 2, mw - w - margin));
-    const z = Math.max(margin, Math.min(pos.z - d / 2, md - d - margin));
-    const maxTier = rng.int(3, Math.min(5, maxTiers));
-    const shape = pickShape(rng, sizeKey);
-
-    if (shape === 'full') {
-      return [{ x, z, w, d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full' }];
-    }
-
-    // Composite shapes for medium/large — reuse the same logic as small composites
-    // but positioned at the big building location
-    const groupId = -1; // placeholder, will be set below
-    const segW = rng.float(fp.min / 2, fp.max / 2);
-    const segD = rng.float(fp.min / 2, fp.max / 2);
-    const results = [];
-    const actualGroupId = results; // use results array ref as temp, set groupId after
-
-    if (shape.startsWith('lShape')) {
-      let strip, ext, stripSup, extSup;
-      if (shape === 'lShapeSW') {
-        strip = { x, z, w: segW, d: segD * 3 };
-        ext = { x: x + segW, z: z + segD * 2, w: segW, d: segD };
-        stripSup = [{ edge: 'east', zMin: ext.z, zMax: ext.z + ext.d }];
-        extSup = [{ edge: 'west' }];
-      } else if (shape === 'lShapeSE') {
-        strip = { x: x + segW, z, w: segW, d: segD * 3 };
-        ext = { x, z: z + segD * 2, w: segW, d: segD };
-        stripSup = [{ edge: 'west', zMin: ext.z, zMax: ext.z + ext.d }];
-        extSup = [{ edge: 'east' }];
-      } else if (shape === 'lShapeNW') {
-        strip = { x, z, w: segW, d: segD * 3 };
-        ext = { x: x + segW, z, w: segW, d: segD };
-        stripSup = [{ edge: 'east', zMin: ext.z, zMax: ext.z + ext.d }];
-        extSup = [{ edge: 'west' }];
-      } else {
-        strip = { x: x + segW, z, w: segW, d: segD * 3 };
-        ext = { x, z, w: segW, d: segD };
-        stripSup = [{ edge: 'west', zMin: ext.z, zMax: ext.z + ext.d }];
-        extSup = [{ edge: 'east' }];
+      // Earmark small buildings that would be displaced by this candidate
+      const earmarked = [];
+      const notEarmarked = [];
+      if (DELETIONS.buildingDisplaceByLarge) {
+        for (const b of buildings) {
+          // Skip buildings already displaced by a previous big building
+          if (displacedByBig.includes(b)) continue;
+          let touches = false;
+          for (const seg of candidate) {
+            if (b.x < seg.x + seg.w + BUILDING_GAP && b.x + b.w > seg.x - BUILDING_GAP &&
+                b.z < seg.z + seg.d + BUILDING_GAP && b.z + b.d > seg.z - BUILDING_GAP) {
+              touches = true;
+              break;
+            }
+          }
+          if (touches) earmarked.push(b);
+          else notEarmarked.push(b);
+        }
       }
-      results.push({ x: strip.x, z: strip.z, w: strip.w, d: strip.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: stripSup });
-      results.push({ x: ext.x, z: ext.z, w: ext.w, d: ext.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: extSup });
-    } else if (shape.startsWith('uNarrow')) {
-      let col, top, bot, colSup, topSup, botSup;
-      if (shape === 'uNarrowN') {
-        col = { x, z, w: segW, d: segD * 3 };
-        top = { x: x + segW, z, w: segW, d: segD };
-        bot = { x: x + segW, z: z + segD * 2, w: segW, d: segD };
-        colSup = [{ edge: 'east', zMin: top.z, zMax: top.z + top.d }, { edge: 'east', zMin: bot.z, zMax: bot.z + bot.d }];
-        topSup = [{ edge: 'west' }]; botSup = [{ edge: 'west' }];
-      } else if (shape === 'uNarrowS') {
-        col = { x: x + segW, z, w: segW, d: segD * 3 };
-        top = { x, z, w: segW, d: segD };
-        bot = { x, z: z + segD * 2, w: segW, d: segD };
-        colSup = [{ edge: 'west', zMin: top.z, zMax: top.z + top.d }, { edge: 'west', zMin: bot.z, zMax: bot.z + bot.d }];
-        topSup = [{ edge: 'east' }]; botSup = [{ edge: 'east' }];
-      } else if (shape === 'uNarrowE') {
-        col = { x, z, w: segW * 3, d: segD };
-        top = { x, z: z + segD, w: segW, d: segD };
-        bot = { x: x + segW * 2, z: z + segD, w: segW, d: segD };
-        colSup = [{ edge: 'south', xMin: top.x, xMax: top.x + top.w }, { edge: 'south', xMin: bot.x, xMax: bot.x + bot.w }];
-        topSup = [{ edge: 'north' }]; botSup = [{ edge: 'north' }];
-      } else {
-        col = { x, z: z + segD, w: segW * 3, d: segD };
-        top = { x, z, w: segW, d: segD };
-        bot = { x: x + segW * 2, z, w: segW, d: segD };
-        colSup = [{ edge: 'north', xMin: top.x, xMax: top.x + top.w }, { edge: 'north', xMin: bot.x, xMax: bot.x + bot.w }];
-        topSup = [{ edge: 'south' }]; botSup = [{ edge: 'south' }];
-      }
-      results.push({ x: col.x, z: col.z, w: col.w, d: col.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: colSup });
-      results.push({ x: top.x, z: top.z, w: top.w, d: top.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: topSup });
-      results.push({ x: bot.x, z: bot.z, w: bot.w, d: bot.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: botSup });
-    } else if (shape.startsWith('uShape')) {
-      let left, right, bar, leftSup, rightSup, barSup;
-      if (shape === 'uShapeN') {
-        left = { x, z, w: segW, d: segD * 3 };
-        right = { x: x + segW * 2, z, w: segW, d: segD * 3 };
-        bar = { x: x + segW, z: z + segD * 2, w: segW, d: segD };
-        leftSup = [{ edge: 'east', zMin: bar.z, zMax: bar.z + bar.d }];
-        rightSup = [{ edge: 'west', zMin: bar.z, zMax: bar.z + bar.d }];
-        barSup = [{ edge: 'west' }, { edge: 'east' }];
-      } else if (shape === 'uShapeS') {
-        left = { x, z, w: segW, d: segD * 3 };
-        right = { x: x + segW * 2, z, w: segW, d: segD * 3 };
-        bar = { x: x + segW, z, w: segW, d: segD };
-        leftSup = [{ edge: 'east', zMin: bar.z, zMax: bar.z + bar.d }];
-        rightSup = [{ edge: 'west', zMin: bar.z, zMax: bar.z + bar.d }];
-        barSup = [{ edge: 'west' }, { edge: 'east' }];
-      } else if (shape === 'uShapeE') {
-        left = { x, z, w: segW * 3, d: segD };
-        right = { x, z: z + segD * 2, w: segW * 3, d: segD };
-        bar = { x, z: z + segD, w: segW, d: segD };
-        leftSup = [{ edge: 'south', xMin: bar.x, xMax: bar.x + bar.w }];
-        rightSup = [{ edge: 'north', xMin: bar.x, xMax: bar.x + bar.w }];
-        barSup = [{ edge: 'north' }, { edge: 'south' }];
-      } else {
-        left = { x, z, w: segW * 3, d: segD };
-        right = { x, z: z + segD * 2, w: segW * 3, d: segD };
-        bar = { x: x + segW * 2, z: z + segD, w: segW, d: segD };
-        leftSup = [{ edge: 'south', xMin: bar.x, xMax: bar.x + bar.w }];
-        rightSup = [{ edge: 'north', xMin: bar.x, xMax: bar.x + bar.w }];
-        barSup = [{ edge: 'north' }, { edge: 'south' }];
-      }
-      results.push({ x: left.x, z: left.z, w: left.w, d: left.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: leftSup });
-      results.push({ x: right.x, z: right.z, w: right.w, d: right.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: rightSup });
-      results.push({ x: bar.x, z: bar.z, w: bar.w, d: bar.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: barSup });
-    } else {
-      // Fallback — shouldn't happen
-      return [{ x, z, w, d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full' }];
-    }
 
-    // Mark all parts with a shared texture group (placeholder, resolved below)
-    const groupMarker = Symbol('group');
-    for (const r of results) r._groupMarker = groupMarker;
-    return results;
+      // Check candidate against: already-placed big buildings + non-earmarked small buildings
+      const checkAgainst = [...placedBig, ...notEarmarked];
+      if (!overlapsAny(candidate, checkAgainst)) {
+        // Success — confirm this placement
+        placedBig.push(...candidate);
+        displacedByBig.push(...earmarked);
+        break;
+      }
+      // Overlap detected — retry with a different shape/size
+    }
+    // If all attempts failed, earmarked buildings are NOT displaced (restored implicitly)
   }
 
-  // Collect all big buildings (makeBig returns arrays now)
-  let bigResults = [];
-  switch (layout) {
-    case 0: bigResults = makeBig('large', C); break;
-    case 1: bigResults = [...makeBig('large', TL), ...makeBig('large', BR)]; break;
-    case 2: bigResults = [...makeBig('medium', TL), ...makeBig('medium', BR), ...makeBig('medium', TR)]; break;
-    case 3: bigResults = [...makeBig('medium', TL), ...makeBig('medium', BL), ...makeBig('medium', TR)]; break;
-    case 4: {
-      const TL1 = { x: mw * 0.15, z: md * 0.15 };
-      const TL2 = { x: mw * 0.35, z: md * 0.35 };
-      bigResults = [...makeBig('medium', TL1), ...makeBig('medium', TL2), ...makeBig('medium', BR), ...makeBig('medium', TR)];
-      break;
-    }
-  }
-
-  // Resolve texture groups — buildings sharing a _groupMarker get the same textureGroup index
-  // based on their final position in the array
+  // Resolve texture groups for placed big buildings
   const groups = new Map();
-  for (let i = 0; i < bigResults.length; i++) {
-    const b = bigResults[i];
+  for (let i = 0; i < placedBig.length; i++) {
+    const b = placedBig[i];
     if (b._groupMarker) {
       if (!groups.has(b._groupMarker)) groups.set(b._groupMarker, i);
       b.textureGroup = groups.get(b._groupMarker);
@@ -517,5 +379,42 @@ function placeBigLayout(layout, config, maxTiers, rng) {
     }
   }
 
-  return bigResults;
+  // Surviving small buildings = all except those displaced by big buildings
+  const surviving = buildings.filter(b => !displacedByBig.includes(b));
+
+  // Remove overlapping small buildings (complex shapes can overflow cell boundaries)
+  const noOverlap = [];
+  for (let i = 0; i < surviving.length; i++) {
+    const a = surviving[i];
+    let dominated = false;
+    for (let j = 0; j < surviving.length; j++) {
+      if (i === j) continue;
+      if (a.textureGroup !== undefined && a.textureGroup === surviving[j].textureGroup) continue;
+      const b = surviving[j];
+      if (a.x < b.x + b.w && a.x + a.w > b.x &&
+          a.z < b.z + b.d && a.z + a.d > b.z) {
+        if (i > j) { dominated = true; break; }
+      }
+    }
+    if (!dominated) noOverlap.push(a);
+  }
+  const displacedByOverlap = surviving.filter(b => !noOverlap.includes(b));
+
+  // Delete 15% of remaining small buildings — track deleted positions for cover placement
+  let culled, randomlyDeleted;
+  if (DELETIONS.buildingRandomCull) {
+    const deleteRatio = BUILDING.deleteRatio;
+    rng.shuffle(noOverlap);
+    const keepCount = Math.ceil(noOverlap.length * (1 - deleteRatio));
+    culled = noOverlap.slice(0, keepCount);
+    randomlyDeleted = noOverlap.slice(keepCount);
+  } else {
+    culled = noOverlap;
+    randomlyDeleted = [];
+  }
+
+  // All deleted buildings = displaced by big + overlap + randomly culled
+  const deletedBuildings = [...displacedByBig, ...displacedByOverlap, ...randomlyDeleted];
+
+  return { ...gridData, buildings: [...placedBig, ...culled], deletedBuildings };
 }
