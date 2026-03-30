@@ -182,7 +182,7 @@ export const GRID = {
 export const GEOMETRY = {
   glbTileSize: 3,            // GLB only: inches per texture repeat
   objAtlasTileSize: 256,     // OBJ atlas: pixels per tile
-  objSegmentsPerTile: 2,     // OBJ atlas: how many 3" segments map to one tile (64px each at 256px tile)
+  objSegmentPixelSize: 128,  // OBJ atlas: pixels per 3" segment (256 = full tile, 128 = 2/tile, 64 = 4/tile)
   objAtlasPadding: 4,        // pixels of padding around each atlas tile
   // UV hash constants for per-object tiling offset (shared by GLB + OBJ)
   uvHashU: [0.7123, 0.3917],     // multipliers for U offset: x * [0] + z * [1]

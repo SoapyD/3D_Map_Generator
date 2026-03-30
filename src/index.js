@@ -4,7 +4,7 @@
  * Usage: node src/index.js --seed 42 --tiers 4 --size 48x48
  */
 
-import { mkdir } from 'fs/promises';
+import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
 import { parseArgs } from './config.js';
 import { createRng } from './core/rng.js';
@@ -14,6 +14,7 @@ import { generateFloors } from './generators/floors.js';
 import { generateWalls } from './generators/walls.js';
 import { generateConnectivity } from './generators/connectivity.js';
 import { generateCover } from './generators/cover.js';
+import { buildGeometry } from './generators/geometry-builder.js';
 import { buildScene } from './generators/scene-builder.js';
 import { exportToGlb, getOutputPath } from './export/glb-exporter.js';
 import { exportToObj, getObjOutputPath } from './export/obj-exporter.js';
@@ -62,26 +63,35 @@ async function main() {
   const coverData = generateCover(connData, config, rng);
   console.log(`  ${coverData.cover.length} cover pieces`);
 
-  // Build 3D scene
-  console.log('[7/7] Building scene and exporting...');
-  const scene = buildScene(coverData, config);
+  // Build geometry primitives (shared handover)
+  console.log('[7/8] Building geometry...');
+  const geometry = buildGeometry(coverData, config);
 
   // Export
   await mkdir(config.outputDir, { recursive: true });
+  const { dir, baseName } = getObjOutputPath(config);
+
+  // Write handover file
+  const geometryPath = path.join(dir, `${baseName}_geometry.json`);
+  await writeFile(geometryPath, JSON.stringify(geometry));
+
+  // Build 3D scene from primitives
+  console.log('[8/8] Building scene and exporting...');
+  const scene = buildScene(geometry, config);
 
   // Always export both GLB and OBJ with texture atlas
   const outputPath = getOutputPath(config);
   await exportToGlb(scene, outputPath);
 
-  const { dir, baseName } = getObjOutputPath(config);
-  const objPath = await exportToObj(coverData, config, dir, baseName);
-  const collisionPath = await exportCollisionObj(scene, dir, baseName);
+  const objPath = await exportToObj(geometry, config, dir, baseName);
+  const collisionPath = await exportCollisionObj(geometry, dir, baseName);
 
   console.log(`\nDone!`);
   console.log(`  GLB: ${outputPath}`);
   console.log(`  OBJ: ${objPath}`);
   console.log(`  Texture: ${path.join(dir, baseName + '.png')}`);
   console.log(`  Collision: ${collisionPath}`);
+  console.log(`  Geometry: ${geometryPath}`);
 
   if (config.preview) {
     console.log('\nStarting preview server...');
