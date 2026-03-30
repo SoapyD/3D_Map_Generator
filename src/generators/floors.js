@@ -16,7 +16,7 @@
  * Max 2 floors at removal tier 0.
  */
 
-import { FLOOR } from '../config.js';
+import { FLOOR, BUILDING } from '../config.js';
 
 const ADJACENT = {
   0: [1, 2],
@@ -39,19 +39,45 @@ export function generateFloors(data, config, rng) {
   }
 
   const buildingQuadrants = [];
+  const roofs = []; // { type: 'flat'|'pyramid', tier, sections, buildingIndex, building }
 
   for (const building of data.buildings) {
     const bq = { tiers: {} };
     const removed = new Set();
     let tier0Count = 0;
+    const isTower = building.size === 'tower';
 
+    // Pre-remove quadrants based on building shape
+    if (building.shape && BUILDING.smallShapes && BUILDING.smallShapes[building.shape]) {
+      for (const q of BUILDING.smallShapes[building.shape].removed) {
+        removed.add(q);
+      }
+    }
+
+    const hasShape = building.shape && BUILDING.smallShapes && BUILDING.smallShapes[building.shape] && BUILDING.smallShapes[building.shape].removed.length > 0;
     for (let tier = 1; tier <= building.maxTier; tier++) {
+      // Tier 1 is protected when building has a non-full shape — the shape IS the tier 1 footprint
+      if (hasShape && tier === 1) {
+        const present = new Set([0, 1, 2, 3].filter((q) => !removed.has(q)));
+        bq.tiers[tier] = present;
+        const sections = quadrantsToSections(building, present);
+        const isRoofTier = tier === building.maxTier;
+        if (isRoofTier && building.pyramidRoof) {
+          roofs.push({ type: 'pyramid', tier, building, buildingIndex: data.buildings.indexOf(building) });
+        } else if (isRoofTier) {
+          for (const s of sections) roofs.push({ type: 'flat', tier, section: s, buildingIndex: data.buildings.indexOf(building) });
+        } else {
+          for (const s of sections) floors[tier].sections.push(s);
+        }
+        continue;
+      }
+
       const removalCount = removed.size;
 
       if (removalCount === 0) {
         // Currently at removal tier 0
         tier0Count++;
-        if (tier0Count > FLOOR.maxTier0Floors || (tier > 1 && rng.chance(FLOOR.tier1EscalateChance))) {
+        if (!isTower && (tier0Count > FLOOR.maxTier0Floors || (tier > 1 && rng.chance(FLOOR.tier1EscalateChance)))) {
           // Escalate to removal tier 1: remove 1 random quadrant
           const available = [0, 1, 2, 3].filter((q) => !removed.has(q));
           removed.add(rng.pick(available));
@@ -75,15 +101,37 @@ export function generateFloors(data, config, rng) {
 
       // Convert to sections
       const sections = quadrantsToSections(building, present);
-      for (const s of sections) {
-        floors[tier].sections.push(s);
+      const isRoofTier = tier === building.maxTier;
+
+      if (isRoofTier && building.pyramidRoof) {
+        // Pyramid roof replaces the flat roof — no floor sections at this tier
+        roofs.push({
+          type: 'pyramid',
+          tier,
+          building,
+          buildingIndex: data.buildings.indexOf(building),
+        });
+      } else if (isRoofTier) {
+        // Flat roof — sections go to roofs array, not floors
+        for (const s of sections) {
+          roofs.push({
+            type: 'flat',
+            tier,
+            section: s,
+            buildingIndex: data.buildings.indexOf(building),
+          });
+        }
+      } else {
+        for (const s of sections) {
+          floors[tier].sections.push(s);
+        }
       }
     }
 
     buildingQuadrants.push(bq);
   }
 
-  return { ...data, floors, buildingQuadrants };
+  return { ...data, floors, buildingQuadrants, roofs };
 }
 
 function pickAdjacentToRemoved(removed, rng) {

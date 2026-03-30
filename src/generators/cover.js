@@ -59,6 +59,7 @@ export function generateCover(data, config, rng) {
   // Rooftop cover: place on each top-tier quadrant with a chance
   for (let bi = 0; bi < data.buildings.length; bi++) {
     const b = data.buildings[bi];
+    if (b.pyramidRoof) continue; // no cover on pyramid roofs
     const bq = data.buildingQuadrants[bi];
     const topTier = b.maxTier;
     const present = bq.tiers[topTier];

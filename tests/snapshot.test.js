@@ -64,19 +64,19 @@ describe('Snapshot regression — seed 42', () => {
   });
 
   it('building count is locked', () => {
-    expect(counts.buildings).toMatchInlineSnapshot(`16`);
+    expect(counts.buildings).toMatchInlineSnapshot(`17`);
   });
 
   it('wall count is locked', () => {
-    expect(counts.walls).toMatchInlineSnapshot(`216`);
+    expect(counts.walls).toMatchInlineSnapshot(`248`);
   });
 
   it('walkway count is locked', () => {
-    expect(counts.walkways).toMatchInlineSnapshot(`23`);
+    expect(counts.walkways).toMatchInlineSnapshot(`10`);
   });
 
   it('cover count is locked', () => {
-    expect(counts.cover).toMatchInlineSnapshot(`13`);
+    expect(counts.cover).toMatchInlineSnapshot(`11`);
   });
 
   it('street scatter count is locked', () => {
@@ -87,10 +87,10 @@ describe('Snapshot regression — seed 42', () => {
     expect(counts.floors).toMatchInlineSnapshot(`
       [
         1,
-        32,
-        32,
-        21,
-        4,
+        30,
+        23,
+        16,
+        0,
       ]
     `);
   });
@@ -111,34 +111,26 @@ describe('Snapshot regression — seed 100', () => {
   });
 
   it('building count is locked', () => {
-    expect(counts.buildings).toMatchInlineSnapshot(`14`);
+    expect(counts.buildings).toMatchInlineSnapshot(`16`);
   });
 
   it('wall count is locked', () => {
-    expect(counts.walls).toMatchInlineSnapshot(`177`);
+    expect(counts.walls).toMatchInlineSnapshot(`197`);
   });
 
   it('walkway count is locked', () => {
-    expect(counts.walkways).toMatchInlineSnapshot(`24`);
+    expect(counts.walkways).toMatchInlineSnapshot(`194`);
   });
 
   it('cover count is locked', () => {
-    expect(counts.cover).toMatchInlineSnapshot(`9`);
+    expect(counts.cover).toMatchInlineSnapshot(`12`);
   });
 
   it('street scatter count is locked', () => {
-    expect(counts.streetScatter).toMatchInlineSnapshot(`20`);
+    expect(counts.streetScatter).toMatchInlineSnapshot(`10`);
   });
 
   it('floor sections per tier are locked', () => {
-    expect(counts.floors).toMatchInlineSnapshot(`
-      [
-        1,
-        28,
-        28,
-        12,
-        2,
-      ]
-    `);
+    expect(counts.floors).toMatchInlineSnapshot(`20`);
   });
 });

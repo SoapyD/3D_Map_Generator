@@ -85,6 +85,9 @@ export async function exportToObj(data, config, outputDir, baseName) {
   const ladderIdx = addTexture('ladder_0', ladderTextures[0]);
   const objectIdx = addTexture('object_0', objectTextures.length > 0 ? objectTextures[0] : wallTextures[0]);
   const courtyardIdx = addTexture('courtyard_0', courtyardTextures[0]);
+  const roofPool = loadTexPool(packDir, 'roofs');
+  const roofTextures = roofPool.length > 0 ? roofPool : floorTextures;
+  const roofIdx = addTexture('roof_0', roofTextures[0]);
 
   // Build atlas image with padding border
   const gridSz = Math.ceil(Math.sqrt(allTextures.length));
@@ -153,6 +156,12 @@ export async function exportToObj(data, config, outputDir, baseName) {
       }
     }
     return -1;
+  }
+
+  function getTexIdx(bi) {
+    if (bi < 0 || bi >= buildings.length) return bi;
+    const b = buildings[bi];
+    return b.textureGroup !== undefined ? b.textureGroup : bi;
   }
 
   // --- OBJ export with subdivision ---
@@ -536,8 +545,9 @@ export async function exportToObj(data, config, outputDir, baseName) {
   }
 
   // Shared-vertex flat surface: grid of position verts, per-tile UVs via separate indices
+  // emitTop: whether to emit the top face (default true)
   // emitBottom: whether to emit the bottom face (skip for ground/courtyards)
-  function addSharedFlat(name, x0, y0, z0, sizeX, sizeY, sizeZ, uv, emitBottom = true, rotateUV = false, simpleBottom = false) {
+  function addSharedFlat(name, x0, y0, z0, sizeX, sizeY, sizeZ, uv, emitBottom = true, rotateUV = false, simpleBottom = false, emitTop = true) {
     const segsX = Math.max(1, Math.ceil(sizeX / SEG_SIZE));
     const segsZ = Math.max(1, Math.ceil(sizeZ / SEG_SIZE));
     const stepX = sizeX / segsX;
@@ -559,14 +569,17 @@ export async function exportToObj(data, config, outputDir, baseName) {
     objLines.push(`o ${name}`);
 
     // Emit grid of position verts for top face: (segsX+1) * (segsZ+1)
-    const voTop = vertOff;
-    for (let gz = 0; gz <= segsZ; gz++) {
-      for (let gx = 0; gx <= segsX; gx++) {
-        objLines.push(`v ${(x0 + gx * stepX).toFixed(6)} ${yTop.toFixed(6)} ${(z0 + gz * stepZ).toFixed(6)}`);
+    let voTop = -1;
+    let topGridW = segsX + 1;
+    if (emitTop) {
+      voTop = vertOff;
+      for (let gz = 0; gz <= segsZ; gz++) {
+        for (let gx = 0; gx <= segsX; gx++) {
+          objLines.push(`v ${(x0 + gx * stepX).toFixed(6)} ${yTop.toFixed(6)} ${(z0 + gz * stepZ).toFixed(6)}`);
+        }
       }
+      vertOff += topGridW * (segsZ + 1);
     }
-    const topGridW = segsX + 1;
-    vertOff += topGridW * (segsZ + 1);
 
     // Emit bottom face verts (if needed)
     let voBot = -1;
@@ -594,9 +607,12 @@ export async function exportToObj(data, config, outputDir, baseName) {
     }
 
     // Normals
-    objLines.push(`vn 0 1 0`);
-    const noTop = normOff;
-    normOff += 1;
+    let noTop = -1;
+    if (emitTop) {
+      objLines.push(`vn 0 1 0`);
+      noTop = normOff;
+      normOff += 1;
+    }
     let noBot = -1;
     if (emitBottom) {
       objLines.push(`vn 0 -1 0`);
@@ -610,30 +626,30 @@ export async function exportToObj(data, config, outputDir, baseName) {
         const uOff = ((sx + baseSegU) % SEGS_PER_TILE) * uvStep;
         const vOff = ((sz + baseSegV) % SEGS_PER_TILE) * uvStepV;
 
-        // Grid vertex indices for this tile's 4 corners (top face)
-        const v00 = voTop + sz * topGridW + sx;
-        const v10 = v00 + 1;
-        const v01 = v00 + topGridW;
-        const v11 = v01 + 1;
+        // Top face
+        if (emitTop) {
+          const v00 = voTop + sz * topGridW + sx;
+          const v10 = v00 + 1;
+          const v01 = v00 + topGridW;
+          const v11 = v01 + 1;
 
-        // Top face UVs
-        const uo = uvOff;
-        if (rotateUV) {
-          objLines.push(`vt ${(uv.uMin+vOff).toFixed(6)} ${(uv.vMin+uOff).toFixed(6)}`);
-          objLines.push(`vt ${(uv.uMin+vOff).toFixed(6)} ${(uv.vMin+uOff+uvStep).toFixed(6)}`);
-          objLines.push(`vt ${(uv.uMin+vOff+uvStepV).toFixed(6)} ${(uv.vMin+uOff+uvStep).toFixed(6)}`);
-          objLines.push(`vt ${(uv.uMin+vOff+uvStepV).toFixed(6)} ${(uv.vMin+uOff).toFixed(6)}`);
-        } else {
-          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
-          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
-          objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
-          objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+          const uo = uvOff;
+          if (rotateUV) {
+            objLines.push(`vt ${(uv.uMin+vOff).toFixed(6)} ${(uv.vMin+uOff).toFixed(6)}`);
+            objLines.push(`vt ${(uv.uMin+vOff).toFixed(6)} ${(uv.vMin+uOff+uvStep).toFixed(6)}`);
+            objLines.push(`vt ${(uv.uMin+vOff+uvStepV).toFixed(6)} ${(uv.vMin+uOff+uvStep).toFixed(6)}`);
+            objLines.push(`vt ${(uv.uMin+vOff+uvStepV).toFixed(6)} ${(uv.vMin+uOff).toFixed(6)}`);
+          } else {
+            objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+            objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff).toFixed(6)}`);
+            objLines.push(`vt ${(uv.uMin+uOff+uvStep).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+            objLines.push(`vt ${(uv.uMin+uOff).toFixed(6)} ${(uv.vMin+vOff+uvStepV).toFixed(6)}`);
+          }
+          uvOff += 4;
+
+          objLines.push(`f ${v00}/${uo}/${noTop} ${v01}/${uo+3}/${noTop} ${v11}/${uo+2}/${noTop}`);
+          objLines.push(`f ${v00}/${uo}/${noTop} ${v11}/${uo+2}/${noTop} ${v10}/${uo+1}/${noTop}`);
         }
-        uvOff += 4;
-
-        // Top face: v00=SW, v10=SE, v11=NE, v01=NW
-        objLines.push(`f ${v00}/${uo}/${noTop} ${v01}/${uo+3}/${noTop} ${v11}/${uo+2}/${noTop}`);
-        objLines.push(`f ${v00}/${uo}/${noTop} ${v11}/${uo+2}/${noTop} ${v10}/${uo+1}/${noTop}`);
 
         // Bottom face (per-tile, skip if simple bottom)
         if (emitBottom && !botSimple) {
@@ -857,7 +873,7 @@ export async function exportToObj(data, config, outputDir, baseName) {
     const tier = floorData[t];
     for (const section of tier.sections) {
       const bi = findBuilding(section);
-      const texIdx = bi >= 0 ? buildingFloorIdx[bi] : baseIdx;
+      const texIdx = bi >= 0 ? buildingFloorIdx[getTexIdx(bi)] : baseIdx;
       addSharedFlat(`floor_t${tier.tier}_${Math.round(section.x)}_${Math.round(section.z)}`,
         section.x, tier.tier * config.tierHeight, section.z,
         section.w, config.slabThickness, section.d, getUV(texIdx), true);
@@ -870,7 +886,7 @@ export async function exportToObj(data, config, outputDir, baseName) {
   for (let i = 0; i < walls.length; i++) {
     const wall = walls[i];
     const bi = findBuildingForWall(wall);
-    const texIdx = bi >= 0 ? buildingWallIdx[bi] : buildingWallIdx[0];
+    const texIdx = bi >= 0 ? buildingWallIdx[getTexIdx(bi)] : buildingWallIdx[0];
     const wx = wall.axis === 'x' ? wall.length : wall.thickness;
     const wz = wall.axis === 'z' ? wall.length : wall.thickness;
     addSharedWall(`wall_${i}`, wall.x, wall.baseY, wall.z, wx, wall.height, wz, getUV(texIdx));
@@ -924,6 +940,53 @@ export async function exportToObj(data, config, outputDir, baseName) {
     addPerimeterEdges(w.x, w.y, w.z, w.w, GEOMETRY.walkwayThickness, w.d, getUV(walkwayIdx));
   }
 
+  // Bridges
+  const bridgesData = data.connections ? data.connections.bridges : [];
+  // Use landmark wall texture for bridges (stone look)
+  const bridgeTexIdx = buildingWallIdx.length > 0 ? buildingWallIdx[0] : baseIdx;
+  const bridgeUV = getUV(bridgeTexIdx);
+  for (let i = 0; i < bridgesData.length; i++) {
+    const b = bridgesData[i];
+    const bThick = GEOMETRY.walkwayThickness + 0.2; // slightly thicker than walkway
+    const wallH = 0.75;
+    const wallT = 0.25;
+
+    // Bridge slab
+    addSharedFlat(`bridge_${i}`, b.x, b.y, b.z, b.w, bThick, b.d, bridgeUV, true, b.w > b.d);
+    addPerimeterEdges(b.x, b.y, b.z, b.w, bThick, b.d, bridgeUV);
+
+    // Side walls
+    const wallY = b.y + bThick;
+    if (b.axis === 'x') {
+      // Walls along the length (north and south sides)
+      addSubBox(`bridge_wall_${i}_L`, b.x, wallY, b.z, b.w, wallH, wallT, bridgeUV, false);
+      addSubBox(`bridge_wall_${i}_R`, b.x, wallY, b.z + b.d - wallT, b.w, wallH, wallT, bridgeUV, false);
+    } else {
+      addSubBox(`bridge_wall_${i}_L`, b.x, wallY, b.z, wallT, wallH, b.d, bridgeUV, false);
+      addSubBox(`bridge_wall_${i}_R`, b.x + b.w - wallT, wallY, b.z, wallT, wallH, b.d, bridgeUV, false);
+    }
+
+    // Battlement tall sections
+    if (b.variant === 'battlement') {
+      const battH = 1.5 - wallH;
+      const spacing = 1.5;
+      const gap = 0.75;
+      const pillarW = spacing - gap;
+      const battY = wallY + wallH;
+      const runLen = b.axis === 'x' ? b.w : b.d;
+
+      for (let pos = 0; pos < runLen - pillarW; pos += spacing) {
+        if (b.axis === 'x') {
+          addSubBox(`bridge_batt_${i}_L_${Math.round(pos)}`, b.x + pos, battY, b.z, pillarW, battH, wallT, bridgeUV, false);
+          addSubBox(`bridge_batt_${i}_R_${Math.round(pos)}`, b.x + pos, battY, b.z + b.d - wallT, pillarW, battH, wallT, bridgeUV, false);
+        } else {
+          addSubBox(`bridge_batt_${i}_L_${Math.round(pos)}`, b.x, battY, b.z + pos, wallT, battH, pillarW, bridgeUV, false);
+          addSubBox(`bridge_batt_${i}_R_${Math.round(pos)}`, b.x + b.w - wallT, battY, b.z + pos, wallT, battH, pillarW, bridgeUV, false);
+        }
+      }
+    }
+  }
+
   // Cover
   const cover = data.cover || [];
   for (let i = 0; i < cover.length; i++) {
@@ -954,6 +1017,86 @@ export async function exportToObj(data, config, outputDir, baseName) {
     const c = streetScatter[i];
     addSharedFlat(`street_scatter_${i}`, c.x, c.y, c.z, c.w, c.height, c.d, getUV(objectIdx), false);
     addPerimeterEdges(c.x, c.y, c.z, c.w, c.height, c.d, getUV(objectIdx));
+  }
+
+  // Roofs (flat and pyramid)
+  const roofUV = getUV(roofIdx);
+  const roofEntries = data.roofs || [];
+  for (let ri = 0; ri < roofEntries.length; ri++) {
+    const roof = roofEntries[ri];
+
+    if (roof.type === 'flat') {
+      const bi = roof.buildingIndex;
+      const floorTexIdx = bi >= 0 && bi < buildingFloorIdx.length ? buildingFloorIdx[getTexIdx(bi)] : baseIdx;
+      const ceilingUV = getUV(floorTexIdx);
+      const ry = roof.tier * config.tierHeight;
+      const rs = roof.section;
+      // Top face — roof texture (emitTop=true, emitBottom=false)
+      addSharedFlat(`roof_${ri}`, rs.x, ry, rs.z, rs.w, config.slabThickness, rs.d, roofUV, false, false, false, true);
+      // Bottom face — floor/ceiling texture (emitTop=false, emitBottom=true)
+      addSharedFlat(`roof_ceiling_${ri}`, rs.x, ry, rs.z, rs.w, config.slabThickness, rs.d, ceilingUV, true, false, false, false);
+      addPerimeterEdges(rs.x, ry, rs.z, rs.w, config.slabThickness, rs.d, roofUV);
+    } else if (roof.type === 'pyramid') {
+      const b = roof.building;
+      const topY = roof.tier * config.tierHeight;
+      const apexY = topY + Math.min(b.w, b.d) * 0.6;
+      const cx = b.x + b.w / 2;
+      const cz = b.z + b.d / 2;
+      const ruv = roofUV;
+      const cu = ((ruv.uMin + ruv.uMax) / 2).toFixed(6);
+      const cv = ((ruv.vMin + ruv.vMax) / 2).toFixed(6);
+
+      objLines.push(`o roof_pyramid_${ri}`);
+      const vo = vertOff;
+      objLines.push(`v ${b.x.toFixed(6)} ${topY.toFixed(6)} ${b.z.toFixed(6)}`);
+      objLines.push(`v ${(b.x + b.w).toFixed(6)} ${topY.toFixed(6)} ${b.z.toFixed(6)}`);
+      objLines.push(`v ${(b.x + b.w).toFixed(6)} ${topY.toFixed(6)} ${(b.z + b.d).toFixed(6)}`);
+      objLines.push(`v ${b.x.toFixed(6)} ${topY.toFixed(6)} ${(b.z + b.d).toFixed(6)}`);
+      objLines.push(`v ${cx.toFixed(6)} ${apexY.toFixed(6)} ${cz.toFixed(6)}`);
+      for (let i = 0; i < 5; i++) objLines.push(`vt ${cu} ${cv}`);
+      const uo = uvOff;
+      objLines.push(`vn 0 0.5 -1`);
+      objLines.push(`f ${vo+1}/${uo+1}/${normOff} ${vo}/${uo}/${normOff} ${vo+4}/${uo+4}/${normOff}`);
+      normOff++;
+      objLines.push(`vn 1 0.5 0`);
+      objLines.push(`f ${vo+2}/${uo+2}/${normOff} ${vo+1}/${uo+1}/${normOff} ${vo+4}/${uo+4}/${normOff}`);
+      normOff++;
+      objLines.push(`vn 0 0.5 1`);
+      objLines.push(`f ${vo+3}/${uo+3}/${normOff} ${vo+2}/${uo+2}/${normOff} ${vo+4}/${uo+4}/${normOff}`);
+      normOff++;
+      objLines.push(`vn -1 0.5 0`);
+      objLines.push(`f ${vo}/${uo}/${normOff} ${vo+3}/${uo+3}/${normOff} ${vo+4}/${uo+4}/${normOff}`);
+      normOff++;
+      vertOff += 5;
+      uvOff += 5;
+      objLines.push('');
+
+      // Flat ceiling quad under pyramid — floor texture, downward-facing
+      const bi = roof.buildingIndex;
+      const floorTexIdx = bi >= 0 && bi < buildingFloorIdx.length ? buildingFloorIdx[getTexIdx(bi)] : baseIdx;
+      const ceilUV = getUV(floorTexIdx);
+      const ccu = ((ceilUV.uMin + ceilUV.uMax) / 2).toFixed(6);
+      const ccv = ((ceilUV.vMin + ceilUV.vMax) / 2).toFixed(6);
+
+      objLines.push(`o roof_pyramid_ceiling_${ri}`);
+      const voc = vertOff;
+      objLines.push(`v ${b.x.toFixed(6)} ${topY.toFixed(6)} ${b.z.toFixed(6)}`);
+      objLines.push(`v ${(b.x + b.w).toFixed(6)} ${topY.toFixed(6)} ${b.z.toFixed(6)}`);
+      objLines.push(`v ${(b.x + b.w).toFixed(6)} ${topY.toFixed(6)} ${(b.z + b.d).toFixed(6)}`);
+      objLines.push(`v ${b.x.toFixed(6)} ${topY.toFixed(6)} ${(b.z + b.d).toFixed(6)}`);
+      objLines.push(`vt ${ceilUV.uMin.toFixed(6)} ${ceilUV.vMin.toFixed(6)}`);
+      objLines.push(`vt ${ceilUV.uMax.toFixed(6)} ${ceilUV.vMin.toFixed(6)}`);
+      objLines.push(`vt ${ceilUV.uMax.toFixed(6)} ${ceilUV.vMax.toFixed(6)}`);
+      objLines.push(`vt ${ceilUV.uMin.toFixed(6)} ${ceilUV.vMax.toFixed(6)}`);
+      objLines.push(`vn 0 -1 0`);
+      const uoc = uvOff;
+      objLines.push(`f ${voc}/${uoc}/${normOff} ${voc+1}/${uoc+1}/${normOff} ${voc+2}/${uoc+2}/${normOff}`);
+      objLines.push(`f ${voc}/${uoc}/${normOff} ${voc+2}/${uoc+2}/${normOff} ${voc+3}/${uoc+3}/${normOff}`);
+      vertOff += 4;
+      uvOff += 4;
+      normOff++;
+      objLines.push('');
+    }
   }
 
   // Flat ladder meshes

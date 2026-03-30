@@ -49,22 +49,134 @@ export function generateWalls(data, config, rng) {
         }
       }
 
-      // Pick up to 2 edges
+      // Diagonal/shaped buildings use all edges; full rectangles pick up to 2
+      const hasShape = building.shape && building.shape !== 'full';
       const allEdges = rng.shuffle([...edgeSet]);
-      const chosen = allEdges.slice(0, 2);
+      const chosen = hasShape ? allEdges : allEdges.slice(0, 2);
 
       for (const edgeLabel of chosen) {
+        // Skip suppressed edges
+        if (building.suppressEdges) {
+          let suppressed = false;
+          for (const se of building.suppressEdges) {
+            if (se.edge === edgeLabel) {
+              if (!se.zMin && !se.xMin) {
+                // Full edge suppressed
+                suppressed = true;
+              }
+              // Partial suppression handled below after wall generation
+            }
+          }
+          if (suppressed) continue;
+        }
+
         const wallDef = buildWall(building, edgeLabel, aboveQuadrants, baseY, wallHeight, wallThickness);
         if (!wallDef) continue;
 
         // Apply wall quadrant damage
         const segments = applyWallDamage(wallDef, rng);
+
+        // Filter out segments that fall in partially suppressed zones
+        if (building.suppressEdges) {
+          for (const se of building.suppressEdges) {
+            if (se.edge !== edgeLabel) continue;
+            if (se.zMin !== undefined) {
+              // Remove segments whose Z range overlaps the suppressed zone (east/west edges)
+              for (let si = segments.length - 1; si >= 0; si--) {
+                const s = segments[si];
+                const sz1 = s.axis === 'z' ? s.z + s.length : s.z + s.thickness;
+                if (s.z < se.zMax + 0.1 && sz1 > se.zMin - 0.1) {
+                  segments.splice(si, 1);
+                }
+              }
+            }
+            if (se.xMin !== undefined) {
+              // Remove segments whose X range overlaps the suppressed zone (north/south edges)
+              for (let si = segments.length - 1; si >= 0; si--) {
+                const s = segments[si];
+                const sx1 = s.axis === 'x' ? s.x + s.length : s.x + s.thickness;
+                if (s.x < se.xMax + 0.1 && sx1 > se.xMin - 0.1) {
+                  segments.splice(si, 1);
+                }
+              }
+            }
+          }
+        }
+
         walls.push(...segments);
       }
     }
   }
 
+  // Interior walls for medium/large buildings on mid-floors
+  const interiorWalls = [];
+  for (let bi = 0; bi < data.buildings.length; bi++) {
+    const building = data.buildings[bi];
+    if (building.size !== 'medium' && building.size !== 'large') continue;
+    const bq = data.buildingQuadrants[bi];
+    const forceInterior = building.interiorWalls === true;
+    if (building.interiorWalls === false) continue;
+    const chance = forceInterior ? 1.0 : (WALL.interiorWallChance[building.size] || 0);
+
+    for (let tier = 1; tier < building.maxTier; tier++) {
+      if (!rng.chance(chance)) continue;
+
+      const aboveQuadrants = bq.tiers[tier + 1];
+      if (!aboveQuadrants || aboveQuadrants.size < 2) continue;
+
+      const baseY = tier * tierHeight + slabThickness;
+      const wallHeight = tierHeight - slabThickness;
+      const { x, z, w, d } = building;
+      const mx = x + w / 2;
+      const mz = z + d / 2;
+
+      // Pick a variant
+      const variant = pickInteriorVariant(rng);
+
+      const defs = [];
+      if (variant === 'cross') {
+        // N-S wall through centre (half room length, centred)
+        defs.push({ x: mx - wallThickness / 2, z: z + d / 4, length: d / 2, height: wallHeight, baseY, thickness: wallThickness, axis: 'z' });
+        // E-W wall through centre (half room width, centred)
+        defs.push({ x: x + w / 4, z: mz - wallThickness / 2, length: w / 2, height: wallHeight, baseY, thickness: wallThickness, axis: 'x' });
+      } else if (variant === 'centreNS') {
+        // Wall from north edge midpoint toward centre
+        defs.push({ x: mx - wallThickness / 2, z, length: d / 2, height: wallHeight, baseY, thickness: wallThickness, axis: 'z' });
+      } else if (variant === 'centreSN') {
+        // Wall from south edge midpoint toward centre
+        defs.push({ x: mx - wallThickness / 2, z: mz, length: d / 2, height: wallHeight, baseY, thickness: wallThickness, axis: 'z' });
+      } else if (variant === 'centreEW') {
+        // Wall from west edge midpoint toward centre
+        defs.push({ x, z: mz - wallThickness / 2, length: w / 2, height: wallHeight, baseY, thickness: wallThickness, axis: 'x' });
+      } else if (variant === 'centreWE') {
+        // Wall from east edge midpoint toward centre
+        defs.push({ x: mx, z: mz - wallThickness / 2, length: w / 2, height: wallHeight, baseY, thickness: wallThickness, axis: 'x' });
+      }
+
+      for (const def of defs) {
+        const segments = applyWallDamage(def, rng);
+        interiorWalls.push(...segments);
+      }
+    }
+  }
+
+  walls.push(...interiorWalls);
+
   return { ...data, walls };
+}
+
+function pickInteriorVariant(rng) {
+  const variants = WALL.interiorWallVariants;
+  if (!variants) return 'centreNS';
+  const entries = Object.entries(variants);
+  const totalWeight = entries.reduce((sum, [, v]) => sum + v.weight, 0);
+  const roll = rng.random() * totalWeight;
+  let cumulative = 0;
+  for (const [name, v] of entries) {
+    cumulative += v.weight;
+    if (roll < cumulative) return name;
+  }
+  return entries[0][0];
 }
 
 /**
