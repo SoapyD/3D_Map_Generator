@@ -31,6 +31,7 @@ const DEBUG_MATERIALS = {
   interiorLadder: new THREE.MeshStandardMaterial({ color: 0x22cccc, roughness: 0.7 }),
   ladderPlatform: new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.7 }),
   streetScatter: new THREE.MeshStandardMaterial({ color: 0x22ee44, roughness: 0.7 }),
+  pillar: new THREE.MeshStandardMaterial({ color: 0x666644, roughness: 0.9 }),
 };
 
 /**
@@ -214,14 +215,17 @@ export function buildScene(data, config) {
       addLadder(ladders[i], material, `ladder_${i}`);
     }
 
-    // Walkways
+    // Walkways — branches share their parent's texture via textureId
     for (let i = 0; i < walkways.length; i++) {
       const w = walkways[i];
       let material;
       if (debug) {
         material = w.blocked ? DEBUG_MATERIALS.ramp : DEBUG_MATERIALS.walkway;
       } else {
-        material = pickFromPool(pools.walkways, i);
+        const texIdx = (w.textureId !== undefined && w.branch)
+          ? walkways.findIndex(ww => ww.textureId === w.textureId && !ww.branch)
+          : i;
+        material = pickFromPool(pools.walkways, texIdx >= 0 ? texIdx : i);
       }
       const mesh = createFloorSlab({ x: w.x, z: w.z, w: w.w, d: w.d }, w.y, GEOMETRY.walkwayThickness, material, { rotateUV: w.w > w.d });
       mesh.name = w.blocked ? `walkway_BLOCKED_${i}` : `walkway_${i}`;
@@ -230,67 +234,150 @@ export function buildScene(data, config) {
 
     // Bridges
     const bridges = data.connections.bridges || [];
+
+    // Collect all branch connections (walkways + bridges) to cut gaps in parent bridge walls
+    const allBranches = [
+      ...walkways.filter(w => w.branch),
+      ...bridges.filter(b => b.branch),
+    ];
+
     for (let i = 0; i < bridges.length; i++) {
       const b = bridges[i];
       const bridgeThickness = CONNECTIVITY.bridgeThickness || 0.5;
       const wallH = CONNECTIVITY.bridgeWallHeight || 0.75;
       const wallT = CONNECTIVITY.bridgeWallThickness || 0.25;
 
-      // Bridge slab
-      const slabMat = debug ? DEBUG_MATERIALS.walkway : pickFromPool(pools.landmark_walls, i);
+      // Bridge slab — branches use their parent's texture via textureId
+      const bridgeTexIdx = (b.textureId !== undefined) ? bridges.findIndex(br => br.textureId === b.textureId && !br.branch) : i;
+      const slabMat = debug ? DEBUG_MATERIALS.walkway : pickFromPool(pools.landmark_walls, bridgeTexIdx >= 0 ? bridgeTexIdx : i);
       const slab = createFloorSlab({ x: b.x, z: b.z, w: b.w, d: b.d }, b.y, bridgeThickness, slabMat, { rotateUV: b.w > b.d });
       slab.name = `bridge_${i}`;
       scene.add(slab);
 
-      // Side walls
+      // Find branches that connect to this bridge (same textureId, same tier)
+      const branchGaps = [];
+      for (const br of allBranches) {
+        if (br.textureId !== b.textureId || Math.abs(br.y - b.y) > 0.5) continue;
+        // Branch must be perpendicular to this bridge
+        if (br.axis === b.axis) continue;
+        branchGaps.push(br);
+      }
+
+      // Side walls — split into segments with gaps where branches connect
       const wallMat = debug ? DEBUG_MATERIALS.wall : pickFromPool(pools.landmark_walls, i + 100);
       const wallY = b.y + bridgeThickness;
 
-      if (b.axis === 'x') {
-        // Bridge runs along X — walls on north and south edges (along Z)
-        const wallL = createSlab(b.x + b.w / 2, wallY + wallH / 2, b.z + wallT / 2, b.w, wallH, wallT, wallMat);
-        wallL.name = `bridge_wall_${i}_L`;
-        scene.add(wallL);
-        const wallR = createSlab(b.x + b.w / 2, wallY + wallH / 2, b.z + b.d - wallT / 2, b.w, wallH, wallT, wallMat);
-        wallR.name = `bridge_wall_${i}_R`;
-        scene.add(wallR);
-      } else {
-        // Bridge runs along Z — walls on east and west edges (along X)
-        const wallL = createSlab(b.x + wallT / 2, wallY + wallH / 2, b.z + b.d / 2, wallT, wallH, b.d, wallMat);
-        wallL.name = `bridge_wall_${i}_L`;
-        scene.add(wallL);
-        const wallR = createSlab(b.x + b.w - wallT / 2, wallY + wallH / 2, b.z + b.d / 2, wallT, wallH, b.d, wallMat);
-        wallR.name = `bridge_wall_${i}_R`;
-        scene.add(wallR);
+      // Helper: render wall segments along the bridge, skipping gap regions
+      // wallAxis: the axis the wall runs along ('x' or 'z')
+      // wallStart/wallEnd: start and end positions along that axis
+      // fixedPos: the fixed cross-axis position (centre of the thin wall)
+      // wallLen: length dimension for createSlab (wallT for thin dimension)
+      function renderWallSegments(wallAxis, wallStart, wallEnd, fixedPos, isXWall) {
+        // Collect gap intervals along the wall's run
+        const gaps = [];
+        for (const br of branchGaps) {
+          let brMin, brMax;
+          if (wallAxis === 'x') {
+            // Wall runs along X; branch crosses in Z
+            // Check branch Z range overlaps the wall's fixed Z position
+            const brZ1 = br.z, brZ2 = br.z + br.d;
+            if (fixedPos < brZ1 - 0.5 || fixedPos > brZ2 + 0.5) continue;
+            brMin = br.x;
+            brMax = br.x + br.w;
+          } else {
+            // Wall runs along Z; branch crosses in X
+            const brX1 = br.x, brX2 = br.x + br.w;
+            if (fixedPos < brX1 - 0.5 || fixedPos > brX2 + 0.5) continue;
+            brMin = br.z;
+            brMax = br.z + br.d;
+          }
+          // Clamp to wall range and add margin
+          const margin = 0.25;
+          const gapStart = Math.max(wallStart, brMin - margin);
+          const gapEnd = Math.min(wallEnd, brMax + margin);
+          if (gapEnd > gapStart) gaps.push({ start: gapStart, end: gapEnd });
+        }
+
+        // Sort gaps and merge overlapping
+        gaps.sort((a, b) => a.start - b.start);
+        const merged = [];
+        for (const g of gaps) {
+          if (merged.length > 0 && g.start <= merged[merged.length - 1].end) {
+            merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, g.end);
+          } else {
+            merged.push({ ...g });
+          }
+        }
+
+        // Build segments between gaps
+        const segments = [];
+        let cursor = wallStart;
+        for (const g of merged) {
+          if (g.start > cursor) segments.push({ start: cursor, end: g.start });
+          cursor = g.end;
+        }
+        if (cursor < wallEnd) segments.push({ start: cursor, end: wallEnd });
+
+        // Render each segment
+        for (let si = 0; si < segments.length; si++) {
+          const seg = segments[si];
+          const segLen = seg.end - seg.start;
+          if (segLen < 0.1) continue;
+          let mesh;
+          if (isXWall) {
+            mesh = createSlab(seg.start + segLen / 2, wallY + wallH / 2, fixedPos, segLen, wallH, wallT, wallMat);
+          } else {
+            mesh = createSlab(fixedPos, wallY + wallH / 2, seg.start + segLen / 2, wallT, wallH, segLen, wallMat);
+          }
+          mesh.name = `bridge_wall_${i}_${si}`;
+          scene.add(mesh);
+        }
+
+        return { segments, merged };
       }
 
-      // Battlement variant — add tall sections on top of side walls
+      let wallDataL, wallDataR;
+      if (b.axis === 'x') {
+        // Bridge runs along X — walls on north (L) and south (R) edges
+        wallDataL = renderWallSegments('x', b.x, b.x + b.w, b.z + wallT / 2, true);
+        wallDataR = renderWallSegments('x', b.x, b.x + b.w, b.z + b.d - wallT / 2, true);
+      } else {
+        // Bridge runs along Z — walls on west (L) and east (R) edges
+        wallDataL = renderWallSegments('z', b.z, b.z + b.d, b.x + wallT / 2, false);
+        wallDataR = renderWallSegments('z', b.z, b.z + b.d, b.x + b.w - wallT / 2, false);
+      }
+
+      // Battlement variant — add tall sections on top of side wall segments (respecting gaps)
       if (b.variant === 'battlement') {
-        const battH = CONNECTIVITY.bridgeBattlementHeight - wallH; // extra height above low wall
+        const battH = CONNECTIVITY.bridgeBattlementHeight - wallH;
         const spacing = CONNECTIVITY.bridgeBattlementSpacing || 1.5;
         const gap = CONNECTIVITY.bridgeBattlementGap || 0.75;
         const pillarW = spacing - gap;
         const battY = wallY + wallH;
-        const runLen = b.axis === 'x' ? b.w : b.d;
 
-        for (let pos = 0; pos < runLen - pillarW; pos += spacing) {
-          if (b.axis === 'x') {
-            const px = b.x + pos;
-            const pL = createSlab(px + pillarW / 2, battY + battH / 2, b.z + wallT / 2, pillarW, battH, wallT, wallMat);
-            pL.name = `bridge_batt_${i}_L_${Math.round(pos)}`;
-            scene.add(pL);
-            const pR = createSlab(px + pillarW / 2, battY + battH / 2, b.z + b.d - wallT / 2, pillarW, battH, wallT, wallMat);
-            pR.name = `bridge_batt_${i}_R_${Math.round(pos)}`;
-            scene.add(pR);
-          } else {
-            const pz = b.z + pos;
-            const pL = createSlab(b.x + wallT / 2, battY + battH / 2, pz + pillarW / 2, wallT, battH, pillarW, wallMat);
-            pL.name = `bridge_batt_${i}_L_${Math.round(pos)}`;
-            scene.add(pL);
-            const pR = createSlab(b.x + b.w - wallT / 2, battY + battH / 2, pz + pillarW / 2, wallT, battH, pillarW, wallMat);
-            pR.name = `bridge_batt_${i}_R_${Math.round(pos)}`;
-            scene.add(pR);
+        function renderBattlements(wallData, fixedPos, isXWall, side) {
+          for (const seg of wallData.segments) {
+            const segStart = seg.start;
+            const segLen = seg.end - seg.start;
+            for (let pos = 0; pos < segLen - pillarW; pos += spacing) {
+              let mesh;
+              if (isXWall) {
+                mesh = createSlab(segStart + pos + pillarW / 2, battY + battH / 2, fixedPos, pillarW, battH, wallT, wallMat);
+              } else {
+                mesh = createSlab(fixedPos, battY + battH / 2, segStart + pos + pillarW / 2, wallT, battH, pillarW, wallMat);
+              }
+              mesh.name = `bridge_batt_${i}_${side}_${Math.round(segStart + pos)}`;
+              scene.add(mesh);
+            }
           }
+        }
+
+        if (b.axis === 'x') {
+          renderBattlements(wallDataL, b.z + wallT / 2, true, 'L');
+          renderBattlements(wallDataR, b.z + b.d - wallT / 2, true, 'R');
+        } else {
+          renderBattlements(wallDataL, b.x + wallT / 2, false, 'L');
+          renderBattlements(wallDataR, b.x + b.w - wallT / 2, false, 'R');
         }
       }
     }
@@ -325,6 +412,28 @@ export function buildScene(data, config) {
       const material = debug ? DEBUG_MATERIALS.ladderPlatform : pickFromPool(pools.floors, p.ladderIndex);
       const mesh = createFloorSlab({ x: p.x, z: p.z, w: p.w, d: p.d }, p.y, GEOMETRY.platformThickness, material);
       mesh.name = `ladder_platform_${i}`;
+      scene.add(mesh);
+    }
+
+    // Pillar supports — use parent walkway/bridge texture
+    const pillars = data.connections.pillars || [];
+    for (let i = 0; i < pillars.length; i++) {
+      const p = pillars[i];
+      let material;
+      if (debug) {
+        material = DEBUG_MATERIALS.pillar;
+      } else if (p.isBridge) {
+        const parentIdx = bridges.findIndex(b => b.textureId === p.textureId && !b.branch);
+        material = pickFromPool(pools.landmark_walls, parentIdx >= 0 ? parentIdx : i);
+      } else {
+        const parentIdx = walkways.findIndex(w => w.textureId === p.textureId && !w.branch);
+        material = pickFromPool(pools.walkways, parentIdx >= 0 ? parentIdx : i);
+      }
+      const mesh = createSlab(
+        p.x + p.w / 2, p.y + p.height / 2, p.z + p.d / 2,
+        p.w, p.height, p.d, material
+      );
+      mesh.name = `pillar_${i}`;
       scene.add(mesh);
     }
   }

@@ -74,6 +74,11 @@ writeSolidPng('base_map', 'stone', 89, 84, 77);
 writeSolidPng('base_map', 'mud', 77, 64, 46);
 writeSolidPng('base_map', 'rubble', 97, 92, 87);
 
+console.log('Roofs:');
+writeSolidPng('roofs', 'dark_red', 102, 46, 36);
+writeSolidPng('roofs', 'clay_red', 115, 56, 41);
+writeSolidPng('roofs', 'dark_brown', 77, 51, 36);
+
 console.log('Domes:');
 writeSolidPng('domes', 'rusty_red', 102, 51, 36);
 writeSolidPng('domes', 'dark_rust', 82, 41, 28);

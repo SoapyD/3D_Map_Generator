@@ -64,21 +64,26 @@ For each building on each tier:
 ## Stage 5: Connectivity
 
 **Input**: All geometry from Stages 3-4
-**Output**: Walkways, ladders, and bridges added
+**Output**: Walkways, ladders, bridges, and branches added
 
 ### Algorithm:
 1. Build a graph: each floor section is a node
 2. Two nodes are connected if they share an edge at the same tier
 3. For each isolated upper-tier node, find the nearest lower-tier node
 4. Place a ladder or stairway between them
-5. For nearby buildings at the same tier, consider placing walkway bridges
-6. Validate: flood-fill from ground level — every node must be reachable
-7. If unreachable nodes exist, add additional ladders/walkways
+5. For nearby buildings at the same tier, place walkways between them
+6. Anti-stacking and criss-cross prevention for walkways
+7. **Gap detection**: Build 1" spatial grid per tier, scan rows/columns for gaps between buildings. Generate 3-6 forced connections (longest kept). Cross-axis clamped to floor overlap, overhang rejected if <50% overlap.
+8. **Wall clearing**: At forced connection endpoints, walls blocking >50% of walkway width are removed; ≤50% left as-is.
+9. **Branching**: Scan forced connections perpendicular for nearby buildings (3-14"). Create T-junction branches (max 2 per map). Branches inherit parent's bridge variant and texture.
+10. **Bridge upgrade**: Tier 2+ walkways (including forced and branches) have 40% chance to become bridges with low wall or battlement side walls. Bridge walls have gaps where branches connect.
+11. Validate: flood-fill from ground level — every node must be reachable
 
 ### Geometry:
 - **Ladders**: Thin rectangular slab (0.5" wide) at ~80° angle, textured as ladder
-- **Walkways**: Flat slab (2" wide) bridging gaps, with optional low wall/railing
-- **Rubble ramps**: Angled slab from ground to tier 1 (for natural-looking access)
+- **Walkways**: Flat slab (2" wide) bridging gaps
+- **Bridges**: Widened walkway (3" wide) with side walls (low 0.75" or battlement 1.5")
+- **Branches**: Perpendicular T-junction off forced connections, same texture as parent
 
 ## Stage 6: Sightline Analysis
 
