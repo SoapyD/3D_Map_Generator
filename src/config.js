@@ -38,11 +38,11 @@ export const BUILDING = {
   cellSizeMultiplier: 1.5,// grid cell = avg small footprint × this
   deleteRatio: 0.20,       // fraction of small buildings randomly deleted
   towerChance: 0.3,        // chance of a tower replacing a small building in placement
+  maxTowers: 2,            // maximum towers per map
   pyramidRoofChance: 0.5,  // chance a tower gets a pyramid roof
-  // Building shapes — which quadrants are initially removed
-  // Each shape is an array of quadrant indices to remove at tier 1
-  // Quadrants: 0=NW, 1=NE, 2=SW, 3=SE
-  shapes: {
+  // Building shapes by size category
+  // Small shapes: used for small buildings (single cell or quadrant-based)
+  smallShapes: {
     full:     { removed: [], weight: 0.4 },       // all 4 quadrants present (rectangle)
     corner0:  { removed: [3], weight: 0.075 },    // missing SE
     corner1:  { removed: [2], weight: 0.075 },    // missing SW
@@ -50,27 +50,30 @@ export const BUILDING = {
     corner3:  { removed: [0], weight: 0.075 },    // missing NW
     diagA:    { removed: [1, 2], weight: 0.05 },  // missing NE + SW (diagonal)
     diagB:    { removed: [0, 3], weight: 0.05 },  // missing NW + SE (diagonal)
-    // L-shapes: 2×1 strip + 1×1 extension, forming an L on a 2×3 grid
-    // Named by which corner the elbow is at
-    lShapeSW: { weight: 0.025 },  // L-shape, elbow at SW
-    lShapeSE: { weight: 0.025 },  // L-shape, elbow at SE
-    lShapeNW: { weight: 0.025 },  // L-shape, elbow at NW
-    lShapeNE: { weight: 0.025 },  // L-shape, elbow at NE
-    // Wide U-shapes: 3×3 grid, two columns + connecting bar, open on one side
-    uShapeN:  { weight: 0.02 },   // open top (north)
-    uShapeS:  { weight: 0.02 },   // open bottom (south)
-    uShapeE:  { weight: 0.02 },   // open right (east)
-    uShapeW:  { weight: 0.02 },   // open left (west)
-    // Narrow U-shapes: 2×3 grid, full column + two stubs, indent on one side
-    uNarrowN: { weight: 0.02 },   // indent top-right
-    uNarrowS: { weight: 0.02 },   // indent bottom-right
-    uNarrowE: { weight: 0.02 },   // indent right-middle (rotated)
-    uNarrowW: { weight: 0.02 },   // indent left-middle (rotated)
-    // Small U-shapes: 2×3 grid, each cell is 1 segment, 5 of 6 filled
-    uSmallN:  { weight: 0.02 },   // gap at middle-right
-    uSmallS:  { weight: 0.02 },   // gap at middle-left
-    uSmallE:  { weight: 0.02 },   // gap at bottom-middle (rotated)
-    uSmallW:  { weight: 0.02 },   // gap at top-middle (rotated)
+    uSmallN:  { weight: 0.02 },   // small U, gap at middle-right (tower-sized cells)
+    uSmallS:  { weight: 0.02 },   // small U, gap at middle-left
+    uSmallE:  { weight: 0.02 },   // small U, gap at bottom-middle (rotated)
+    uSmallW:  { weight: 0.02 },   // small U, gap at top-middle (rotated)
+  },
+  // Medium shapes: used for medium buildings (multi-segment composites)
+  mediumShapes: {
+    full:      { weight: 0.4 },    // standard rectangle
+    lShapeSW:  { weight: 0.075 },  // L-shape, elbow at SW
+    lShapeSE:  { weight: 0.075 },  // L-shape, elbow at SE
+    lShapeNW:  { weight: 0.075 },  // L-shape, elbow at NW
+    lShapeNE:  { weight: 0.075 },  // L-shape, elbow at NE
+    uNarrowN:  { weight: 0.05 },   // narrow U, indent top-right
+    uNarrowS:  { weight: 0.05 },   // narrow U, indent bottom-right
+    uNarrowE:  { weight: 0.05 },   // narrow U, indent right-middle (rotated)
+    uNarrowW:  { weight: 0.05 },   // narrow U, indent left-middle (rotated)
+  },
+  // Large shapes: used for large buildings (wide composites)
+  largeShapes: {
+    full:     { weight: 0.5 },     // standard rectangle
+    uShapeN:  { weight: 0.125 },   // wide U, open top
+    uShapeS:  { weight: 0.125 },   // wide U, open bottom
+    uShapeE:  { weight: 0.125 },   // wide U, open right
+    uShapeW:  { weight: 0.125 },   // wide U, open left
   },
 };
 

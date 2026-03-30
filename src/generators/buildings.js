@@ -15,10 +15,15 @@ const HEIGHTS = BUILDING.heights;
 const BUILDING_GAP = BUILDING.gap;
 
 /**
- * Pick a building shape using weighted random selection.
+ * Pick a building shape using weighted random selection for a given size category.
  */
-function pickShape(rng) {
-  const shapes = BUILDING.shapes;
+function pickShape(rng, sizeCategory = 'small') {
+  const shapeMap = {
+    small: BUILDING.smallShapes,
+    medium: BUILDING.mediumShapes,
+    large: BUILDING.largeShapes,
+  };
+  const shapes = shapeMap[sizeCategory] || BUILDING.smallShapes;
   if (!shapes) return 'full';
 
   const entries = Object.entries(shapes);
@@ -52,13 +57,16 @@ export function generateBuildings(gridData, config, rng) {
   const cellW = config.mapWidth / cols;
   const cellD = config.mapDepth / rows;
 
+  let towerCount = 0;
+  const maxTowers = BUILDING.maxTowers || Infinity;
+
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
       const cellX = col * cellW;
       const cellZ = row * cellD;
 
       // Chance to place a tower instead of a small building
-      if (BUILDING.towerChance && rng.chance(BUILDING.towerChance)) {
+      if (towerCount < maxTowers && BUILDING.towerChance && rng.chance(BUILDING.towerChance)) {
         const tFp = FOOTPRINTS.tower || { min: 2, max: 3 };
         const w = rng.float(tFp.min, tFp.max);
         const d = rng.float(tFp.min, tFp.max);
@@ -66,6 +74,7 @@ export function generateBuildings(gridData, config, rng) {
         const z = cellZ + (cellD - d) / 2;
         const pyramidRoof = rng.chance(BUILDING.pyramidRoofChance);
         buildings.push({ x, z, w, d, maxTier: tiers, size: 'tower', height: 'tall', blockIndex: 0, pyramidRoof });
+        towerCount++;
       } else {
         // Standard small building
         const w = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
@@ -82,6 +91,7 @@ export function generateBuildings(gridData, config, rng) {
 
         if (shape === 'diagA' || shape === 'diagB') {
           // Diagonal: two independent single-quadrant buildings
+          const groupId = buildings.length; // all parts share this texture group
           const hw = w / 2;
           const hd = d / 2;
           const hk2 = rng.pick(['short', 'medium', 'tall']);
@@ -89,15 +99,15 @@ export function generateBuildings(gridData, config, rng) {
           const mt2 = rng.int(Math.min(h2.tierMin, tiers), Math.min(h2.tierMax, tiers));
 
           if (shape === 'diagA') {
-            buildings.push({ x, z, w: hw, d: hd, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full' });
-            buildings.push({ x: x + hw, z: z + hd, w: hw, d: hd, maxTier: mt2, size: 'small', height: hk2, blockIndex: 0, shape: 'full' });
+            buildings.push({ x, z, w: hw, d: hd, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full', textureGroup: groupId });
+            buildings.push({ x: x + hw, z: z + hd, w: hw, d: hd, maxTier: mt2, size: 'small', height: hk2, blockIndex: 0, shape: 'full', textureGroup: groupId });
           } else {
-            buildings.push({ x: x + hw, z, w: hw, d: hd, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full' });
-            buildings.push({ x, z: z + hd, w: hw, d: hd, maxTier: mt2, size: 'small', height: hk2, blockIndex: 0, shape: 'full' });
+            buildings.push({ x: x + hw, z, w: hw, d: hd, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full', textureGroup: groupId });
+            buildings.push({ x, z: z + hd, w: hw, d: hd, maxTier: mt2, size: 'small', height: hk2, blockIndex: 0, shape: 'full', textureGroup: groupId });
           }
         } else if (shape.startsWith('lShape')) {
           // L-shape: 3 segments long × 2 segments wide, 4 of 6 cells filled
-          // Each segment uses the standard small building size range
+          const groupId = buildings.length;
           const segW = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
           const segD = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
 
@@ -139,8 +149,8 @@ export function generateBuildings(gridData, config, rng) {
             extSuppress = [{ edge: 'east' }];
           }
 
-          buildings.push({ x: strip.x, z: strip.z, w: strip.w, d: strip.d, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full', suppressEdges: stripSuppress });
-          buildings.push({ x: ext.x, z: ext.z, w: ext.w, d: ext.d, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full', suppressEdges: extSuppress });
+          buildings.push({ x: strip.x, z: strip.z, w: strip.w, d: strip.d, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full', suppressEdges: stripSuppress, textureGroup: groupId });
+          buildings.push({ x: ext.x, z: ext.z, w: ext.w, d: ext.d, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full', suppressEdges: extSuppress, textureGroup: groupId });
         } else if (shape.startsWith('uShape')) {
           // U-shape: 3×2 grid, two columns + connecting bar
           const segW = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
@@ -191,14 +201,16 @@ export function generateBuildings(gridData, config, rng) {
             barSup   = [{ edge: 'north' }, { edge: 'south' }];
           }
 
-          buildings.push({ x: left.x, z: left.z, w: left.w, d: left.d, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full', suppressEdges: leftSup });
-          buildings.push({ x: right.x, z: right.z, w: right.w, d: right.d, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full', suppressEdges: rightSup });
-          buildings.push({ x: bar.x, z: bar.z, w: bar.w, d: bar.d, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full', suppressEdges: barSup });
+          const groupId = buildings.length;
+          buildings.push({ x: left.x, z: left.z, w: left.w, d: left.d, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full', suppressEdges: leftSup, textureGroup: groupId });
+          buildings.push({ x: right.x, z: right.z, w: right.w, d: right.d, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full', suppressEdges: rightSup, textureGroup: groupId });
+          buildings.push({ x: bar.x, z: bar.z, w: bar.w, d: bar.d, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full', suppressEdges: barSup, textureGroup: groupId });
         } else if (shape.startsWith('uNarrow')) {
           // Narrow U-shape: 2×3 grid, full column + top stub + bottom stub, indent on one side
+          const groupId = buildings.length;
           const segW = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
           const segD = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
-          const bProps = { maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full' };
+          const bProps = { maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full', textureGroup: groupId };
 
           let col, top, bot, colSup, topSup, botSup;
           if (shape === 'uNarrowN') {
@@ -246,10 +258,11 @@ export function generateBuildings(gridData, config, rng) {
           buildings.push({ x: bot.x, z: bot.z, w: bot.w, d: bot.d, ...bProps, suppressEdges: botSup });
         } else if (shape.startsWith('uSmall')) {
           // Small U: 2×3 grid, each cell is tower-sized, 5 of 6 filled
+          const groupId = buildings.length;
           const tFp = FOOTPRINTS.tower || { min: 2, max: 3 };
           const segW = rng.float(tFp.min, tFp.max);
           const segD = rng.float(tFp.min, tFp.max);
-          const bProps = { maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full' };
+          const bProps = { maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full', textureGroup: groupId };
 
           // Grid positions (row, col) -> { x, z, w: segW, d: segD }
           // Gap position determines which cell is empty
@@ -363,20 +376,146 @@ function placeBigLayout(layout, config, maxTiers, rng) {
     const x = Math.max(margin, Math.min(pos.x - w / 2, mw - w - margin));
     const z = Math.max(margin, Math.min(pos.z - d / 2, md - d - margin));
     const maxTier = rng.int(3, Math.min(5, maxTiers));
-    return { x, z, w, d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0 };
+    const shape = pickShape(rng, sizeKey);
+
+    if (shape === 'full') {
+      return [{ x, z, w, d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full' }];
+    }
+
+    // Composite shapes for medium/large — reuse the same logic as small composites
+    // but positioned at the big building location
+    const groupId = -1; // placeholder, will be set below
+    const segW = rng.float(fp.min / 2, fp.max / 2);
+    const segD = rng.float(fp.min / 2, fp.max / 2);
+    const results = [];
+    const actualGroupId = results; // use results array ref as temp, set groupId after
+
+    if (shape.startsWith('lShape')) {
+      let strip, ext, stripSup, extSup;
+      if (shape === 'lShapeSW') {
+        strip = { x, z, w: segW, d: segD * 3 };
+        ext = { x: x + segW, z: z + segD * 2, w: segW, d: segD };
+        stripSup = [{ edge: 'east', zMin: ext.z, zMax: ext.z + ext.d }];
+        extSup = [{ edge: 'west' }];
+      } else if (shape === 'lShapeSE') {
+        strip = { x: x + segW, z, w: segW, d: segD * 3 };
+        ext = { x, z: z + segD * 2, w: segW, d: segD };
+        stripSup = [{ edge: 'west', zMin: ext.z, zMax: ext.z + ext.d }];
+        extSup = [{ edge: 'east' }];
+      } else if (shape === 'lShapeNW') {
+        strip = { x, z, w: segW, d: segD * 3 };
+        ext = { x: x + segW, z, w: segW, d: segD };
+        stripSup = [{ edge: 'east', zMin: ext.z, zMax: ext.z + ext.d }];
+        extSup = [{ edge: 'west' }];
+      } else {
+        strip = { x: x + segW, z, w: segW, d: segD * 3 };
+        ext = { x, z, w: segW, d: segD };
+        stripSup = [{ edge: 'west', zMin: ext.z, zMax: ext.z + ext.d }];
+        extSup = [{ edge: 'east' }];
+      }
+      results.push({ x: strip.x, z: strip.z, w: strip.w, d: strip.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: stripSup });
+      results.push({ x: ext.x, z: ext.z, w: ext.w, d: ext.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: extSup });
+    } else if (shape.startsWith('uNarrow')) {
+      let col, top, bot, colSup, topSup, botSup;
+      if (shape === 'uNarrowN') {
+        col = { x, z, w: segW, d: segD * 3 };
+        top = { x: x + segW, z, w: segW, d: segD };
+        bot = { x: x + segW, z: z + segD * 2, w: segW, d: segD };
+        colSup = [{ edge: 'east', zMin: top.z, zMax: top.z + top.d }, { edge: 'east', zMin: bot.z, zMax: bot.z + bot.d }];
+        topSup = [{ edge: 'west' }]; botSup = [{ edge: 'west' }];
+      } else if (shape === 'uNarrowS') {
+        col = { x: x + segW, z, w: segW, d: segD * 3 };
+        top = { x, z, w: segW, d: segD };
+        bot = { x, z: z + segD * 2, w: segW, d: segD };
+        colSup = [{ edge: 'west', zMin: top.z, zMax: top.z + top.d }, { edge: 'west', zMin: bot.z, zMax: bot.z + bot.d }];
+        topSup = [{ edge: 'east' }]; botSup = [{ edge: 'east' }];
+      } else if (shape === 'uNarrowE') {
+        col = { x, z, w: segW * 3, d: segD };
+        top = { x, z: z + segD, w: segW, d: segD };
+        bot = { x: x + segW * 2, z: z + segD, w: segW, d: segD };
+        colSup = [{ edge: 'south', xMin: top.x, xMax: top.x + top.w }, { edge: 'south', xMin: bot.x, xMax: bot.x + bot.w }];
+        topSup = [{ edge: 'north' }]; botSup = [{ edge: 'north' }];
+      } else {
+        col = { x, z: z + segD, w: segW * 3, d: segD };
+        top = { x, z, w: segW, d: segD };
+        bot = { x: x + segW * 2, z, w: segW, d: segD };
+        colSup = [{ edge: 'north', xMin: top.x, xMax: top.x + top.w }, { edge: 'north', xMin: bot.x, xMax: bot.x + bot.w }];
+        topSup = [{ edge: 'south' }]; botSup = [{ edge: 'south' }];
+      }
+      results.push({ x: col.x, z: col.z, w: col.w, d: col.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: colSup });
+      results.push({ x: top.x, z: top.z, w: top.w, d: top.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: topSup });
+      results.push({ x: bot.x, z: bot.z, w: bot.w, d: bot.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: botSup });
+    } else if (shape.startsWith('uShape')) {
+      let left, right, bar, leftSup, rightSup, barSup;
+      if (shape === 'uShapeN') {
+        left = { x, z, w: segW, d: segD * 3 };
+        right = { x: x + segW * 2, z, w: segW, d: segD * 3 };
+        bar = { x: x + segW, z: z + segD * 2, w: segW, d: segD };
+        leftSup = [{ edge: 'east', zMin: bar.z, zMax: bar.z + bar.d }];
+        rightSup = [{ edge: 'west', zMin: bar.z, zMax: bar.z + bar.d }];
+        barSup = [{ edge: 'west' }, { edge: 'east' }];
+      } else if (shape === 'uShapeS') {
+        left = { x, z, w: segW, d: segD * 3 };
+        right = { x: x + segW * 2, z, w: segW, d: segD * 3 };
+        bar = { x: x + segW, z, w: segW, d: segD };
+        leftSup = [{ edge: 'east', zMin: bar.z, zMax: bar.z + bar.d }];
+        rightSup = [{ edge: 'west', zMin: bar.z, zMax: bar.z + bar.d }];
+        barSup = [{ edge: 'west' }, { edge: 'east' }];
+      } else if (shape === 'uShapeE') {
+        left = { x, z, w: segW * 3, d: segD };
+        right = { x, z: z + segD * 2, w: segW * 3, d: segD };
+        bar = { x, z: z + segD, w: segW, d: segD };
+        leftSup = [{ edge: 'south', xMin: bar.x, xMax: bar.x + bar.w }];
+        rightSup = [{ edge: 'north', xMin: bar.x, xMax: bar.x + bar.w }];
+        barSup = [{ edge: 'north' }, { edge: 'south' }];
+      } else {
+        left = { x, z, w: segW * 3, d: segD };
+        right = { x, z: z + segD * 2, w: segW * 3, d: segD };
+        bar = { x: x + segW * 2, z: z + segD, w: segW, d: segD };
+        leftSup = [{ edge: 'south', xMin: bar.x, xMax: bar.x + bar.w }];
+        rightSup = [{ edge: 'north', xMin: bar.x, xMax: bar.x + bar.w }];
+        barSup = [{ edge: 'north' }, { edge: 'south' }];
+      }
+      results.push({ x: left.x, z: left.z, w: left.w, d: left.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: leftSup });
+      results.push({ x: right.x, z: right.z, w: right.w, d: right.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: rightSup });
+      results.push({ x: bar.x, z: bar.z, w: bar.w, d: bar.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: barSup });
+    } else {
+      // Fallback — shouldn't happen
+      return [{ x, z, w, d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full' }];
+    }
+
+    // Mark all parts with a shared texture group (placeholder, resolved below)
+    const groupMarker = Symbol('group');
+    for (const r of results) r._groupMarker = groupMarker;
+    return results;
   }
 
+  // Collect all big buildings (makeBig returns arrays now)
+  let bigResults = [];
   switch (layout) {
-    case 0: return [makeBig('large', C)];
-    case 1: return [makeBig('large', TL), makeBig('large', BR)];
-    case 2: return [makeBig('medium', TL), makeBig('medium', BR), makeBig('medium', TR)];
-    case 3: return [makeBig('medium', TL), makeBig('medium', BL), makeBig('medium', TR)];
+    case 0: bigResults = makeBig('large', C); break;
+    case 1: bigResults = [...makeBig('large', TL), ...makeBig('large', BR)]; break;
+    case 2: bigResults = [...makeBig('medium', TL), ...makeBig('medium', BR), ...makeBig('medium', TR)]; break;
+    case 3: bigResults = [...makeBig('medium', TL), ...makeBig('medium', BL), ...makeBig('medium', TR)]; break;
     case 4: {
-      // 2 in top-left quadrant (offset slightly), 1 BR, 1 TR
       const TL1 = { x: mw * 0.15, z: md * 0.15 };
       const TL2 = { x: mw * 0.35, z: md * 0.35 };
-      return [makeBig('medium', TL1), makeBig('medium', TL2), makeBig('medium', BR), makeBig('medium', TR)];
+      bigResults = [...makeBig('medium', TL1), ...makeBig('medium', TL2), ...makeBig('medium', BR), ...makeBig('medium', TR)];
+      break;
     }
   }
-  return [];
+
+  // Resolve texture groups — buildings sharing a _groupMarker get the same textureGroup index
+  // based on their final position in the array
+  const groups = new Map();
+  for (let i = 0; i < bigResults.length; i++) {
+    const b = bigResults[i];
+    if (b._groupMarker) {
+      if (!groups.has(b._groupMarker)) groups.set(b._groupMarker, i);
+      b.textureGroup = groups.get(b._groupMarker);
+      delete b._groupMarker;
+    }
+  }
+
+  return bigResults;
 }

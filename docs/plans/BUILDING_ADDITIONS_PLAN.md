@@ -10,6 +10,10 @@ Add new building types, shapes, and features to increase map variety. Includes r
 
 ---
 
+> **Building types reference table:** See [docs/BUILDING_REFERENCE.md](../BUILDING_REFERENCE.md) for full breakdown of all types, chances, heights, config keys, and shape diagrams.
+
+---
+
 ## 1. Ruined Towers
 
 Tall, narrow buildings (2×2 to 3×3 footprint) that always go to max tier. Distinct from regular buildings by their height-to-footprint ratio.

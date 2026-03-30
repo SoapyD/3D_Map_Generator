@@ -46,6 +46,13 @@ function findBuildingIndex(x, z, buildings) {
   return -1;
 }
 
+/** Get the texture group index for a building (for consistent textures across composite parts) */
+function getTextureIndex(bi, buildings) {
+  if (bi < 0 || bi >= buildings.length) return bi;
+  const b = buildings[bi];
+  return b.textureGroup !== undefined ? b.textureGroup : bi;
+}
+
 /**
  * Build a Three.js scene from the pipeline data.
  */
@@ -74,11 +81,11 @@ export function buildScene(data, config) {
         material = pickFromPool(pools.base_map, Math.floor(section.x * 7 + section.z * 13));
       } else {
         const bi = findBuildingIndex(section.x, section.z, data.buildings);
+        const ti = getTextureIndex(bi, data.buildings);
         if (bi >= 0 && data.buildings[bi].size !== 'small') {
-          // Deleted footprints use courtyard
-          material = pickFromPool(pools.floors, bi);
+          material = pickFromPool(pools.floors, ti);
         } else {
-          material = pickFromPool(pools.floors, bi >= 0 ? bi : 0);
+          material = pickFromPool(pools.floors, ti >= 0 ? ti : 0);
         }
       }
 
@@ -97,10 +104,11 @@ export function buildScene(data, config) {
         material = DEBUG_MATERIALS.wall;
       } else {
         const bi = findBuildingIndex(w.x, w.z, data.buildings);
+        const ti = getTextureIndex(bi, data.buildings);
         if (bi >= 0 && (data.buildings[bi].size === 'large' || data.buildings[bi].size === 'medium')) {
-          material = pickFromPool(pools.landmark_walls, bi);
+          material = pickFromPool(pools.landmark_walls, ti);
         } else {
-          material = pickFromPool(pools.walls, bi >= 0 ? bi : i);
+          material = pickFromPool(pools.walls, ti >= 0 ? ti : i);
         }
       }
       const mesh = createWallSlab(w.x, w.z, w.length, w.height, w.baseY, w.thickness, w.axis, material);
@@ -113,8 +121,9 @@ export function buildScene(data, config) {
   if (data.roofs) {
     for (let ri = 0; ri < data.roofs.length; ri++) {
       const roof = data.roofs[ri];
-      const roofMat = debug ? DEBUG_MATERIALS.floor[0] : pickFromPool(pools.roofs, roof.buildingIndex);
-      const ceilingMat = debug ? DEBUG_MATERIALS.floor[0] : pickFromPool(pools.floors, roof.buildingIndex);
+      const roofTi = getTextureIndex(roof.buildingIndex, data.buildings);
+      const roofMat = debug ? DEBUG_MATERIALS.floor[0] : pickFromPool(pools.roofs, roofTi);
+      const ceilingMat = debug ? DEBUG_MATERIALS.floor[0] : pickFromPool(pools.floors, roofTi);
 
       if (roof.type === 'flat') {
         const y = roof.tier * config.tierHeight;

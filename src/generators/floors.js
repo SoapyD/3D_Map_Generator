@@ -48,13 +48,13 @@ export function generateFloors(data, config, rng) {
     const isTower = building.size === 'tower';
 
     // Pre-remove quadrants based on building shape
-    if (building.shape && BUILDING.shapes && BUILDING.shapes[building.shape]) {
-      for (const q of BUILDING.shapes[building.shape].removed) {
+    if (building.shape && BUILDING.smallShapes && BUILDING.smallShapes[building.shape]) {
+      for (const q of BUILDING.smallShapes[building.shape].removed) {
         removed.add(q);
       }
     }
 
-    const hasShape = building.shape && BUILDING.shapes && BUILDING.shapes[building.shape] && BUILDING.shapes[building.shape].removed.length > 0;
+    const hasShape = building.shape && BUILDING.smallShapes && BUILDING.smallShapes[building.shape] && BUILDING.smallShapes[building.shape].removed.length > 0;
     for (let tier = 1; tier <= building.maxTier; tier++) {
       // Tier 1 is protected when building has a non-full shape — the shape IS the tier 1 footprint
       if (hasShape && tier === 1) {

@@ -158,6 +158,12 @@ export async function exportToObj(data, config, outputDir, baseName) {
     return -1;
   }
 
+  function getTexIdx(bi) {
+    if (bi < 0 || bi >= buildings.length) return bi;
+    const b = buildings[bi];
+    return b.textureGroup !== undefined ? b.textureGroup : bi;
+  }
+
   // --- OBJ export with subdivision ---
   const objLines = [];
   let vertOff = 1, uvOff = 1, normOff = 1;
@@ -867,7 +873,7 @@ export async function exportToObj(data, config, outputDir, baseName) {
     const tier = floorData[t];
     for (const section of tier.sections) {
       const bi = findBuilding(section);
-      const texIdx = bi >= 0 ? buildingFloorIdx[bi] : baseIdx;
+      const texIdx = bi >= 0 ? buildingFloorIdx[getTexIdx(bi)] : baseIdx;
       addSharedFlat(`floor_t${tier.tier}_${Math.round(section.x)}_${Math.round(section.z)}`,
         section.x, tier.tier * config.tierHeight, section.z,
         section.w, config.slabThickness, section.d, getUV(texIdx), true);
@@ -880,7 +886,7 @@ export async function exportToObj(data, config, outputDir, baseName) {
   for (let i = 0; i < walls.length; i++) {
     const wall = walls[i];
     const bi = findBuildingForWall(wall);
-    const texIdx = bi >= 0 ? buildingWallIdx[bi] : buildingWallIdx[0];
+    const texIdx = bi >= 0 ? buildingWallIdx[getTexIdx(bi)] : buildingWallIdx[0];
     const wx = wall.axis === 'x' ? wall.length : wall.thickness;
     const wz = wall.axis === 'z' ? wall.length : wall.thickness;
     addSharedWall(`wall_${i}`, wall.x, wall.baseY, wall.z, wx, wall.height, wz, getUV(texIdx));
@@ -1021,7 +1027,7 @@ export async function exportToObj(data, config, outputDir, baseName) {
 
     if (roof.type === 'flat') {
       const bi = roof.buildingIndex;
-      const floorTexIdx = bi >= 0 && bi < buildingFloorIdx.length ? buildingFloorIdx[bi] : baseIdx;
+      const floorTexIdx = bi >= 0 && bi < buildingFloorIdx.length ? buildingFloorIdx[getTexIdx(bi)] : baseIdx;
       const ceilingUV = getUV(floorTexIdx);
       const ry = roof.tier * config.tierHeight;
       const rs = roof.section;
@@ -1067,7 +1073,7 @@ export async function exportToObj(data, config, outputDir, baseName) {
 
       // Flat ceiling quad under pyramid — floor texture, downward-facing
       const bi = roof.buildingIndex;
-      const floorTexIdx = bi >= 0 && bi < buildingFloorIdx.length ? buildingFloorIdx[bi] : baseIdx;
+      const floorTexIdx = bi >= 0 && bi < buildingFloorIdx.length ? buildingFloorIdx[getTexIdx(bi)] : baseIdx;
       const ceilUV = getUV(floorTexIdx);
       const ccu = ((ceilUV.uMin + ceilUV.uMax) / 2).toFixed(6);
       const ccv = ((ceilUV.vMin + ceilUV.vMax) / 2).toFixed(6);

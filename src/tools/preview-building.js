@@ -336,6 +336,11 @@ async function main() {
     streets: [],
   };
 
+  // Ensure all parts of a composite building share the same texture group
+  for (const b of buildingsList) {
+    if (b.textureGroup === undefined) b.textureGroup = 0;
+  }
+
   const buildingData = {
     ...gridData,
     buildings: buildingsList,
