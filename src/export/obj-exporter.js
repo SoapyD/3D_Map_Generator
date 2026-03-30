@@ -188,8 +188,9 @@ export async function exportToObj(geometry, config, outputDir, baseName) {
   function addSubBox(name, x0, y0, z0, sizeX, sizeY, sizeZ, uv, showEdges = false, rotateUV = false, thinAxis = null) {
     // thinAxis override: 'x' = wall facing X, 'z' = wall facing Z, null = auto-detect
     const isFloor = thinAxis ? false : sizeY < 1;
-    const isWallX = thinAxis === 'x' || (!thinAxis && sizeX < 1);
-    const isWallZ = thinAxis === 'z' || (!thinAxis && sizeZ < 1);
+    const isColumn = !thinAxis && sizeX < 1 && sizeZ < 1;
+    const isWallX = thinAxis === 'x' || (!thinAxis && sizeX < 1 && sizeZ >= 1);
+    const isWallZ = thinAxis === 'z' || (!thinAxis && sizeZ < 1 && sizeX >= 1);
 
     const tileW = uv.uMax - uv.uMin;
     const tileH = uv.vMax - uv.vMin;
@@ -203,6 +204,13 @@ export async function exportToObj(geometry, config, outputDir, baseName) {
     const hashV = fract(x0 * hv0 + z0 * hv1 + y0 * hv2) * SEGS_PER_TILE;
     const baseSegU = Math.floor(hashU);
     const baseSegV = Math.floor(hashV);
+
+    if (isColumn) {
+      // Column (thin in both X and Z) — emit both wall pairs for full coverage
+      addSubBox(name + '_zf', x0, y0, z0, sizeX, sizeY, sizeZ, uv, false, rotateUV, 'z');
+      addSubBox(name + '_xf', x0, y0, z0, sizeX, sizeY, sizeZ, uv, false, rotateUV, 'x');
+      return;
+    }
 
     if (isFloor || (!isWallX && !isWallZ)) {
       // Horizontal slab — subdivide XZ
@@ -280,7 +288,10 @@ export async function exportToObj(geometry, config, outputDir, baseName) {
         function addEdgeFace(v0, v1, v2, v3, nx, ny, nz) {
           const vo = vertOff;
           for (const v of [v0,v1,v2,v3]) objLines.push(`v ${v[0].toFixed(6)} ${v[1].toFixed(6)} ${v[2].toFixed(6)}`);
-          for (let i = 0; i < 4; i++) objLines.push(`vt ${cu} ${cv}`);
+          objLines.push(`vt ${uv.uMin.toFixed(6)} ${uv.vMin.toFixed(6)}`);
+          objLines.push(`vt ${uv.uMax.toFixed(6)} ${uv.vMin.toFixed(6)}`);
+          objLines.push(`vt ${uv.uMax.toFixed(6)} ${uv.vMax.toFixed(6)}`);
+          objLines.push(`vt ${uv.uMin.toFixed(6)} ${uv.vMax.toFixed(6)}`);
           objLines.push(`vn ${nx} ${ny} ${nz}`);
           objLines.push(`vn ${-nx} ${-ny} ${-nz}`);
           const uo = uvOff, no = normOff;
@@ -362,7 +373,10 @@ export async function exportToObj(geometry, config, outputDir, baseName) {
         function addEdgeFace(v0, v1, v2, v3, nx, ny, nz) {
           const vo = vertOff;
           for (const v of [v0,v1,v2,v3]) objLines.push(`v ${v[0].toFixed(6)} ${v[1].toFixed(6)} ${v[2].toFixed(6)}`);
-          for (let i = 0; i < 4; i++) objLines.push(`vt ${cu} ${cv}`);
+          objLines.push(`vt ${uv.uMin.toFixed(6)} ${uv.vMin.toFixed(6)}`);
+          objLines.push(`vt ${uv.uMax.toFixed(6)} ${uv.vMin.toFixed(6)}`);
+          objLines.push(`vt ${uv.uMax.toFixed(6)} ${uv.vMax.toFixed(6)}`);
+          objLines.push(`vt ${uv.uMin.toFixed(6)} ${uv.vMax.toFixed(6)}`);
           objLines.push(`vn ${nx} ${ny} ${nz}`);
           objLines.push(`vn ${-nx} ${-ny} ${-nz}`);
           const uo = uvOff, no = normOff;
@@ -443,7 +457,10 @@ export async function exportToObj(geometry, config, outputDir, baseName) {
         function addEdgeFace(v0, v1, v2, v3, nx, ny, nz) {
           const vo = vertOff;
           for (const v of [v0,v1,v2,v3]) objLines.push(`v ${v[0].toFixed(6)} ${v[1].toFixed(6)} ${v[2].toFixed(6)}`);
-          for (let i = 0; i < 4; i++) objLines.push(`vt ${cu} ${cv}`);
+          objLines.push(`vt ${uv.uMin.toFixed(6)} ${uv.vMin.toFixed(6)}`);
+          objLines.push(`vt ${uv.uMax.toFixed(6)} ${uv.vMin.toFixed(6)}`);
+          objLines.push(`vt ${uv.uMax.toFixed(6)} ${uv.vMax.toFixed(6)}`);
+          objLines.push(`vt ${uv.uMin.toFixed(6)} ${uv.vMax.toFixed(6)}`);
           objLines.push(`vn ${nx} ${ny} ${nz}`);
           objLines.push(`vn ${-nx} ${-ny} ${-nz}`);
           const uo = uvOff, no = normOff;
@@ -455,8 +472,8 @@ export async function exportToObj(geometry, config, outputDir, baseName) {
         }
         addEdgeFace([x0,y1,z0],[x0+sizeX,y1,z0],[x0+sizeX,y1,z0+sizeZ],[x0,y1,z0+sizeZ], 0,1,0);
         addEdgeFace([x0,y0,z0+sizeZ],[x0+sizeX,y0,z0+sizeZ],[x0+sizeX,y0,z0],[x0,y0,z0], 0,-1,0);
-        addEdgeFace([x0,y0,z0],[x0,y0,z0+sizeZ],[x0,y1,z0+sizeZ],[x0,y1,z0], 0,0,-1);
-        addEdgeFace([x0+sizeX,y0,z0+sizeZ],[x0+sizeX,y0,z0],[x0+sizeX,y1,z0],[x0+sizeX,y1,z0+sizeZ], 0,0,1);
+        addEdgeFace([x0+sizeX,y0,z0],[x0,y0,z0],[x0,y1,z0],[x0+sizeX,y1,z0], 0,0,-1);
+        addEdgeFace([x0,y0,z0+sizeZ],[x0+sizeX,y0,z0+sizeZ],[x0+sizeX,y1,z0+sizeZ],[x0,y1,z0+sizeZ], 0,0,1);
       }
     }
 
@@ -571,7 +588,10 @@ export async function exportToObj(geometry, config, outputDir, baseName) {
               const cv = ((uv.vMin + uv.vMax) / 2).toFixed(6);
               const b0 = voBot, b1 = voBot + segsX, b2 = voBot + segsZ * gridW + segsX, b3 = voBot + segsZ * gridW;
               const uo = uvOff;
-              for (let i = 0; i < 4; i++) objLines.push(`vt ${cu} ${cv}`);
+              objLines.push(`vt ${uv.uMin.toFixed(6)} ${uv.vMin.toFixed(6)}`);
+          objLines.push(`vt ${uv.uMax.toFixed(6)} ${uv.vMin.toFixed(6)}`);
+          objLines.push(`vt ${uv.uMax.toFixed(6)} ${uv.vMax.toFixed(6)}`);
+          objLines.push(`vt ${uv.uMin.toFixed(6)} ${uv.vMax.toFixed(6)}`);
               uvOff += 4;
               objLines.push(`f ${b0}/${uo}/${noBot} ${b1}/${uo+1}/${noBot} ${b2}/${uo+2}/${noBot}`);
               objLines.push(`f ${b0}/${uo}/${noBot} ${b2}/${uo+2}/${noBot} ${b3}/${uo+3}/${noBot}`);
@@ -938,7 +958,7 @@ export async function exportToObj(geometry, config, outputDir, baseName) {
           addSharedFlat(prim.name, prim.x, prim.y, prim.z, prim.w, prim.h, prim.d, uv,
             prim.emitBottom, prim.rotateUV, prim.simpleBottom, prim.emitTop);
         } else {
-          addSubBox(prim.name, prim.x, prim.y, prim.z, prim.w, prim.h, prim.d, uv, false, prim.rotateUV, prim.thinAxis || null);
+          addSubBox(prim.name, prim.x, prim.y, prim.z, prim.w, prim.h, prim.d, uv, true, prim.rotateUV, prim.thinAxis || null);
         }
         break;
       }
@@ -953,7 +973,10 @@ export async function exportToObj(geometry, config, outputDir, baseName) {
         function addWallEdge(v0, v1, v2, v3, nx, ny, nz) {
           const vo = vertOff;
           for (const v of [v0,v1,v2,v3]) objLines.push(`v ${v[0].toFixed(6)} ${v[1].toFixed(6)} ${v[2].toFixed(6)}`);
-          for (let i = 0; i < 4; i++) objLines.push(`vt ${cu} ${cv}`);
+          objLines.push(`vt ${uv.uMin.toFixed(6)} ${uv.vMin.toFixed(6)}`);
+          objLines.push(`vt ${uv.uMax.toFixed(6)} ${uv.vMin.toFixed(6)}`);
+          objLines.push(`vt ${uv.uMax.toFixed(6)} ${uv.vMax.toFixed(6)}`);
+          objLines.push(`vt ${uv.uMin.toFixed(6)} ${uv.vMax.toFixed(6)}`);
           objLines.push(`vn ${nx} ${ny} ${nz}`);
           objLines.push(`vn ${-nx} ${-ny} ${-nz}`);
           const uo = uvOff, no = normOff;

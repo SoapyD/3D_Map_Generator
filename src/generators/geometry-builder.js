@@ -384,7 +384,7 @@ export function buildGeometry(data, config) {
           textureKey: texKey,
           emitTop: false, emitBottom: false, simpleBottom: false, rotateUV: false,
           shared: false,
-          thinAxis: isXWall ? 'x' : 'z',
+          thinAxis: isXWall ? 'z' : 'x',
         });
       }
 
@@ -426,7 +426,7 @@ export function buildGeometry(data, config) {
               textureKey: texKey,
               emitTop: false, emitBottom: false, simpleBottom: false, rotateUV: false,
               shared: false,
-              thinAxis: isXWall ? 'x' : 'z',
+              thinAxis: isXWall ? 'z' : 'x',
             });
           }
         }
