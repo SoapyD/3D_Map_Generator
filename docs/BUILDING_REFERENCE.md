@@ -8,7 +8,11 @@ Quick reference for all building types, their generation chances, dimensions, an
 
 | Type | Size | Footprint | Shape Chance | Height | Internal Walls | Auto Ladder | Max Count | Config Key |
 |---|---|---|---|---|---|---|---|---|
+<<<<<<< Updated upstream
 | **Small (full)** | Small | 4-7" × 4-7" | 40% of small | Random 2-4 tiers | No | No | Unlimited (grid-based) | `smallShapes.full` |
+=======
+| **Small (full)** | Small | 4-7" × 4-7" | 40% of small | Random 2-4 tiers | No | No | Unlimited (grid) | `smallShapes.full` |
+>>>>>>> Stashed changes
 | **Small (corner ×4)** | Small | 4-7" × 4-7" (3/4) | 7.5% each | Random 2-4 tiers | No | No | Unlimited | `smallShapes.corner0-3` |
 | **Small (diagonal ×2)** | Small | 2 half-buildings | 5% each | Random per half | No | No | Unlimited | `smallShapes.diagA/B` |
 | **Small U (×4)** | Small | 5 tower-sized cells | 2% each | Random 2-4 tiers | No | No | Unlimited | `smallShapes.uSmallN/S/E/W` |
@@ -22,7 +26,11 @@ Quick reference for all building types, their generation chances, dimensions, an
 
 ### Max Count Notes
 
+<<<<<<< Updated upstream
 - **Small**: Generated per grid cell. Cell count depends on map size — a 48×48 map has ~36 cells. After tower chance and shape selection, typically 8-15 small buildings per map. 15-20% are then randomly culled.
+=======
+- **Small**: Generated per grid cell. A 48×48 map has ~36 cells. After tower chance and shape selection, typically 8-15 small buildings per map. 15-20% are then randomly culled.
+>>>>>>> Stashed changes
 - **Tower**: Max 2 per map (`BUILDING.maxTowers`). 30% chance per cell until cap reached.
 - **Medium**: 0-4 per map, determined by layout selection (layouts 2-4 use medium). Hardcoded.
 - **Large**: 0-2 per map, determined by layout selection (layouts 0-1 use large). Hardcoded.
@@ -32,7 +40,11 @@ Quick reference for all building types, their generation chances, dimensions, an
 
 ## Layout Selection (Medium/Large)
 
+<<<<<<< Updated upstream
 The map generates 1-4 medium/large buildings from 5 equally weighted layouts (hardcoded, 20% each):
+=======
+5 equally weighted layouts (hardcoded, 20% each):
+>>>>>>> Stashed changes
 
 | Layout | Buildings |
 |---|---|
@@ -106,11 +118,19 @@ uShapeN:    uShapeS:    uShapeE:    uShapeW:
 
 ## Connections
 
+<<<<<<< Updated upstream
 | Type | Trigger | Dimensions | Variants |
 |---|---|---|---|
 | Walkway | Between buildings, same tier | 2" wide × 0.3" thick | Wood texture, UV rotated for E-W |
 | Bridge | Replaces tier 2+ walkway (40%) | 3" wide × 0.5" thick | Low walls (0.75") or battlements (1.5" spaced) |
 | Tower ladder | Every tower | Ground to top floor | Exterior, wall deleted at exit tier |
+=======
+| Type | Trigger | Dimensions | Variants | Max Count |
+|---|---|---|---|---|
+| Walkway | Between buildings, same tier | 2" wide × 0.3" thick | Wood texture, UV rotated for E-W | No max |
+| Bridge | Replaces tier 2+ walkway (40%) | 3" wide × 0.5" thick | Low walls (0.75") or battlements (1.5" spaced) | No max |
+| Tower ladder | Every tower | Ground to top floor | Exterior, wall deleted at exit tier | 1 per tower |
+>>>>>>> Stashed changes
 
 ---
 
@@ -119,6 +139,10 @@ uShapeN:    uShapeS:    uShapeE:    uShapeW:
 | Setting | Location | Configurable? |
 |---|---|---|
 | Tower chance (30%) | `BUILDING.towerChance` | Yes |
+<<<<<<< Updated upstream
+=======
+| Max towers (2) | `BUILDING.maxTowers` | Yes |
+>>>>>>> Stashed changes
 | Pyramid roof chance (50%) | `BUILDING.pyramidRoofChance` | Yes |
 | Tower footprint (2-3") | `BUILDING.tower` | Yes |
 | Small/medium/large footprints | `BUILDING.footprints` | Yes |
@@ -131,6 +155,10 @@ uShapeN:    uShapeS:    uShapeE:    uShapeW:
 | Bridge chance (40%) | `CONNECTIVITY.bridgeChance` | Yes |
 | Bridge variants (low/battlement) | `CONNECTIVITY.bridgeVariants` | Yes |
 | Bridge dimensions | `CONNECTIVITY.bridge*` | Yes |
+<<<<<<< Updated upstream
+=======
+| Max walkway length (24") | `CONNECTIVITY.maxWalkwayLength` | Yes |
+>>>>>>> Stashed changes
 | Layout count (5 options) | `buildings.js` line 305 | **Hardcoded** |
 | Medium/large height range (3-5) | `buildings.js` line 374 | **Hardcoded** |
 | Medium/large segment size (fp/2) | `buildings.js` makeBig | **Hardcoded** |
