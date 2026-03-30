@@ -1,8 +1,10 @@
 # Walkway Improvements Plan
 
 **Date:** 2026-03-30
-**Status:** Active
+**Completed:** 2026-03-30
+**Status:** Archived
 **Priority:** High
+**Outcome:** Implemented gap detection (forced connections with cross-axis clamping, wall clearing, overhang rejection), branching T-junctions off forced connections with bridge/texture inheritance, and pillar supports under long walkways/bridges. Phases 1-3 complete; phases 4-6 (L-shaped walkways, chains, ramps) deferred to future work.
 
 ## Summary
 
@@ -156,13 +158,21 @@ Improve walkway and bridge generation to create more interesting, varied, and ta
 
 **Complexity:** S
 **Impact:** Medium — visual improvement, adds tactical cover under long walkways
+**Status:** Complete
+
+**Implementation:**
+- Pillars generated after bridge upgrade, before return from `generateConnectivity()`
+- Stops at flush floor/roof surfaces below; skipped entirely on partial overlap
+- Skipped if overlapping another walkway/bridge
+- Inherits parent walkway/bridge texture via `textureId`
+- Config: `pillarWidth: 0.5`, `pillarSpacing: 6`, `pillarEdgeInset: 1.0`, `pillarMinWalkwayLength: 8`, `pillarMinHeight: 1.0`
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 1 | Config for pillar spacing and dimensions | Pending | |
-| 2 | Pillar generation for walkways/bridges exceeding threshold length | Pending | e.g. > 8" |
-| 3 | Render pillars in GLB + OBJ | Pending | Thin box geometry |
-| 4 | Include pillars in collision mesh | Pending | Ground-level cover |
+| 1 | Config for pillar spacing and dimensions | Done | `CONNECTIVITY.pillar*` values |
+| 2 | Pillar generation for walkways/bridges exceeding threshold length | Done | >8" walkways, flush/partial floor checks |
+| 3 | Render pillars in GLB + OBJ | Done | `createSlab`, parent texture inheritance |
+| 4 | Include pillars in collision mesh | Done | `pillar_` prefix in collision exporter |
 
 ### 4. Walkway Chains (Multi-Span)
 
@@ -237,7 +247,7 @@ Improve walkway and bridge generation to create more interesting, varied, and ta
 |---|---|---|---|
 | 1 | Gap detection (#1) | **Complete** | Grid-based, cross-axis clamping, wall clearing, overhang rejection |
 | 2 | Branching walkways (#5) | **Complete** | T-junctions off forced connections, texture + bridge inheritance |
-| 3 | Pillar supports (#3) | Pending | Quick visual win |
-| 4 | Cornered walkways (#2) | Pending | Solves diagonal connections |
-| 5 | Walkway chains (#4) | Pending | Nice to have |
-| 6 | Tier-spanning ramps (#6) | Pending | Complex, save for later |
+| 3 | Pillar supports (#3) | **Complete** | Flush floor/roof detection, parent texture inheritance |
+| 4 | Cornered walkways (#2) | Deferred | Solves diagonal connections |
+| 5 | Walkway chains (#4) | Deferred | Nice to have |
+| 6 | Tier-spanning ramps (#6) | Deferred | Complex, save for later |

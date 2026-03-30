@@ -33,8 +33,8 @@ Raise or lower portions of the base map to create hills, sunken areas, or steppe
 ### ~~1e. Water Features~~ → WATERWAYS_PLAN
 Moved to Waterways Plan — cross-pattern canals with edge wall variants, bridges, and ground floor splitting.
 
-### ~~1k. Walkway Improvements~~ → WALKWAY_IMPROVEMENTS_PLAN
-Moved to Walkway Improvements Plan. **Gap detection** (complete): grid-based forced connections, cross-axis clamping, wall clearing, overhang rejection. **Branching** (complete): T-junctions off forced connections with bridge inheritance. Remaining: pillar supports, L-shaped walkways, walkway chains, tier-spanning ramps.
+### ~~1k. Walkway Improvements~~ → ARCHIVED
+Completed and archived. Gap detection (forced connections), branching T-junctions, pillar supports. See `docs/plans/archive/WALKWAY_IMPROVEMENTS_PLAN.md`. Deferred: L-shaped walkways, walkway chains, tier-spanning ramps.
 
 ### 1f. Different City Layout Presets
 Layout modes: radial, linear, district-based. Currently pure BSP.
