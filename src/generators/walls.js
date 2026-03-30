@@ -55,11 +55,44 @@ export function generateWalls(data, config, rng) {
       const chosen = hasShape ? allEdges : allEdges.slice(0, 2);
 
       for (const edgeLabel of chosen) {
+        // Skip suppressed edges
+        if (building.suppressEdges) {
+          let suppressed = false;
+          for (const se of building.suppressEdges) {
+            if (se.edge === edgeLabel) {
+              if (!se.zMin && !se.xMin) {
+                // Full edge suppressed
+                suppressed = true;
+              }
+              // Partial suppression handled below after wall generation
+            }
+          }
+          if (suppressed) continue;
+        }
+
         const wallDef = buildWall(building, edgeLabel, aboveQuadrants, baseY, wallHeight, wallThickness);
         if (!wallDef) continue;
 
         // Apply wall quadrant damage
         const segments = applyWallDamage(wallDef, rng);
+
+        // Filter out segments that fall in partially suppressed zones
+        if (building.suppressEdges) {
+          for (const se of building.suppressEdges) {
+            if (se.edge !== edgeLabel) continue;
+            if (se.zMin !== undefined) {
+              // Remove segments whose Z range overlaps the suppressed zone
+              for (let si = segments.length - 1; si >= 0; si--) {
+                const s = segments[si];
+                const sz1 = s.axis === 'z' ? s.z + s.length : s.z + s.thickness;
+                if (s.z < se.zMax + 0.1 && sz1 > se.zMin - 0.1) {
+                  segments.splice(si, 1);
+                }
+              }
+            }
+          }
+        }
+
         walls.push(...segments);
       }
     }

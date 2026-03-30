@@ -50,6 +50,12 @@ export const BUILDING = {
     corner3:  { removed: [0], weight: 0.075 },    // missing NW
     diagA:    { removed: [1, 2], weight: 0.05 },  // missing NE + SW (diagonal)
     diagB:    { removed: [0, 3], weight: 0.05 },  // missing NW + SE (diagonal)
+    // L-shapes: 2×1 strip + 1×1 extension, forming an L on a 2×3 grid
+    // Named by which corner the elbow is at
+    lShapeSW: { weight: 0.025 },  // ##  (strip along top, extension bottom-left)
+    lShapeSE: { weight: 0.025 },  // ##  (strip along top, extension bottom-right)
+    lShapeNW: { weight: 0.025 },  // ##  (strip along bottom, extension top-left)
+    lShapeNE: { weight: 0.025 },  // ##  (strip along bottom, extension top-right)
   },
 };
 

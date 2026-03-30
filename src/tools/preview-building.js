@@ -137,6 +137,42 @@ async function main() {
     for (const b of buildingsList) {
       console.log(`  Part: ${b.w.toFixed(1)} x ${b.d.toFixed(1)} at (${b.x.toFixed(1)}, ${b.z.toFixed(1)}), maxTier: ${b.maxTier}`);
     }
+  } else if (args.shape.startsWith('lShape')) {
+    const base = createBuilding(args.type, 'full', args.tiers, rng);
+    const { x, z } = base;
+    const segW = rng.float(BUILDING.footprints.small.min, BUILDING.footprints.small.max);
+    const segD = rng.float(BUILDING.footprints.small.min, BUILDING.footprints.small.max);
+
+    let strip, ext, stripSuppress, extSuppress;
+    if (args.shape === 'lShapeSW') {
+      strip = { x, z, w: segW, d: segD * 3 };
+      ext   = { x: x + segW, z: z + segD * 2, w: segW, d: segD };
+      stripSuppress = [{ edge: 'east', zMin: ext.z, zMax: ext.z + ext.d }];
+      extSuppress = [{ edge: 'west' }];
+    } else if (args.shape === 'lShapeSE') {
+      strip = { x: x + segW, z, w: segW, d: segD * 3 };
+      ext   = { x, z: z + segD * 2, w: segW, d: segD };
+      stripSuppress = [{ edge: 'west', zMin: ext.z, zMax: ext.z + ext.d }];
+      extSuppress = [{ edge: 'east' }];
+    } else if (args.shape === 'lShapeNW') {
+      strip = { x, z, w: segW, d: segD * 3 };
+      ext   = { x: x + segW, z, w: segW, d: segD };
+      stripSuppress = [{ edge: 'east', zMin: ext.z, zMax: ext.z + ext.d }];
+      extSuppress = [{ edge: 'west' }];
+    } else {
+      strip = { x: x + segW, z, w: segW, d: segD * 3 };
+      ext   = { x, z, w: segW, d: segD };
+      stripSuppress = [{ edge: 'west', zMin: ext.z, zMax: ext.z + ext.d }];
+      extSuppress = [{ edge: 'east' }];
+    }
+
+    buildingsList.push({ x: strip.x, z: strip.z, w: strip.w, d: strip.d, maxTier: base.maxTier, size: 'small', height: base.height, blockIndex: 0, shape: 'full', pyramidRoof: false, suppressEdges: stripSuppress });
+    buildingsList.push({ x: ext.x, z: ext.z, w: ext.w, d: ext.d, maxTier: base.maxTier, size: 'small', height: base.height, blockIndex: 0, shape: 'full', pyramidRoof: false, suppressEdges: extSuppress });
+
+    console.log(`Preview building: type=${args.type}, shape=${args.shape}, seed=${args.seed}, tiers=${args.tiers}`);
+    for (const b of buildingsList) {
+      console.log(`  Part: ${b.w.toFixed(1)} x ${b.d.toFixed(1)} at (${b.x.toFixed(1)}, ${b.z.toFixed(1)}), maxTier: ${b.maxTier}`);
+    }
   } else {
     const building = createBuilding(args.type, args.shape, args.tiers, rng);
     if (args.interiorWalls) building.interiorWalls = true;

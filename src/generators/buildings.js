@@ -84,20 +84,63 @@ export function generateBuildings(gridData, config, rng) {
           // Diagonal: two independent single-quadrant buildings
           const hw = w / 2;
           const hd = d / 2;
-          // Each half gets its own random height
           const hk2 = rng.pick(['short', 'medium', 'tall']);
           const h2 = HEIGHTS[hk2];
           const mt2 = rng.int(Math.min(h2.tierMin, tiers), Math.min(h2.tierMax, tiers));
 
           if (shape === 'diagA') {
-            // Quadrant 0 (NW) and 3 (SE)
             buildings.push({ x, z, w: hw, d: hd, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full' });
             buildings.push({ x: x + hw, z: z + hd, w: hw, d: hd, maxTier: mt2, size: 'small', height: hk2, blockIndex: 0, shape: 'full' });
           } else {
-            // Quadrant 1 (NE) and 2 (SW)
             buildings.push({ x: x + hw, z, w: hw, d: hd, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full' });
             buildings.push({ x, z: z + hd, w: hw, d: hd, maxTier: mt2, size: 'small', height: hk2, blockIndex: 0, shape: 'full' });
           }
+        } else if (shape.startsWith('lShape')) {
+          // L-shape: 3 segments long × 2 segments wide, 4 of 6 cells filled
+          // Each segment uses the standard small building size range
+          const segW = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
+          const segD = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
+
+          // The strip is 1 segment wide × 3 segments deep
+          // The extension is 1 segment wide × 1 segment deep, adjacent to one end
+          let strip, ext, stripSuppress, extSuppress;
+          if (shape === 'lShapeSW') {
+            // #.
+            // #.
+            // ##
+            strip = { x, z, w: segW, d: segD * 3 };
+            ext   = { x: x + segW, z: z + segD * 2, w: segW, d: segD };
+            // Strip suppresses east wall in the zone where ext meets it
+            stripSuppress = [{ edge: 'east', zMin: ext.z, zMax: ext.z + ext.d }];
+            extSuppress = [{ edge: 'west' }];
+          } else if (shape === 'lShapeSE') {
+            // .#
+            // .#
+            // ##
+            strip = { x: x + segW, z, w: segW, d: segD * 3 };
+            ext   = { x, z: z + segD * 2, w: segW, d: segD };
+            stripSuppress = [{ edge: 'west', zMin: ext.z, zMax: ext.z + ext.d }];
+            extSuppress = [{ edge: 'east' }];
+          } else if (shape === 'lShapeNW') {
+            // ##
+            // #.
+            // #.
+            strip = { x, z, w: segW, d: segD * 3 };
+            ext   = { x: x + segW, z, w: segW, d: segD };
+            stripSuppress = [{ edge: 'east', zMin: ext.z, zMax: ext.z + ext.d }];
+            extSuppress = [{ edge: 'west' }];
+          } else { // lShapeNE
+            // ##
+            // .#
+            // .#
+            strip = { x: x + segW, z, w: segW, d: segD * 3 };
+            ext   = { x, z, w: segW, d: segD };
+            stripSuppress = [{ edge: 'west', zMin: ext.z, zMax: ext.z + ext.d }];
+            extSuppress = [{ edge: 'east' }];
+          }
+
+          buildings.push({ x: strip.x, z: strip.z, w: strip.w, d: strip.d, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full', suppressEdges: stripSuppress });
+          buildings.push({ x: ext.x, z: ext.z, w: ext.w, d: ext.d, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape: 'full', suppressEdges: extSuppress });
         } else {
           buildings.push({ x, z, w, d, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape });
         }
