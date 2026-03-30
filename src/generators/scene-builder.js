@@ -31,6 +31,7 @@ const DEBUG_MATERIALS = {
   interiorLadder: new THREE.MeshStandardMaterial({ color: 0x22cccc, roughness: 0.7 }),
   ladderPlatform: new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.7 }),
   streetScatter: new THREE.MeshStandardMaterial({ color: 0x22ee44, roughness: 0.7 }),
+  pillar: new THREE.MeshStandardMaterial({ color: 0x666644, roughness: 0.9 }),
 };
 
 /**
@@ -414,7 +415,27 @@ export function buildScene(data, config) {
       scene.add(mesh);
     }
 
-
+    // Pillar supports — use parent walkway/bridge texture
+    const pillars = data.connections.pillars || [];
+    for (let i = 0; i < pillars.length; i++) {
+      const p = pillars[i];
+      let material;
+      if (debug) {
+        material = DEBUG_MATERIALS.pillar;
+      } else if (p.isBridge) {
+        const parentIdx = bridges.findIndex(b => b.textureId === p.textureId && !b.branch);
+        material = pickFromPool(pools.landmark_walls, parentIdx >= 0 ? parentIdx : i);
+      } else {
+        const parentIdx = walkways.findIndex(w => w.textureId === p.textureId && !w.branch);
+        material = pickFromPool(pools.walkways, parentIdx >= 0 ? parentIdx : i);
+      }
+      const mesh = createSlab(
+        p.x + p.w / 2, p.y + p.height / 2, p.z + p.d / 2,
+        p.w, p.height, p.d, material
+      );
+      mesh.name = `pillar_${i}`;
+      scene.add(mesh);
+    }
   }
 
   // Cover pieces

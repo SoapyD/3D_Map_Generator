@@ -30,6 +30,7 @@ const INCLUDE_PREFIXES = [
   'deleted_',
   'walkway_',
   'bridge_',
+  'pillar_',
   'street_scatter_',
 ];
 

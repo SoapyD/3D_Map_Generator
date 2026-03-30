@@ -145,6 +145,12 @@ export const CONNECTIVITY = {
   cyanLadderCullRatio: 0.4,
   // Distance for ladder-top near walkway check
   ladderTopWalkwayDist: 2,
+  // Pillar supports for long walkways/bridges
+  pillarWidth: 0.5,          // pillar cross-section (inches)
+  pillarSpacing: 6,          // max distance between pillars along walkway
+  pillarEdgeInset: 1.0,      // inset from walkway ends to first pillar
+  pillarMinWalkwayLength: 8, // min walkway length to get pillars
+  pillarMinHeight: 1.0,      // don't generate pillars shorter than this
 };
 
 // --- Cover ---
@@ -243,6 +249,9 @@ export const DELETIONS = {
   cyanLadderOrangeOverlap: true,   // drop cyan ladders touching orange ladders
   cyanLadderTopNearWalkway: true,  // drop cyan ladders whose top is near a walkway
   orangeLadderTopNearWalkway: true,// drop orange ladders whose top is near a walkway
+
+  // Pillars
+  pillarGeneration: true,          // generate support pillars under walkways/bridges
 };
 
 // --- CLI parser ---
