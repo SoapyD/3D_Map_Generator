@@ -122,7 +122,7 @@ export const CONNECTIVITY = {
   ladderWidth: 1.0,        // inches (half walkway width)
   ladderDepth: 0.5,        // inches
   ladderWallOffset: 0.3,   // offset from wall to prevent clashing
-  maxWalkwayLength: 15,    // inches
+  maxWalkwayLength: 24,    // inches (half map width)
   minWalkwayLength: 3,     // inches
   walkwayKeepRatio: 0.6,   // fraction of walkways kept per tier
   ladderCullRatio: 0.6,    // fraction of red/orange ladders kept

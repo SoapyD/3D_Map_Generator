@@ -160,6 +160,21 @@ export function generateConnectivity(data, config, rng) {
           }
           if (DELETIONS.walkwayBothEndsCheck && (!startTouches || !endTouches)) continue;
 
+          // Prevent stacking — reject if an existing walkway on a different tier
+          // runs the same axis and overlaps in XZ position
+          let stacked = false;
+          for (const existing of walkways) {
+            if (existing.axis !== walkway.axis) continue;
+            if (Math.abs(existing.y - walkway.y) < 0.5) continue; // same tier is fine
+            // Check XZ overlap
+            if (walkway.x < existing.x + existing.w && walkway.x + walkway.w > existing.x &&
+                walkway.z < existing.z + existing.d && walkway.z + walkway.d > existing.z) {
+              stacked = true;
+              break;
+            }
+          }
+          if (stacked) continue;
+
           walkways.push(walkway);
         }
       }
