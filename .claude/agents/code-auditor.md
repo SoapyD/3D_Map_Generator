@@ -64,7 +64,15 @@ Look for:
 - String building in tight loops where array join would be better
 - Unnecessary object cloning or allocation
 
-### Step 7: Find potential bugs
+### Step 7: Flag oversized files
+
+Check the line count of every `.js` file under `src/`. Flag any file exceeding **500 lines** as a splitting candidate. For each:
+- Report the file path and line count
+- List the top-level functions/sections and their line ranges
+- Estimate how many independent modules the file could split into
+- Note the largest function — if a single function exceeds 300 lines, flag it specifically
+
+### Step 8: Find potential bugs
 
 Check for:
 - Variable shadowing (local variable redefining an imported/outer variable)
@@ -73,7 +81,7 @@ Check for:
 - Missing dependency declarations in package.json vs actual imports
 - Inconsistent parameter ordering across similar functions
 
-### Step 8: Write the report
+### Step 9: Write the report
 
 Write the full audit report to `docs/reports/CODE_AUDIT.md` with these sections:
 
@@ -98,6 +106,9 @@ Date: YYYY-MM-DD
 
 ## Inefficiencies
 <table: file, line, issue, suggested fix>
+
+## Oversized Files
+<table: file, lines, largest function (name + lines), suggested split count>
 
 ## Potential Bugs
 <table: file, line, issue, severity (low/medium/high)>
