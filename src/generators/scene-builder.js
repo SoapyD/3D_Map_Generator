@@ -6,7 +6,8 @@
  */
 
 import * as THREE from 'three';
-import { createFloorSlab, createSlab, createLadderMesh } from '../core/geometry.js';
+import { createSlab, createLadderMesh } from '../core/geometry-misc.js';
+import { createFloorSlab } from '../core/geometry-rects.js';
 import { buildTexturePools, pickFromPool } from './textures.js';
 import { LADDER_DISPLAY, GEOMETRY } from '../config.js';
 

@@ -9,15 +9,16 @@ import path from 'path';
 import { parseArgs } from './config.js';
 import { createRng } from './core/rng.js';
 import { generateGrid } from './generators/grid.js';
-import { generateBuildings } from './generators/buildings.js';
+import { generateBuildings } from './generators/buildings/index.js';
 import { generateFloors } from './generators/floors.js';
-import { generateWalls } from './generators/walls.js';
-import { generateConnectivity } from './generators/connectivity.js';
+import { generateWalls } from './generators/walls-main.js';
+import { generateConnectivity } from './generators/connectivity/index.js';
 import { generateCover } from './generators/cover.js';
-import { buildGeometry } from './generators/geometry-builder.js';
+import { buildGeometry } from './generators/geometry-building/index.js';
 import { buildScene } from './generators/scene-builder.js';
 import { exportToGlb, getOutputPath } from './export/glb-exporter.js';
-import { exportToObj, getObjOutputPath } from './export/obj-exporter.js';
+import { exportToObj } from './export/obj-geometry/export-to-obj.js';
+import { getObjOutputPath } from './export/obj-geometry/get-obj-output-path.js';
 import { exportCollisionObj } from './export/collision-exporter.js';
 
 async function main() {

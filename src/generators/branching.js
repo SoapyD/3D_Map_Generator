@@ -3,7 +3,7 @@
  */
 
 import { CONNECTIVITY } from '../config.js';
-import { findBuildingIndex } from './connectivity-utils.js';
+import { findBuildingIndex } from './connectivity/find-building-index.js';
 
 /**
  * Generate branching walkways (T-junctions) off forced connections to nearby buildings.

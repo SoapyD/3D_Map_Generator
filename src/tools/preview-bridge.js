@@ -10,7 +10,8 @@ import { mkdir } from 'fs/promises';
 import { createRng } from '../core/rng.js';
 import { CONNECTIVITY, GEOMETRY } from '../config.js';
 import { buildTexturePools, pickFromPool } from '../generators/textures.js';
-import { createFloorSlab, createSlab } from '../core/geometry.js';
+import { createSlab } from '../core/geometry-misc.js';
+import { createFloorSlab } from '../core/geometry-rects.js';
 import * as THREE from 'three';
 import { exportToGlb } from '../export/glb-exporter.js';
 
