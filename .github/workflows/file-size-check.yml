@@ -1,0 +1,21 @@
+name: File Size Limits
+
+on:
+  workflow_dispatch: # Temporarily disabled - was: pull_request on [master, main]
+
+jobs:
+  check-file-sizes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check file size limits
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: node scripts/checks/check-file-sizes.js --ci

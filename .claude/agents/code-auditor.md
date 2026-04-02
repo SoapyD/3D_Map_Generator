@@ -9,6 +9,29 @@ model: haiku
 
 Performs a comprehensive audit of the codebase and produces a report of issues to fix. Does not modify any files — report only. Run this before refactoring to get a clear picture of cleanup work needed.
 
+## CRUCIAL — File Size Limits & Structure Rules
+
+These limits are non-negotiable. Every source file must respect the effective line limits below. Effective lines exclude blank lines, comments, and import statements. Files over the limit MUST be split.
+
+| Area | Path pattern | Max effective lines | Split rule |
+|------|-------------|---------------------|------------|
+| Core utilities | `src/core/*.js` | 80 | One concern per file (RNG, geometry helpers, spatial indexing) |
+| Generator stages | `src/generators/*.js` | 200 | **1 pipeline stage per file** — if a file handles multiple sub-stages, split by sub-stage |
+| Exporters | `src/export/*.js` | 200 | One export format per file |
+| Preview | `src/preview/*.js` | 80 | Thin server layer |
+| Tools | `src/tools/*.js` | 150 | Dev tooling |
+| Config | `src/config.js` | 300 | Data-heavy, exempt from normal limits |
+| Root source | `src/*.js` (other) | 120 | Entry points and orchestration |
+
+### Structure rules
+
+- **1 pipeline stage per file.** Each generator file should represent one discrete stage of the generation pipeline. If a file orchestrates multiple sub-stages (e.g. ladders + walkways + gap bridging), split each sub-stage into its own file.
+- **Named exports only.** No default exports anywhere in `src/`.
+- **Shared helpers go in `src/core/`.** If 3+ generator files use the same utility, extract it to core.
+- **Sub-stage files share a prefix.** When splitting a stage, use the stage name as prefix: `connectivity-ladders.js`, `connectivity-walkways.js`, `connectivity-gaps.js`.
+
+Flag violations as **Critical** in audit reports. Flag files within 10% of the limit as **Warning**.
+
 ## Reference Documents (read before starting)
 
 - **src/config.js:** (MANDATORY -- always read) All config variables, to identify what's already configurable vs hardcoded

@@ -9,7 +9,12 @@
     "preview": "node src/index.js --preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "check:file-sizes": "node scripts/checks/check-file-sizes.js",
+    "check:all": "node scripts/checks/run-all.js",
+    "check:all:summary": "node scripts/checks/run-all.js --summary",
+    "check:all:definitions": "node scripts/checks/run-all.js --definitions",
+    "check:all:output": "node scripts/checks/run-all.js --output"
   },
   "keywords": [
     "mordheim",

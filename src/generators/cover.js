@@ -12,45 +12,13 @@
  */
 
 import { COVER, DELETIONS, GEOMETRY } from '../config.js';
-import { rectsOverlap, rectCollidesWithWall, getQuadrantRect } from '../core/spatial.js';
+import { getQuadrantRect } from '../core/get-quadrant-rect.js';
+import { pickCoverType } from './pick/pickCoverType.js';
+import { overlapsAny } from './cover-overlap.js';
+import { hitsAnyWall } from './cover-hits-wall.js';
+import { makeCoverPiece } from './make-cover-piece.js';
 
 const COVER_THIN = COVER.thin;
-const COVER_TYPES = COVER.types;
-
-/**
- * Pick a random cover type using weighted chances.
- */
-function pickCoverType(rng) {
-  const roll = rng.random();
-  let cumulative = 0;
-  for (const t of COVER_TYPES) {
-    cumulative += t.chance;
-    if (roll < cumulative) return t;
-  }
-  return COVER_TYPES[0];
-}
-
-/**
- * Check if a piece overlaps any item in a list (XZ overlap, Y within 1").
- */
-function overlapsAny(piece, list) {
-  for (const existing of list) {
-    if (existing.y !== undefined && Math.abs(existing.y - piece.y) > 1) continue;
-    if (rectsOverlap(piece, existing)) return true;
-  }
-  return false;
-}
-
-/**
- * Check if a piece overlaps any wall (ground-level only if groundOnly is true).
- */
-function hitsAnyWall(piece, walls, groundOnly = false) {
-  for (const wall of walls) {
-    if (groundOnly && wall.baseY > 1) continue;
-    if (rectCollidesWithWall(piece, wall)) return true;
-  }
-  return false;
-}
 
 export function generateCover(data, config, rng) {
   const { tierHeight, slabThickness } = config;
@@ -179,22 +147,4 @@ export function generateCover(data, config, rng) {
   });
 
   return { ...data, cover: filteredCover, interiorCover, deletedFootprints, streetScatter };
-}
-
-/**
- * Create a cover piece randomly placed within a rect.
- */
-function makeCoverPiece(rect, y, rng) {
-  const type = pickCoverType(rng);
-  const isWide = rng.chance(0.5);
-  const w = isWide ? COVER_THIN : rng.float(2, 4);
-  const d = isWide ? rng.float(2, 4) : COVER_THIN;
-
-  if (w > rect.w - 0.5 || d > rect.d - 0.5) return null;
-
-  const pad = COVER.placementPadding;
-  const x = rng.float(rect.x + pad, rect.x + rect.w - w - pad);
-  const z = rng.float(rect.z + pad, rect.z + rect.d - d - pad);
-
-  return { x, z, w, d, height: type.height, y };
 }

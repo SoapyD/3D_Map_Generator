@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateCover } from '../../src/generators/cover.js';
-import { generateConnectivity } from '../../src/generators/connectivity.js';
+import { generateConnectivity } from '../../src/generators/connectivity-main.js';
 import { generateWalls } from '../../src/generators/walls.js';
 import { generateFloors } from '../../src/generators/floors.js';
 import { generateBuildings } from '../../src/generators/buildings.js';

@@ -4,7 +4,7 @@ import { generateGrid } from '../src/generators/grid.js';
 import { generateBuildings } from '../src/generators/buildings.js';
 import { generateFloors } from '../src/generators/floors.js';
 import { generateWalls } from '../src/generators/walls.js';
-import { generateConnectivity } from '../src/generators/connectivity.js';
+import { generateConnectivity } from '../src/generators/connectivity-main.js';
 import { generateCover } from '../src/generators/cover.js';
 
 const baseConfig = {
