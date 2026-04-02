@@ -1,4 +1,4 @@
-import { findBranchGaps } from '../find-branch-gaps.js';
+import { findBranchGaps } from '../find/index.js';
 import { splitWallSegments } from '../split-wall-segments.js';
 
 /**

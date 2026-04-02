@@ -1,4 +1,4 @@
-import { WALL } from '../config.js';
+import { WALL } from '../../config.js';
 
 export function pickInteriorVariant(rng) {
   const variants = WALL.interiorWallVariants;

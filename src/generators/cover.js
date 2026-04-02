@@ -13,7 +13,7 @@
 
 import { COVER, DELETIONS, GEOMETRY } from '../config.js';
 import { getQuadrantRect } from '../core/get-quadrant-rect.js';
-import { pickCoverType } from './pick-cover-type.js';
+import { pickCoverType } from './pick/pickCoverType.js';
 import { overlapsAny } from './cover-overlap.js';
 import { hitsAnyWall } from './cover-hits-wall.js';
 import { makeCoverPiece } from './make-cover-piece.js';

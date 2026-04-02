@@ -1,5 +1,5 @@
-import { resolveDebugMaterial } from './resolve-debug-material.js';
-import { resolveTexturedMaterial } from './resolve-textured-material.js';
+import { resolveDebugMaterial } from '../resolve-debug-material.js';
+import { resolveTexturedMaterial } from '../resolve-textured-material.js';
 
 /**
  * Get the appropriate material for a primitive based on debug mode.

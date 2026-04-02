@@ -17,7 +17,7 @@
  */
 
 import { FLOOR, BUILDING } from '../config.js';
-import { pickAdjacentToRemoved } from './pick-adjacent-to-removed.js';
+import { pickAdjacentToRemoved } from './pick/pickAdjacentToRemoved.js';
 import { quadrantsToSections } from './quadrants-to-sections.js';
 
 export function generateFloors(data, config, rng) {

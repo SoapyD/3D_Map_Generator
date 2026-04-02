@@ -1,4 +1,4 @@
-import { pickFromPool } from './pick-from-pool.js';
+import { pickFromPool } from './pick/pickFromPool.js';
 
 /**
  * Resolve a textureKey string to a material from texture pools.

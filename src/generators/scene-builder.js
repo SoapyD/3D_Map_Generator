@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { createSlab } from '../core/geometry-misc.js';
 import { createLadderMesh } from '../core/create-ladder-mesh.js';
 import { createFloorSlab } from '../core/geometry-rects.js';
-import { buildTexturePools } from './build-texture-pools.js';
+import { buildTexturePools } from './build/buildTexturePools.js';
 import { resolveDebugMaterial } from './resolve-debug-material.js';
 import { resolveTexturedMaterial } from './resolve-textured-material.js';
 import { LADDER_DISPLAY, GEOMETRY } from '../config.js';

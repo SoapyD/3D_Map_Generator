@@ -11,11 +11,10 @@
  */
 
 import { GEOMETRY } from '../../config.js';
-import { findBuilding } from '../find-building.js';
-import { findBuildingForWall } from '../find-building-for-wall.js';
+import { findBuilding, findBuildingForWall } from '../find/index.js';
 import { wallTextureKey } from '../wall-texture-key.js';
 import { floorTextureKey } from '../floor-texture-key.js';
-import { getEdgeGaps } from '../get-edge-gaps.js';
+import { getEdgeGaps } from '../get/index.js';
 import { buildRoofPrimitives } from './build-roof-primitives.js';
 import { buildAllLadderPrimitives } from './build-all-ladder-primitives.js';
 import { buildLadderPlatformPrimitives } from './build-ladder-platform-primitives.js';

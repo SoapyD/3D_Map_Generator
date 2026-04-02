@@ -1,4 +1,4 @@
-import { COVER } from '../config.js';
+import { COVER } from '../../config.js';
 
 const COVER_TYPES = COVER.types;
 

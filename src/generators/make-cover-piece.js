@@ -1,5 +1,5 @@
 import { COVER } from '../config.js';
-import { pickCoverType } from './pick-cover-type.js';
+import { pickCoverType } from './pick/pickCoverType.js';
 
 const COVER_THIN = COVER.thin;
 

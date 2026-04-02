@@ -1,4 +1,4 @@
-import { getTexGroup } from './get-tex-group.js';
+import { getTexGroup } from './get/getTexGroup.js';
 
 /**
  * Determine floor texture key for a building.
