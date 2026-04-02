@@ -1,0 +1,119 @@
+==========================================
+  Code Quality — Detailed Findings
+==========================================
+
+  ── file-sizes (4) ──
+
+  src/core/geometry-misc.js
+    ⚠ [Core utility] 109 lines (limit: 80)
+
+  src/export/obj-geometry/add-sub-box.js
+    ⚠ [Exporter] 244 lines (limit: 200)
+
+  src/generators/geometry-building/build-geometry.js
+    ⚠ [Generator stage] 282 lines (limit: 200)
+
+  src/tools/preview-building-main.js
+    ⚠ [Tool] 256 lines (limit: 150)
+
+
+  ── single-export (20) ──
+
+  src/core/geometry-misc.js
+    ⚠ 2 exports: createSlab, createLadderMesh
+    ⚠ 3 functions: createSlab, mergeBufferGeometries, createLadderMesh
+
+  src/core/rng.js
+    ⚠ 2 functions: createRng, next
+
+  src/core/spatial.js
+    ⚠ 4 exports: rectsOverlap, getWallBounds, rectCollidesWithWall, getQuadrantRect
+    ⚠ 4 functions: rectsOverlap, getWallBounds, rectCollidesWithWall, getQuadrantRect
+
+  src/export/obj-geometry/add-floor-edges-from-gaps.js
+    ⚠ 2 functions: addFloorEdgesFromGaps, addEdge
+
+  src/export/obj-geometry/add-perimeter-edges.js
+    ⚠ 2 functions: addPerimeterEdges, addEdgeFace
+
+  src/export/obj-geometry/add-sub-box.js
+    ⚠ 4 functions: addSubBox, addEdgeFace, addEdgeFace, addEdgeFace
+
+  src/generators/cover.js
+    ⚠ 5 functions: pickCoverType, overlapsAny, hitsAnyWall, generateCover, makeCoverPiece
+
+  src/generators/floors.js
+    ⚠ 3 functions: generateFloors, pickAdjacentToRemoved, quadrantsToSections
+
+  src/generators/geometry-building/build-geometry.js
+    ⚠ 3 functions: buildGeometry, emitWallSegments, emitBattlements
+
+  src/generators/geometry-helpers.js
+    ⚠ 8 exports: findBuilding, findBuildingForWall, getTexGroup, wallTextureKey, floorTextureKey, getEdgeGaps, findBranchGaps, splitWallSegments
+    ⚠ 8 functions: findBuilding, findBuildingForWall, getTexGroup, wallTextureKey, floorTextureKey, getEdgeGaps, findBranchGaps, splitWallSegments
+
+  src/generators/grid.js
+    ⚠ 3 functions: generateGrid, bspSplit, extractStreets
+
+  src/generators/scene-builder.js
+    ⚠ 4 functions: resolveDebugMaterial, resolveTexturedMaterial, buildScene, getMaterial
+
+  src/generators/textures.js
+    ⚠ 2 exports: buildTexturePools, pickFromPool
+    ⚠ 2 functions: buildTexturePools, pickFromPool
+
+  src/generators/walls-damage.js
+    ⚠ 4 exports: pickInteriorVariant, applyWallDamage, mergeSegments, buildWall
+    ⚠ 4 functions: pickInteriorVariant, applyWallDamage, mergeSegments, buildWall
+
+  src/tools/preview-building-setup.js
+    ⚠ 2 functions: parsePreviewArgs, createBuilding
+
+
+  ── single-function (15) ──
+
+  src/core/geometry-misc.js
+    ⚠ 3 functions: createSlab, mergeBufferGeometries, createLadderMesh
+
+  src/core/rng.js
+    ⚠ 2 functions: createRng, next
+
+  src/core/spatial.js
+    ⚠ 4 functions: rectsOverlap, getWallBounds, rectCollidesWithWall, getQuadrantRect
+
+  src/export/obj-geometry/add-floor-edges-from-gaps.js
+    ⚠ 2 functions: addFloorEdgesFromGaps, addEdge
+
+  src/export/obj-geometry/add-perimeter-edges.js
+    ⚠ 2 functions: addPerimeterEdges, addEdgeFace
+
+  src/export/obj-geometry/add-sub-box.js
+    ⚠ 4 functions: addSubBox, addEdgeFace, addEdgeFace, addEdgeFace
+
+  src/generators/cover.js
+    ⚠ 5 functions: pickCoverType, overlapsAny, hitsAnyWall, generateCover, makeCoverPiece
+
+  src/generators/floors.js
+    ⚠ 3 functions: generateFloors, pickAdjacentToRemoved, quadrantsToSections
+
+  src/generators/geometry-building/build-geometry.js
+    ⚠ 3 functions: buildGeometry, emitWallSegments, emitBattlements
+
+  src/generators/geometry-helpers.js
+    ⚠ 8 functions: findBuilding, findBuildingForWall, getTexGroup, wallTextureKey, floorTextureKey, getEdgeGaps, findBranchGaps, splitWallSegments
+
+  src/generators/grid.js
+    ⚠ 3 functions: generateGrid, bspSplit, extractStreets
+
+  src/generators/scene-builder.js
+    ⚠ 4 functions: resolveDebugMaterial, resolveTexturedMaterial, buildScene, getMaterial
+
+  src/generators/textures.js
+    ⚠ 2 functions: buildTexturePools, pickFromPool
+
+  src/generators/walls-damage.js
+    ⚠ 4 functions: pickInteriorVariant, applyWallDamage, mergeSegments, buildWall
+
+  src/tools/preview-building-setup.js
+    ⚠ 2 functions: parsePreviewArgs, createBuilding
+

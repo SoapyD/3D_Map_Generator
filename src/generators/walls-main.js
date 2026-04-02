@@ -19,7 +19,9 @@
  */
 
 import { WALL } from '../config.js';
-import { applyWallDamage, buildWall, pickInteriorVariant } from './walls-damage.js';
+import { applyWallDamage } from './apply-wall-damage.js';
+import { buildWall } from './build-wall.js';
+import { pickInteriorVariant } from './pick-interior-variant.js';
 
 const QUADRANT_EDGES = {
   0: ['north', 'west'],

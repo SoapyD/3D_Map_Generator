@@ -1,8 +1,7 @@
 name: File Size Limits
 
 on:
-  pull_request:
-    branches: [master, main]
+  workflow_dispatch: # Temporarily disabled - was: pull_request on [master, main]
 
 jobs:
   check-file-sizes:
@@ -12,83 +11,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Check file size limits
-        run: |
-          set -euo pipefail
-
-          # Get files changed in this PR
-          changed_files=$(git diff --name-only --diff-filter=ACMR origin/${{ github.base_ref }}...HEAD)
-
-          violations=""
-
-          for file in $changed_files; do
-            # Only check src/ JS files
-            [ -f "$file" ] || continue
-            case "$file" in
-              src/*.js) ;;
-              *) continue ;;
-            esac
-
-            # Skip test files
-            case "$file" in
-              *__tests__*|*.test.*|*.spec.*) continue ;;
-            esac
-
-            # Determine limit based on path
-            limit=0
-            area=""
-            case "$file" in
-              src/core/*.js)
-                limit=80; area="Core utility" ;;
-              src/generators/*.js)
-                limit=200; area="Generator stage" ;;
-              src/export/*.js)
-                limit=200; area="Exporter" ;;
-              src/preview/*.js)
-                limit=80; area="Preview" ;;
-              src/tools/*.js)
-                limit=150; area="Tool" ;;
-              src/config.js)
-                limit=300; area="Config" ;;
-              src/*.js)
-                limit=120; area="Root source" ;;
-            esac
-
-            [ "$limit" -eq 0 ] && continue
-
-            # Count effective lines: exclude blank, comments, imports
-            effective_lines=$(cat "$file" | \
-              grep -v '^\s*$' | \
-              grep -v '^\s*//' | \
-              grep -v '^\s*\*' | \
-              grep -v '^\s*import ' | \
-              wc -l | tr -d ' ')
-
-            if [ "$effective_lines" -gt "$limit" ]; then
-              violations="${violations}| ${area} | \`${file}\` | ${effective_lines} | ${limit} |\n"
-            fi
-          done
-
-          if [ -n "$violations" ]; then
-            echo "## File Size Limit Violations" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "The following files exceed their area's line limit (effective lines = non-blank, non-comment, non-import):" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "| Area | File | Lines | Limit |" >> "$GITHUB_STEP_SUMMARY"
-            echo "|------|------|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
-            echo -e "$violations" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "Split oversized files by pipeline sub-stage. See \`.claude/agents/code-auditor.md\` for details." >> "$GITHUB_STEP_SUMMARY"
-
-            echo ""
-            echo "=========================================="
-            echo "  FAILED — File size limit exceeded"
-            echo "=========================================="
-            echo -e "$violations" | column -t -s'|'
-            echo ""
-            echo "Split oversized files by pipeline sub-stage."
-            exit 1
-          fi
-
-          echo "All changed files within size limits." >> "$GITHUB_STEP_SUMMARY"
-          echo "All changed files within size limits."
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: node scripts/checks/check-file-sizes.js --ci

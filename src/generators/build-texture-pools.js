@@ -1,19 +1,5 @@
 /**
  * Texture loader — loads PNG textures from a texture pack directory.
- *
- * Pack structure:
- *   assets/textures/{packName}/
- *     walls/          ← PNG files
- *     floors/
- *     objects/
- *     ladders/
- *     walkways/
- *     courtyards/
- *     base_map/
- *     landmark_walls/
- *
- * Each subfolder's PNGs become a material pool. Materials carry _pngBuffer
- * for the GLB exporter to embed.
  */
 
 import * as THREE from 'three';
@@ -67,11 +53,4 @@ export function buildTexturePools(packName = 'base') {
   }
 
   return pools;
-}
-
-/**
- * Pick a material from a pool using an index (deterministic per-building).
- */
-export function pickFromPool(pool, index) {
-  return pool[Math.abs(index) % pool.length];
 }

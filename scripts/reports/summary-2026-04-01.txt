@@ -1,0 +1,14 @@
+==========================================
+  Code Quality — Summary
+==========================================
+
+  Checks run:    5
+  Files scanned: 375
+  Total findings: 39
+
+  ✓ imports — passed (91 files)
+  ✓ barrel-nesting — passed (4 files)
+  ✗ file-sizes — 4 findings (98 files)
+  ✗ single-export — 20 findings (91 files)
+  ✗ single-function — 15 findings (91 files)
+

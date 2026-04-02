@@ -10,20 +10,19 @@
  * and collision-exporter.js independently.
  */
 
-import { GEOMETRY, CONNECTIVITY } from '../../config.js';
-import {
-  findBuilding,
-  findBuildingForWall,
-  wallTextureKey,
-  floorTextureKey,
-  getEdgeGaps,
-  findBranchGaps,
-  splitWallSegments,
-} from '../geometry-helpers.js';
+import { GEOMETRY } from '../../config.js';
+import { findBuilding } from '../find-building.js';
+import { findBuildingForWall } from '../find-building-for-wall.js';
+import { wallTextureKey } from '../wall-texture-key.js';
+import { floorTextureKey } from '../floor-texture-key.js';
+import { getEdgeGaps } from '../get-edge-gaps.js';
 import { buildRoofPrimitives } from './build-roof-primitives.js';
 import { buildAllLadderPrimitives } from './build-all-ladder-primitives.js';
 import { buildLadderPlatformPrimitives } from './build-ladder-platform-primitives.js';
 import { buildJunctionPlatformPrimitives } from './build-junction-platform-primitives.js';
+import { buildBridgePrimitives } from './build-bridge-primitives.js';
+import { buildBoxSlabPrimitives } from './build-scatter-primitives.js';
+import { buildCourtyardPrimitives } from './build-courtyard-primitives.js';
 
 // ─── Main builder ─────────────────────────────────────────────────────
 
@@ -138,121 +137,11 @@ export function buildGeometry(data, config) {
   // ─── Bridges ──────────────────────────────────────────────────────
 
   const bridges = data.connections ? data.connections.bridges || [] : [];
-
-  // Collect all branches for gap detection
   const allBranches = [
     ...walkways.filter(w => w.branch),
     ...bridges.filter(b => b.branch),
   ];
-
-  const bridgeThickness = CONNECTIVITY.bridgeThickness || 0.5;
-  const wallH = CONNECTIVITY.bridgeWallHeight || 0.75;
-  const wallT = CONNECTIVITY.bridgeWallThickness || 0.25;
-
-  for (let i = 0; i < bridges.length; i++) {
-    const b = bridges[i];
-
-    // Bridge texture — branches use parent's texture via textureId
-    const bridgeTexIdx = (b.textureId !== undefined)
-      ? bridges.findIndex(br => br.textureId === b.textureId && !br.branch)
-      : i;
-    const texKey = `wall:landmark:${bridgeTexIdx >= 0 ? bridgeTexIdx : i}`;
-
-    // Bridge slab
-    primitives.push({
-      type: 'slab', name: `bridge_${i}`,
-      x: b.x, y: b.y, z: b.z, w: b.w, h: bridgeThickness, d: b.d,
-      textureKey: texKey,
-      emitTop: true, emitBottom: true, simpleBottom: false,
-      rotateUV: b.w > b.d,
-      shared: true,
-    });
-    primitives.push({
-      type: 'edges', name: `bridge_${i}`,
-      x: b.x, y: b.y, z: b.z, w: b.w, h: bridgeThickness, d: b.d,
-      textureKey: texKey,
-    });
-
-    // Side walls with gap detection
-    const wallY = b.y + bridgeThickness;
-
-    function emitWallSegments(side, wallAxis, wallStart, wallEnd, fixedPos, isXWall) {
-      const gaps = findBranchGaps(b, wallAxis, wallStart, wallEnd, fixedPos, allBranches);
-      const segments = splitWallSegments(wallStart, wallEnd, gaps);
-
-      for (let si = 0; si < segments.length; si++) {
-        const seg = segments[si];
-        const segLen = seg.end - seg.start;
-        let sx, sz, sw, sd;
-        if (isXWall) {
-          sx = seg.start; sz = fixedPos - wallT / 2; sw = segLen; sd = wallT;
-        } else {
-          sx = fixedPos - wallT / 2; sz = seg.start; sw = wallT; sd = segLen;
-        }
-
-        primitives.push({
-          type: 'slab', name: `bridge_wall_${i}_${side}_seg${si}`,
-          x: sx, y: wallY, z: sz, w: sw, h: wallH, d: sd,
-          textureKey: texKey,
-          emitTop: false, emitBottom: false, simpleBottom: false, rotateUV: false,
-          shared: false,
-          thinAxis: isXWall ? 'z' : 'x',
-        });
-      }
-
-      return segments;
-    }
-
-    let segmentsL, segmentsR;
-    if (b.axis === 'x') {
-      segmentsL = emitWallSegments('L', 'x', b.x, b.x + b.w, b.z + wallT / 2, true);
-      segmentsR = emitWallSegments('R', 'x', b.x, b.x + b.w, b.z + b.d - wallT / 2, true);
-    } else {
-      segmentsL = emitWallSegments('L', 'z', b.z, b.z + b.d, b.x + wallT / 2, false);
-      segmentsR = emitWallSegments('R', 'z', b.z, b.z + b.d, b.x + b.w - wallT / 2, false);
-    }
-
-    // Battlements — only within surviving wall segments
-    if (b.variant === 'battlement') {
-      const battH = CONNECTIVITY.bridgeBattlementHeight - wallH;
-      const spacing = CONNECTIVITY.bridgeBattlementSpacing || 2.25;
-      const gap = CONNECTIVITY.bridgeBattlementGap || 1.5;
-      const pillarW = spacing - gap;
-      const battY = wallY + wallH;
-
-      function emitBattlements(segments, fixedPos, isXWall, side) {
-        for (const seg of segments) {
-          const segStart = seg.start;
-          const segLen = seg.end - seg.start;
-          for (let pos = 0; pos < segLen - pillarW; pos += spacing) {
-            let bx, bz, bw, bd;
-            if (isXWall) {
-              bx = segStart + pos; bz = fixedPos - wallT / 2; bw = pillarW; bd = wallT;
-            } else {
-              bx = fixedPos - wallT / 2; bz = segStart + pos; bw = wallT; bd = pillarW;
-            }
-
-            primitives.push({
-              type: 'slab', name: `bridge_batt_${i}_${side}_${Math.round(segStart + pos)}`,
-              x: bx, y: battY, z: bz, w: bw, h: battH, d: bd,
-              textureKey: texKey,
-              emitTop: false, emitBottom: false, simpleBottom: false, rotateUV: false,
-              shared: false,
-              thinAxis: isXWall ? 'z' : 'x',
-            });
-          }
-        }
-      }
-
-      if (b.axis === 'x') {
-        emitBattlements(segmentsL, b.z + wallT / 2, true, 'L');
-        emitBattlements(segmentsR, b.z + b.d - wallT / 2, true, 'R');
-      } else {
-        emitBattlements(segmentsL, b.x + wallT / 2, false, 'L');
-        emitBattlements(segmentsR, b.x + b.w - wallT / 2, false, 'R');
-      }
-    }
-  }
+  primitives.push(...buildBridgePrimitives(bridges, walkways, allBranches));
 
   // ─── Pillars ──────────────────────────────────────────────────────
 
@@ -277,81 +166,16 @@ export function buildGeometry(data, config) {
     });
   }
 
-  // ─── Cover ────────────────────────────────────────────────────────
+  // ─── Cover / Interior Cover / Street Scatter ──────────────────────
 
-  const cover = data.cover || [];
-  for (let i = 0; i < cover.length; i++) {
-    const c = cover[i];
-    primitives.push({
-      type: 'slab', name: `cover_${i}`,
-      x: c.x, y: c.y, z: c.z, w: c.w, h: c.height, d: c.d,
-      textureKey: `object:${i}`,
-      emitTop: true, emitBottom: false, simpleBottom: false, rotateUV: false,
-      shared: true,
-    });
-    primitives.push({
-      type: 'edges', name: `cover_${i}`,
-      x: c.x, y: c.y, z: c.z, w: c.w, h: c.height, d: c.d,
-      textureKey: `object:${i}`,
-    });
-  }
-
-  // ─── Interior Cover ───────────────────────────────────────────────
-
-  const interiorCover = data.interiorCover || [];
-  for (let i = 0; i < interiorCover.length; i++) {
-    const c = interiorCover[i];
-    primitives.push({
-      type: 'slab', name: `interior_cover_${i}`,
-      x: c.x, y: c.y, z: c.z, w: c.w, h: c.height, d: c.d,
-      textureKey: `object:${i}`,
-      emitTop: true, emitBottom: false, simpleBottom: false, rotateUV: false,
-      shared: true,
-    });
-    primitives.push({
-      type: 'edges', name: `interior_cover_${i}`,
-      x: c.x, y: c.y, z: c.z, w: c.w, h: c.height, d: c.d,
-      textureKey: `object:${i}`,
-    });
-  }
+  const objTexKey = (i) => `object:${i}`;
+  primitives.push(...buildBoxSlabPrimitives(data.cover || [], 'cover', objTexKey));
+  primitives.push(...buildBoxSlabPrimitives(data.interiorCover || [], 'interior_cover', objTexKey));
+  primitives.push(...buildBoxSlabPrimitives(data.streetScatter || [], 'street_scatter', objTexKey));
 
   // ─── Deleted Footprints (Courtyards) ──────────────────────────────
 
-  const deletedFootprints = data.deletedFootprints || [];
-  for (let i = 0; i < deletedFootprints.length; i++) {
-    const df = deletedFootprints[i];
-    primitives.push({
-      type: 'slab', name: `deleted_${i}`,
-      x: df.x, y: GEOMETRY.courtyardY, z: df.z, w: df.w, h: GEOMETRY.courtyardThickness, d: df.d,
-      textureKey: 'courtyard',
-      emitTop: true, emitBottom: false, simpleBottom: false, rotateUV: false,
-      shared: true,
-    });
-    primitives.push({
-      type: 'edges', name: `deleted_${i}`,
-      x: df.x, y: GEOMETRY.courtyardY, z: df.z, w: df.w, h: GEOMETRY.courtyardThickness, d: df.d,
-      textureKey: 'courtyard',
-    });
-  }
-
-  // ─── Street Scatter ───────────────────────────────────────────────
-
-  const streetScatter = data.streetScatter || [];
-  for (let i = 0; i < streetScatter.length; i++) {
-    const c = streetScatter[i];
-    primitives.push({
-      type: 'slab', name: `street_scatter_${i}`,
-      x: c.x, y: c.y, z: c.z, w: c.w, h: c.height, d: c.d,
-      textureKey: `object:${i}`,
-      emitTop: true, emitBottom: false, simpleBottom: false, rotateUV: false,
-      shared: true,
-    });
-    primitives.push({
-      type: 'edges', name: `street_scatter_${i}`,
-      x: c.x, y: c.y, z: c.z, w: c.w, h: c.height, d: c.d,
-      textureKey: `object:${i}`,
-    });
-  }
+  primitives.push(...buildCourtyardPrimitives(data.deletedFootprints || []));
 
   // ─── Roofs ────────────────────────────────────────────────────────
 

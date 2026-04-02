@@ -2,10 +2,8 @@
  * Build roof primitives (flat and pyramid) from pipeline data.
  */
 
-import {
-  getTexGroup,
-  floorTextureKey,
-} from '../geometry-helpers.js';
+import { getTexGroup } from '../get-tex-group.js';
+import { floorTextureKey } from '../floor-texture-key.js';
 
 /**
  * Build roof primitives (flat and pyramid) from pipeline data.
