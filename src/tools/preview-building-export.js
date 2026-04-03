@@ -3,11 +3,11 @@
  */
 
 import { mkdir } from 'fs/promises';
-import { generateFloors } from '../generators/floors.js';
-import { generateWalls } from '../generators/walls-main.js';
+import { generateFloors } from '../generators/floors/index.js';
+import { generateWalls } from '../generators/walls/index.js';
 import { generateConnectivity } from '../generators/connectivity/index.js';
-import { buildGeometry } from '../generators/geometry-building/index.js';
-import { buildScene } from '../generators/scene-builder.js';
+import { buildGeometry } from '../generators/geometry/index.js';
+import { buildScene } from '../generators/scene/index.js';
 import { exportToGlb } from '../export/glb-exporter.js';
 import { exportToObj } from '../export/obj-geometry/export-to-obj.js';
 

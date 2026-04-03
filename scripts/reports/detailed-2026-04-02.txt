@@ -1,0 +1,75 @@
+==========================================
+  Code Quality — Detailed Findings
+==========================================
+
+  ── file-sizes (1) ──
+
+  src/generators/connectivity/generate-walkways-helpers.js
+    ⚠ [Generator stage] 102 lines (limit: 100)
+
+
+  ── imports (8) ──
+
+  src/generators/cover/generate-ground-cover.js
+    ⚠ line 2: [barrel-bypass] Barrel bypass: ../selectors/pickCoverType.js — import from the barrel (../selectors) instead
+
+  src/generators/cover/make-cover-piece.js
+    ⚠ line 2: [barrel-bypass] Barrel bypass: ../selectors/pickCoverType.js — import from the barrel (../selectors) instead
+
+  src/generators/floors/process-building-floors.js
+    ⚠ line 2: [barrel-bypass] Barrel bypass: ../selectors/pickAdjacentToRemoved.js — import from the barrel (../selectors) instead
+
+  src/generators/geometry-helpers/getMaterial.js
+    ⚠ line 1: [barrel-bypass] Barrel bypass: ../scene/resolve-debug-material.js — import from the barrel (../scene) instead
+    ⚠ line 2: [barrel-bypass] Barrel bypass: ../scene/resolve-textured-material.js — import from the barrel (../scene) instead
+
+  src/generators/geometry/emit-wall-segments.js
+    ⚠ line 2: [barrel-bypass] Barrel bypass: ../walls/split-wall-segments.js — import from the barrel (../walls) instead
+
+  src/generators/scene/resolve-textured-material.js
+    ⚠ line 1: [barrel-bypass] Barrel bypass: ../selectors/pickFromPool.js — import from the barrel (../selectors) instead
+
+  src/generators/walls/generate-interior-walls.js
+    ⚠ line 3: [barrel-bypass] Barrel bypass: ../selectors/pickInteriorVariant.js — import from the barrel (../selectors) instead
+
+
+  ── single-export (10) ──
+
+  src/generators/buildings/buildBigShapes.js
+    ⚠ 3 exports: buildBigLShape, buildBigNarrowU, buildBigUShape
+    ⚠ 3 functions: buildBigLShape, buildBigNarrowU, buildBigUShape
+
+  src/generators/connectivity/cull-walkways.js
+    ⚠ 2 exports: stripIntersectingWalkways, cullWalkwaysByTier
+    ⚠ 2 functions: stripIntersectingWalkways, cullWalkwaysByTier
+
+  src/generators/connectivity/filter-and-cull-ladders-helpers.js
+    ⚠ 3 exports: filterOrangeOverlaps, proximityCullIndices, cullAndFilterCyan
+    ⚠ 3 functions: filterOrangeOverlaps, proximityCullIndices, cullAndFilterCyan
+
+  src/generators/connectivity/generate-interior-ladders-helpers.js
+    ⚠ 2 exports: positionInteriorLadder, findInteriorLadderTierRange
+    ⚠ 2 functions: positionInteriorLadder, findInteriorLadderTierRange
+
+  src/generators/connectivity/generate-walkways-helpers.js
+    ⚠ 3 exports: findNearestSection, buildWalkwayRect, validateWalkway
+    ⚠ 3 functions: findNearestSection, buildWalkwayRect, validateWalkway
+
+
+  ── single-function (5) ──
+
+  src/generators/buildings/buildBigShapes.js
+    ⚠ 3 functions: buildBigLShape, buildBigNarrowU, buildBigUShape
+
+  src/generators/connectivity/cull-walkways.js
+    ⚠ 2 functions: stripIntersectingWalkways, cullWalkwaysByTier
+
+  src/generators/connectivity/filter-and-cull-ladders-helpers.js
+    ⚠ 3 functions: filterOrangeOverlaps, proximityCullIndices, cullAndFilterCyan
+
+  src/generators/connectivity/generate-interior-ladders-helpers.js
+    ⚠ 2 functions: positionInteriorLadder, findInteriorLadderTierRange
+
+  src/generators/connectivity/generate-walkways-helpers.js
+    ⚠ 3 functions: findNearestSection, buildWalkwayRect, validateWalkway
+

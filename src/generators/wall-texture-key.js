@@ -1,4 +1,4 @@
-import { getTexGroup } from './get/getTexGroup.js';
+import { getTexGroup } from './geometry-helpers/getTexGroup.js';
 
 /**
  * Determine wall texture category based on building size.
