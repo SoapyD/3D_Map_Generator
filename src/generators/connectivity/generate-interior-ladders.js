@@ -46,8 +46,11 @@ export function generateInteriorLadders(ctx) {
           }
           if (trimmedTop <= baseTier) continue;
 
+          // Platform extends opposite to side (back toward the present quadrant)
+          const opposite = { north: 'south', south: 'north', east: 'west', west: 'east' };
           interiorLadders.push({
             type: 'interior_ladder',
+            platformDir: opposite[side],
             x: lx, z: lz, w: lw, d: ld,
             y0: baseTier * tierHeight, y1: trimmedTop * tierHeight,
           });

@@ -59,7 +59,7 @@ export function generateGroundLadders(ctx, culledWalkways) {
         }
 
         const ladder = buildGroundLadderForEdge(lx, lz, lw, ld, data, config);
-        if (ladder) groundLadders.push(ladder);
+        if (ladder) { ladder.platformDir = edge.side; groundLadders.push(ladder); }
       }
     }
   }

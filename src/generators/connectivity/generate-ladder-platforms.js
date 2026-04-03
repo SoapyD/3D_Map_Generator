@@ -33,42 +33,22 @@ export function generateLadderPlatforms(ctx, ladderResults, finalWalkways, tierH
       // Skip if platform is at the very bottom or top of the ladder
       if (Math.abs(py - ladder.y0) < 0.1 || Math.abs(py - ladder.y1) < 0.1) continue;
 
-      // Centre platform on the ladder's wide axis, align outer edge with ladder's outer face
+      // Use the ladder's platformDir to extend the platform outward from the wall
       let px, pz;
-      if (ladder.w < ladder.d) {
-        // Thin in X (ladder flat against wall in X) — extend platform outward in X
-        // Find nearest building to determine which side the wall is on
-        let nearestBuildingCx = ladder.x; // default
-        for (const b of data.buildings) {
-          if (ladder.z + ladder.d > b.z && ladder.z < b.z + b.d &&
-              Math.abs(ladder.x - b.x) < b.w + 1) {
-            nearestBuildingCx = b.x + b.w / 2;
-            break;
-          }
-        }
-        // If ladder is to the right of building centre, extend right; else left
-        if (ladder.x > nearestBuildingCx) {
-          px = ladder.x; // flush with ladder, extending right
-        } else {
-          px = ladder.x + ladder.w - PLATFORM_SIZE; // flush, extending left
-        }
+      const dir = ladder.platformDir;
+      if (dir === 'east') {
+        px = ladder.x;
         pz = ladder.z + ladder.d / 2 - PLATFORM_SIZE / 2;
-      } else {
-        // Thin in Z (ladder flat against wall in Z)
+      } else if (dir === 'west') {
+        px = ladder.x + ladder.w - PLATFORM_SIZE;
+        pz = ladder.z + ladder.d / 2 - PLATFORM_SIZE / 2;
+      } else if (dir === 'south') {
         px = ladder.x + ladder.w / 2 - PLATFORM_SIZE / 2;
-        let nearestBuildingCz = ladder.z;
-        for (const b of data.buildings) {
-          if (ladder.x + ladder.w > b.x && ladder.x < b.x + b.w &&
-              Math.abs(ladder.z - b.z) < b.d + 1) {
-            nearestBuildingCz = b.z + b.d / 2;
-            break;
-          }
-        }
-        if (ladder.z > nearestBuildingCz) {
-          pz = ladder.z;
-        } else {
-          pz = ladder.z + ladder.d - PLATFORM_SIZE;
-        }
+        pz = ladder.z;
+      } else {
+        // north
+        px = ladder.x + ladder.w / 2 - PLATFORM_SIZE / 2;
+        pz = ladder.z + ladder.d - PLATFORM_SIZE;
       }
 
       ladderPlatforms.push({

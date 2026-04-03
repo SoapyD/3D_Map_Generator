@@ -70,7 +70,7 @@ export function generateTowerLadders(ctx, ladderResults) {
       if (overlaps) continue;
 
       // Place the ladder
-      const ladder = { type: 'ground_ladder', x: lx, z: lz, w: lw, d: ld, y0, y1 };
+      const ladder = { type: 'ground_ladder', platformDir: side, x: lx, z: lz, w: lw, d: ld, y0, y1 };
       finalRed.push(ladder);
       allExistingLadders.push(ladder);
       placed = true;
