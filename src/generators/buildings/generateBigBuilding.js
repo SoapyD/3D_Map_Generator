@@ -1,5 +1,8 @@
 import { BUILDING } from '../../config.js';
 import { pickShape } from './pickShape.js';
+import { buildBigLShape } from './buildBigLShape.js';
+import { buildBigNarrowU } from './buildBigNarrowU.js';
+import { buildBigUShape } from './buildBigUShape.js';
 
 const FOOTPRINTS = BUILDING.footprints;
 
@@ -26,97 +29,14 @@ export function generateBigBuilding(sizeKey, pos, config, maxTiers, rng) {
 
   const segW = rng.float(fp.min / 2, fp.max / 2);
   const segD = rng.float(fp.min / 2, fp.max / 2);
-  const results = [];
+  let results;
 
   if (shape.startsWith('lShape')) {
-    let strip, ext, stripSup, extSup;
-    if (shape === 'lShapeSW') {
-      strip = { x, z, w: segW, d: segD * 3 };
-      ext = { x: x + segW, z: z + segD * 2, w: segW, d: segD };
-      stripSup = [{ edge: 'east', zMin: ext.z, zMax: ext.z + ext.d }];
-      extSup = [{ edge: 'west' }];
-    } else if (shape === 'lShapeSE') {
-      strip = { x: x + segW, z, w: segW, d: segD * 3 };
-      ext = { x, z: z + segD * 2, w: segW, d: segD };
-      stripSup = [{ edge: 'west', zMin: ext.z, zMax: ext.z + ext.d }];
-      extSup = [{ edge: 'east' }];
-    } else if (shape === 'lShapeNW') {
-      strip = { x, z, w: segW, d: segD * 3 };
-      ext = { x: x + segW, z, w: segW, d: segD };
-      stripSup = [{ edge: 'east', zMin: ext.z, zMax: ext.z + ext.d }];
-      extSup = [{ edge: 'west' }];
-    } else {
-      strip = { x: x + segW, z, w: segW, d: segD * 3 };
-      ext = { x, z, w: segW, d: segD };
-      stripSup = [{ edge: 'west', zMin: ext.z, zMax: ext.z + ext.d }];
-      extSup = [{ edge: 'east' }];
-    }
-    results.push({ x: strip.x, z: strip.z, w: strip.w, d: strip.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: stripSup });
-    results.push({ x: ext.x, z: ext.z, w: ext.w, d: ext.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: extSup });
+    results = buildBigLShape(shape, x, z, segW, segD, maxTier, sizeKey);
   } else if (shape.startsWith('uNarrow')) {
-    let col, top, bot, colSup, topSup, botSup;
-    if (shape === 'uNarrowN') {
-      col = { x, z, w: segW, d: segD * 3 };
-      top = { x: x + segW, z, w: segW, d: segD };
-      bot = { x: x + segW, z: z + segD * 2, w: segW, d: segD };
-      colSup = [{ edge: 'east', zMin: top.z, zMax: top.z + top.d }, { edge: 'east', zMin: bot.z, zMax: bot.z + bot.d }];
-      topSup = [{ edge: 'west' }]; botSup = [{ edge: 'west' }];
-    } else if (shape === 'uNarrowS') {
-      col = { x: x + segW, z, w: segW, d: segD * 3 };
-      top = { x, z, w: segW, d: segD };
-      bot = { x, z: z + segD * 2, w: segW, d: segD };
-      colSup = [{ edge: 'west', zMin: top.z, zMax: top.z + top.d }, { edge: 'west', zMin: bot.z, zMax: bot.z + bot.d }];
-      topSup = [{ edge: 'east' }]; botSup = [{ edge: 'east' }];
-    } else if (shape === 'uNarrowE') {
-      col = { x, z, w: segW * 3, d: segD };
-      top = { x, z: z + segD, w: segW, d: segD };
-      bot = { x: x + segW * 2, z: z + segD, w: segW, d: segD };
-      colSup = [{ edge: 'south', xMin: top.x, xMax: top.x + top.w }, { edge: 'south', xMin: bot.x, xMax: bot.x + bot.w }];
-      topSup = [{ edge: 'north' }]; botSup = [{ edge: 'north' }];
-    } else {
-      col = { x, z: z + segD, w: segW * 3, d: segD };
-      top = { x, z, w: segW, d: segD };
-      bot = { x: x + segW * 2, z, w: segW, d: segD };
-      colSup = [{ edge: 'north', xMin: top.x, xMax: top.x + top.w }, { edge: 'north', xMin: bot.x, xMax: bot.x + bot.w }];
-      topSup = [{ edge: 'south' }]; botSup = [{ edge: 'south' }];
-    }
-    results.push({ x: col.x, z: col.z, w: col.w, d: col.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: colSup });
-    results.push({ x: top.x, z: top.z, w: top.w, d: top.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: topSup });
-    results.push({ x: bot.x, z: bot.z, w: bot.w, d: bot.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: botSup });
+    results = buildBigNarrowU(shape, x, z, segW, segD, maxTier, sizeKey);
   } else if (shape.startsWith('uShape')) {
-    let left, right, bar, leftSup, rightSup, barSup;
-    if (shape === 'uShapeN') {
-      left = { x, z, w: segW, d: segD * 3 };
-      right = { x: x + segW * 2, z, w: segW, d: segD * 3 };
-      bar = { x: x + segW, z: z + segD * 2, w: segW, d: segD };
-      leftSup = [{ edge: 'east', zMin: bar.z, zMax: bar.z + bar.d }];
-      rightSup = [{ edge: 'west', zMin: bar.z, zMax: bar.z + bar.d }];
-      barSup = [{ edge: 'west' }, { edge: 'east' }];
-    } else if (shape === 'uShapeS') {
-      left = { x, z, w: segW, d: segD * 3 };
-      right = { x: x + segW * 2, z, w: segW, d: segD * 3 };
-      bar = { x: x + segW, z, w: segW, d: segD };
-      leftSup = [{ edge: 'east', zMin: bar.z, zMax: bar.z + bar.d }];
-      rightSup = [{ edge: 'west', zMin: bar.z, zMax: bar.z + bar.d }];
-      barSup = [{ edge: 'west' }, { edge: 'east' }];
-    } else if (shape === 'uShapeE') {
-      left = { x, z, w: segW * 3, d: segD };
-      right = { x, z: z + segD * 2, w: segW * 3, d: segD };
-      bar = { x, z: z + segD, w: segW, d: segD };
-      leftSup = [{ edge: 'south', xMin: bar.x, xMax: bar.x + bar.w }];
-      rightSup = [{ edge: 'north', xMin: bar.x, xMax: bar.x + bar.w }];
-      barSup = [{ edge: 'north' }, { edge: 'south' }];
-    } else {
-      left = { x, z, w: segW * 3, d: segD };
-      right = { x, z: z + segD * 2, w: segW * 3, d: segD };
-      bar = { x: x + segW * 2, z: z + segD, w: segW, d: segD };
-      leftSup = [{ edge: 'south', xMin: bar.x, xMax: bar.x + bar.w }];
-      rightSup = [{ edge: 'north', xMin: bar.x, xMax: bar.x + bar.w }];
-      barSup = [{ edge: 'north' }, { edge: 'south' }];
-    }
-    results.push({ x: left.x, z: left.z, w: left.w, d: left.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: leftSup });
-    results.push({ x: right.x, z: right.z, w: right.w, d: right.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: rightSup });
-    results.push({ x: bar.x, z: bar.z, w: bar.w, d: bar.d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full', suppressEdges: barSup });
+    results = buildBigUShape(shape, x, z, segW, segD, maxTier, sizeKey);
   } else {
     return [{ x, z, w, d, maxTier, size: sizeKey, height: 'tall', blockIndex: 0, shape: 'full' }];
   }
