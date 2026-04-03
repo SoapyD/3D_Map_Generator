@@ -102,6 +102,7 @@ export function generateOrangeLadders(ctx) {
 
           orangeLadders.push({
             type: 'orange_ladder',
+            platformDir: edge.side,
             x: lx, z: lz,
             w: lw, d: ld,
             y0, y1,

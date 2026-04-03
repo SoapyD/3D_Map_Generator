@@ -44,7 +44,7 @@ export function generateExteriorWalls(data, config, rng) {
         const wallDef = buildWall(building, edgeLabel, aboveQuadrants, baseY, wallHeight, wallThickness);
         if (!wallDef) continue;
 
-        const segments = applyWallDamage(wallDef, rng);
+        const segments = applyWallDamage(wallDef, rng, 'external');
 
         if (building.suppressEdges) {
           for (const se of building.suppressEdges) {

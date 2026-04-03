@@ -46,8 +46,10 @@ export function generateInteriorLadders(ctx) {
           }
           if (trimmedTop <= baseTier) continue;
 
+          // Platform extends toward the missing quadrant (out from the floor edge)
           interiorLadders.push({
             type: 'interior_ladder',
+            platformDir: side,
             x: lx, z: lz, w: lw, d: ld,
             y0: baseTier * tierHeight, y1: trimmedTop * tierHeight,
           });

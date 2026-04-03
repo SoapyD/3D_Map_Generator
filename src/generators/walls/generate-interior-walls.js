@@ -27,20 +27,37 @@ export function generateInteriorWalls(data, config, rng) {
       const variant = pickInteriorVariant(rng);
 
       const defs = [];
+      const doorGap = WALL.quadSize;
       if (variant === 'cross') {
         defs.push({ x: mx - wallThickness / 2, z: z + d / 4, length: d / 2, height: wallHeight, baseY, thickness: wallThickness, axis: 'z' });
         defs.push({ x: x + w / 4, z: mz - wallThickness / 2, length: w / 2, height: wallHeight, baseY, thickness: wallThickness, axis: 'x' });
       } else if (variant === 'centreNS') {
-        defs.push({ x: mx - wallThickness / 2, z, length: d / 2, height: wallHeight, baseY, thickness: wallThickness, axis: 'z' });
+        const fullLen = d / 2;
+        const segLen = (fullLen - doorGap) / 2;
+        const startZ = z;
+        defs.push({ x: mx - wallThickness / 2, z: startZ, length: segLen, height: wallHeight, baseY, thickness: wallThickness, axis: 'z' });
+        defs.push({ x: mx - wallThickness / 2, z: startZ + segLen + doorGap, length: segLen, height: wallHeight, baseY, thickness: wallThickness, axis: 'z' });
       } else if (variant === 'centreSN') {
-        defs.push({ x: mx - wallThickness / 2, z: mz, length: d / 2, height: wallHeight, baseY, thickness: wallThickness, axis: 'z' });
+        const fullLen = d / 2;
+        const segLen = (fullLen - doorGap) / 2;
+        const startZ = mz;
+        defs.push({ x: mx - wallThickness / 2, z: startZ, length: segLen, height: wallHeight, baseY, thickness: wallThickness, axis: 'z' });
+        defs.push({ x: mx - wallThickness / 2, z: startZ + segLen + doorGap, length: segLen, height: wallHeight, baseY, thickness: wallThickness, axis: 'z' });
       } else if (variant === 'centreEW') {
-        defs.push({ x, z: mz - wallThickness / 2, length: w / 2, height: wallHeight, baseY, thickness: wallThickness, axis: 'x' });
+        const fullLen = w / 2;
+        const segLen = (fullLen - doorGap) / 2;
+        const startX = x;
+        defs.push({ x: startX, z: mz - wallThickness / 2, length: segLen, height: wallHeight, baseY, thickness: wallThickness, axis: 'x' });
+        defs.push({ x: startX + segLen + doorGap, z: mz - wallThickness / 2, length: segLen, height: wallHeight, baseY, thickness: wallThickness, axis: 'x' });
       } else if (variant === 'centreWE') {
-        defs.push({ x: mx, z: mz - wallThickness / 2, length: w / 2, height: wallHeight, baseY, thickness: wallThickness, axis: 'x' });
+        const fullLen = w / 2;
+        const segLen = (fullLen - doorGap) / 2;
+        const startX = mx;
+        defs.push({ x: startX, z: mz - wallThickness / 2, length: segLen, height: wallHeight, baseY, thickness: wallThickness, axis: 'x' });
+        defs.push({ x: startX + segLen + doorGap, z: mz - wallThickness / 2, length: segLen, height: wallHeight, baseY, thickness: wallThickness, axis: 'x' });
       }
 
-      for (const def of defs) interiorWalls.push(...applyWallDamage(def, rng));
+      for (const def of defs) interiorWalls.push(...applyWallDamage(def, rng, 'internal'));
     }
   }
 

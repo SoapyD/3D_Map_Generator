@@ -59,8 +59,13 @@ export function buildYellowLadderAtEndpoint(w, endpoint, data, config) {
   const ladderY1 = ladderTopTier * tierHeight;
   if (ladderY1 <= ladderY0) return null;
 
+  // Platform extends away from the wall (toward the walkway)
+  const platformDir = w.axis === 'x'
+    ? (endpoint === 'start' ? 'east' : 'west')
+    : (endpoint === 'start' ? 'south' : 'north');
+
   return {
-    type: 'ladder', parentWalkway: w,
+    type: 'ladder', platformDir, parentWalkway: w,
     x: ladderX, z: ladderZ, w: ladderW, d: ladderD,
     y0: ladderY0, y1: ladderY1,
   };
