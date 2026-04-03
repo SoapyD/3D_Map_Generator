@@ -80,16 +80,18 @@ export const BUILDING = {
 // --- Walls ---
 export const WALL = {
   quadSize: 1.5,           // inches per wall quadrant column
-  upperRemovalRatio: 0.7,  // max fraction of upper row removed
-  lowerRemovalRatio: 0.5,  // max fraction of lower row removed
+  externalUpperRemovalRatio: 0.7,  // max fraction of upper row removed (external)
+  externalLowerRemovalRatio: 0.5,  // max fraction of lower row removed (external)
+  internalUpperRemovalRatio: 0.6,  // max fraction of upper row removed (internal)
+  internalLowerRemovalRatio: 0.3, // max fraction of lower row removed (internal)
   // Interior walls (medium/large buildings, mid-floors)
-  interiorWallChance: { medium: 0.2, large: 1.0 }, // chance per eligible floor
+  interiorWallChance: { medium: 0.75, large: 1.0 }, // chance per eligible floor
   interiorWallVariants: {
-    centreNS:  { weight: 0.25 },  // wall from north edge midpoint toward centre
-    centreEW:  { weight: 0.25 },  // wall from west edge midpoint toward centre
-    centreSN:  { weight: 0.125 }, // wall from south edge midpoint toward centre
-    centreWE:  { weight: 0.125 }, // wall from east edge midpoint toward centre
-    cross:     { weight: 0.25 },  // cross shape in centre
+    centreNS:  { weight: 0.175 }, // wall from north edge midpoint toward centre
+    centreEW:  { weight: 0.175 }, // wall from west edge midpoint toward centre
+    centreSN:  { weight: 0.175 }, // wall from south edge midpoint toward centre
+    centreWE:  { weight: 0.175 }, // wall from east edge midpoint toward centre
+    cross:     { weight: 0.3 },   // cross shape in centre
   },
 };
 

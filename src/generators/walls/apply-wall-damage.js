@@ -2,15 +2,15 @@ import { WALL } from '../../config.js';
 import { mergeSegments } from './merge-segments.js';
 
 const WALL_QUAD_SIZE = WALL.quadSize;
-const UPPER_REMOVAL_RATIO = WALL.upperRemovalRatio;
-const LOWER_REMOVAL_RATIO = WALL.lowerRemovalRatio;
 
 /**
  * Divide wall into upper/lower quadrant grid and remove some.
- * Upper row: up to 50% removed. Lower row: up to 30% removed.
  * Removals spread from first removal adjacently.
+ * @param {'external'|'internal'} type - selects which removal ratios to use
  */
-export function applyWallDamage(wallDef, rng) {
+export function applyWallDamage(wallDef, rng, type = 'external') {
+  const UPPER_REMOVAL_RATIO = type === 'internal' ? WALL.internalUpperRemovalRatio : WALL.externalUpperRemovalRatio;
+  const LOWER_REMOVAL_RATIO = type === 'internal' ? WALL.internalLowerRemovalRatio : WALL.externalLowerRemovalRatio;
   const { x, z, length, height, baseY, thickness, axis } = wallDef;
   const cols = Math.max(1, Math.round(length / WALL_QUAD_SIZE));
   const rows = 2;
