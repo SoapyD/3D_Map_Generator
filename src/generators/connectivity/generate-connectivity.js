@@ -16,6 +16,7 @@ import { postFilterLadders } from './post-filter-ladders.js';
 import { generateTowerLadders } from './generate-tower-ladders.js';
 import { generateLadderPlatforms } from './generate-ladder-platforms.js';
 import { upgradeToBridges } from './upgrade-to-bridges.js';
+import { carveLadderDoorway } from './carve-ladder-doorway.js';
 
 export function generateConnectivity(data, config, rng) {
   const { tierHeight } = config;
@@ -40,6 +41,16 @@ export function generateConnectivity(data, config, rng) {
   let { finalRed } = ladderResults;
 
   finalRed = generateTowerLadders(ctx, { survivingYellow, finalRed, finalOrange, finalInterior });
+
+  // Carve doorway-sized gaps in walls at the top exit of every surviving ladder.
+  // Must run after all cull passes so we don't cut holes for ladders that were removed.
+  if (DELETIONS.ladderTopWallClearance) {
+    const state = { walls: data.walls, config };
+    const allSurvivors = [...survivingYellow, ...finalRed, ...finalOrange, ...finalInterior];
+    for (const ladder of allSurvivors) {
+      carveLadderDoorway(ladder, state);
+    }
+  }
 
   const gapWalkways = detectGapsAndConnect(data, finalWalkways, [], config, rng);
   finalWalkways.push(...gapWalkways);

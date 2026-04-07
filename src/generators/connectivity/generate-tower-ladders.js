@@ -69,24 +69,11 @@ export function generateTowerLadders(ctx, ladderResults) {
       }
       if (overlaps) continue;
 
-      // Place the ladder
+      // Place the ladder — wall carving is handled by carveLadderDoorway after all culls
       const ladder = { type: 'ground_ladder', platformDir: side, x: lx, z: lz, w: lw, d: ld, y0, y1 };
       finalRed.push(ladder);
       allExistingLadders.push(ladder);
       placed = true;
-
-      // Delete wall segments that overlap the ladder at the termination floor
-      const exitY = topTier * tierHeight;
-      for (let wi = data.walls.length - 1; wi >= 0; wi--) {
-        const wall = data.walls[wi];
-        if (wall.baseY < exitY) continue;
-        const wx1 = wall.axis === 'x' ? wall.x + wall.length : wall.x + wall.thickness;
-        const wz1 = wall.axis === 'z' ? wall.z + wall.length : wall.z + wall.thickness;
-        if (lx < wx1 + 0.3 && lx + lw > wall.x - 0.3 &&
-            lz < wz1 + 0.3 && lz + ld > wall.z - 0.3) {
-          data.walls.splice(wi, 1);
-        }
-      }
       break;
     }
     // If no side is free, skip this tower's ladder
