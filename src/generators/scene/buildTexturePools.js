@@ -6,6 +6,9 @@ import * as THREE from 'three';
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import { PNG } from 'pngjs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const PACKAGE_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 const CATEGORIES = [
   'walls', 'landmark_walls', 'floors', 'objects',
@@ -16,7 +19,7 @@ const CATEGORIES = [
  * Load a texture pack by name. Falls back to flat colour if directory missing.
  */
 export function buildTexturePools(packName = 'base') {
-  const packDir = path.join('assets', 'textures', packName);
+  const packDir = path.join(PACKAGE_ROOT, 'assets', 'textures', packName);
   const pools = {};
 
   for (const cat of CATEGORIES) {
