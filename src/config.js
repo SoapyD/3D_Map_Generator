@@ -3,7 +3,7 @@
  */
 
 // --- CLI defaults ---
-const DEFAULTS = {
+export const DEFAULTS = {
   seed: Math.floor(Math.random() * 100000),
   mapWidth: 48,       // inches
   mapDepth: 48,       // inches

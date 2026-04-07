@@ -14,6 +14,15 @@ import path from 'path';
  * Export a Three.js scene to a GLB file.
  */
 export async function exportToGlb(scene, outputPath) {
+  const glb = await buildGlbBuffer(scene);
+  await writeFile(outputPath, glb);
+  return outputPath;
+}
+
+/**
+ * Build a GLB Buffer from a Three.js scene without writing to disk.
+ */
+export async function buildGlbBuffer(scene) {
   const meshes = [];
   scene.traverse((child) => {
     if (child.isMesh) meshes.push(child);
@@ -21,7 +30,6 @@ export async function exportToGlb(scene, outputPath) {
 
   if (meshes.length === 0) throw new Error('Scene has no meshes to export');
 
-  // Collect all geometry data
   const nodes = [];
   const meshDefs = [];
   const accessors = [];
@@ -46,7 +54,6 @@ export async function exportToGlb(scene, outputPath) {
     const uv = geo.getAttribute('uv');
     const index = geo.getIndex();
 
-    // Material
     let matIdx;
     const matKey = mesh.material.uuid;
     if (materialMap.has(matKey)) {
@@ -63,7 +70,6 @@ export async function exportToGlb(scene, outputPath) {
         },
       };
 
-      // Embed PNG texture if available
       if (mesh.material._pngBuffer) {
         const pngBuf = mesh.material._pngBuffer;
         let imgIdx;
@@ -90,7 +96,6 @@ export async function exportToGlb(scene, outputPath) {
         matDef.pbrMetallicRoughness.baseColorFactor = [1, 1, 1, 1];
       }
 
-      // Handle transparency
       if (mesh.material.transparent && mesh.material.opacity < 1) {
         matDef.alphaMode = 'BLEND';
         matDef.pbrMetallicRoughness.baseColorFactor[3] = mesh.material.opacity;
@@ -99,14 +104,12 @@ export async function exportToGlb(scene, outputPath) {
       materials.push(matDef);
     }
 
-    // Position buffer
     const posData = new Float32Array(position.array);
     const posBuf = Buffer.from(posData.buffer);
     const posViewIdx = bufferViews.length;
     bufferViews.push({ buffer: 0, byteOffset, byteLength: posBuf.length, target: 34962 });
     bufferParts.push(posBuf);
 
-    // Compute bounds
     let minPos = [Infinity, Infinity, Infinity];
     let maxPos = [-Infinity, -Infinity, -Infinity];
     for (let i = 0; i < position.count; i++) {
@@ -118,7 +121,7 @@ export async function exportToGlb(scene, outputPath) {
     const posAccIdx = accessors.length;
     accessors.push({
       bufferView: posViewIdx,
-      componentType: 5126, // FLOAT
+      componentType: 5126,
       count: position.count,
       type: 'VEC3',
       min: minPos,
@@ -126,7 +129,6 @@ export async function exportToGlb(scene, outputPath) {
     });
     byteOffset += posBuf.length;
 
-    // Normal buffer
     let normAccIdx;
     if (normal) {
       const normData = new Float32Array(normal.array);
@@ -134,18 +136,11 @@ export async function exportToGlb(scene, outputPath) {
       const normViewIdx = bufferViews.length;
       bufferViews.push({ buffer: 0, byteOffset, byteLength: normBuf.length, target: 34962 });
       bufferParts.push(normBuf);
-
       normAccIdx = accessors.length;
-      accessors.push({
-        bufferView: normViewIdx,
-        componentType: 5126,
-        count: normal.count,
-        type: 'VEC3',
-      });
+      accessors.push({ bufferView: normViewIdx, componentType: 5126, count: normal.count, type: 'VEC3' });
       byteOffset += normBuf.length;
     }
 
-    // UV buffer
     let uvAccIdx;
     if (uv) {
       const uvData = new Float32Array(uv.array);
@@ -158,24 +153,16 @@ export async function exportToGlb(scene, outputPath) {
       byteOffset += uvBuf.length;
     }
 
-    // Index buffer
     let idxAccIdx;
     if (index) {
-      // Use Uint16 if possible, Uint32 otherwise
       const useUint32 = position.count > 65535;
-      const idxData = useUint32
-        ? new Uint32Array(index.array)
-        : new Uint16Array(index.array);
+      const idxData = useUint32 ? new Uint32Array(index.array) : new Uint16Array(index.array);
       const idxBuf = Buffer.from(idxData.buffer);
-
-      // Pad to 4-byte alignment
       const padding = (4 - (idxBuf.length % 4)) % 4;
       const paddedBuf = padding > 0 ? Buffer.concat([idxBuf, Buffer.alloc(padding)]) : idxBuf;
-
       const idxViewIdx = bufferViews.length;
       bufferViews.push({ buffer: 0, byteOffset, byteLength: idxBuf.length, target: 34963 });
       bufferParts.push(paddedBuf);
-
       idxAccIdx = accessors.length;
       accessors.push({
         bufferView: idxViewIdx,
@@ -186,24 +173,18 @@ export async function exportToGlb(scene, outputPath) {
       byteOffset += paddedBuf.length;
     }
 
-    // Mesh primitive
-    const primitive = {
-      attributes: { POSITION: posAccIdx },
-      material: matIdx,
-    };
+    const primitive = { attributes: { POSITION: posAccIdx }, material: matIdx };
     if (normAccIdx !== undefined) primitive.attributes.NORMAL = normAccIdx;
     if (uvAccIdx !== undefined) primitive.attributes.TEXCOORD_0 = uvAccIdx;
     if (idxAccIdx !== undefined) primitive.indices = idxAccIdx;
 
     const meshIdx = meshDefs.length;
     meshDefs.push({ primitives: [primitive], name: mesh.name || undefined });
-
     nodes.push({ mesh: meshIdx, name: mesh.name || undefined });
 
     geo.dispose();
   }
 
-  // Build glTF JSON
   const gltf = {
     asset: { version: '2.0', generator: 'mordheim-map-generator' },
     scene: 0,
@@ -222,38 +203,30 @@ export async function exportToGlb(scene, outputPath) {
 
   const jsonStr = JSON.stringify(gltf);
   const jsonBuf = Buffer.from(jsonStr, 'utf-8');
-  // Pad JSON to 4-byte alignment
   const jsonPadding = (4 - (jsonBuf.length % 4)) % 4;
-  const paddedJsonBuf = Buffer.concat([jsonBuf, Buffer.alloc(jsonPadding, 0x20)]); // pad with spaces
+  const paddedJsonBuf = Buffer.concat([jsonBuf, Buffer.alloc(jsonPadding, 0x20)]);
 
   const binBuf = Buffer.concat(bufferParts);
-  // Pad binary to 4-byte alignment
   const binPadding = (4 - (binBuf.length % 4)) % 4;
   const paddedBinBuf = binPadding > 0 ? Buffer.concat([binBuf, Buffer.alloc(binPadding)]) : binBuf;
 
-  // GLB header (12 bytes) + JSON chunk (8 + data) + BIN chunk (8 + data)
   const totalLength = 12 + 8 + paddedJsonBuf.length + 8 + paddedBinBuf.length;
-
   const glb = Buffer.alloc(totalLength);
   let offset = 0;
 
-  // Header
-  glb.writeUInt32LE(0x46546C67, offset); offset += 4; // magic "glTF"
-  glb.writeUInt32LE(2, offset); offset += 4;           // version
-  glb.writeUInt32LE(totalLength, offset); offset += 4;  // total length
+  glb.writeUInt32LE(0x46546C67, offset); offset += 4;
+  glb.writeUInt32LE(2, offset); offset += 4;
+  glb.writeUInt32LE(totalLength, offset); offset += 4;
 
-  // JSON chunk
-  glb.writeUInt32LE(paddedJsonBuf.length, offset); offset += 4; // chunk length
-  glb.writeUInt32LE(0x4E4F534A, offset); offset += 4;          // chunk type "JSON"
+  glb.writeUInt32LE(paddedJsonBuf.length, offset); offset += 4;
+  glb.writeUInt32LE(0x4E4F534A, offset); offset += 4;
   paddedJsonBuf.copy(glb, offset); offset += paddedJsonBuf.length;
 
-  // BIN chunk
-  glb.writeUInt32LE(paddedBinBuf.length, offset); offset += 4; // chunk length
-  glb.writeUInt32LE(0x004E4942, offset); offset += 4;          // chunk type "BIN\0"
+  glb.writeUInt32LE(paddedBinBuf.length, offset); offset += 4;
+  glb.writeUInt32LE(0x004E4942, offset); offset += 4;
   paddedBinBuf.copy(glb, offset);
 
-  await writeFile(outputPath, glb);
-  return outputPath;
+  return glb;
 }
 
 /**

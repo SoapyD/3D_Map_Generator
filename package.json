@@ -4,6 +4,9 @@
   "description": "Procedural ruined city map generator for Mordheim / Tabletop Simulator",
   "type": "module",
   "main": "src/index.js",
+  "exports": {
+    ".": "./src/lib.js"
+  },
   "scripts": {
     "generate": "node src/index.js",
     "preview": "node src/index.js --preview",
