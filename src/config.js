@@ -147,6 +147,8 @@ export const CONNECTIVITY = {
   cyanLadderCullRatio: 0.4,
   // Distance for ladder-top near walkway check
   ladderTopWalkwayDist: 2,
+  // Minimum wall remnant length kept when carving a ladder doorway (inches)
+  ladderDoorwayMinRemnant: 0.25,
   // Pillar supports for long walkways/bridges
   pillarWidth: 0.5,          // pillar cross-section (inches)
   pillarSpacing: 6,          // max distance between pillars along walkway
@@ -251,6 +253,9 @@ export const DELETIONS = {
   cyanLadderOrangeOverlap: true,   // drop cyan ladders touching orange ladders
   cyanLadderTopNearWalkway: true,  // drop cyan ladders whose top is near a walkway
   orangeLadderTopNearWalkway: true,// drop orange ladders whose top is near a walkway
+
+  // Ladder top-wall doorway carving
+  ladderTopWallClearance: true,    // carve doorway in wall at top exit of each ladder
 
   // Pillars
   pillarGeneration: true,          // generate support pillars under walkways/bridges
