@@ -4,7 +4,7 @@ import { overlapsAny } from './cover-overlap.js';
 
 const COVER_THIN = COVER.thin;
 
-export function generateInteriorCover(data, config, rng) {
+export function generateInteriorCover(data, config, rng, existingCover = []) {
   const { tierHeight, slabThickness } = config;
   const interiorCover = [];
   for (let bi = 0; bi < data.buildings.length; bi++) {
@@ -32,7 +32,7 @@ export function generateInteriorCover(data, config, rng) {
         const px = rng.float(qr.x + pad, qr.x + qr.w - w - pad);
         const pz = rng.float(qr.z + pad, qr.z + qr.d - d - pad);
         const candidate = { x: px, z: pz, w, d, y };
-        if (!overlapsAny(candidate, interiorCover)) {
+        if (!overlapsAny(candidate, interiorCover) && !overlapsAny(candidate, existingCover)) {
           interiorCover.push({ x: px, z: pz, w, d, height: interiorHeight, y, interior: true });
         }
       }
