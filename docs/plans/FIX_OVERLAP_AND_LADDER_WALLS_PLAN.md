@@ -33,54 +33,46 @@ The `overlapsAny` helper already handles Y distance checks, so no changes to tha
 
 ## Problem 2 — Ladder Wall Clearance Not Working (Seed 41)
 
-### What's happening
+### Why the current approach fails
 
-When a red or orange ladder reaches the top of a building wall, a doorway is meant to be carved in that wall so a player can step off the ladder onto the floor above. The current code in `carve-ladder-doorway.js` works like this:
+After `applyWallDamage` runs, every full-height wall is split into individual quadrant-height segments — a lower row and an upper row, each with its own `baseY`. The current code in `carve-ladder-doorway.js` searches for walls by matching `wall.baseY` against a single computed Y value (`exitTier * tierHeight + slabThickness`). That value only matches the lower-row segments. Upper-row segments sit half a tier higher and slip through the filter untouched. The doorway gets carved in the bottom half of the wall but the top half remains, still blocking the exit.
 
-1. Calculate `exitWallY` — the Y coordinate of the floor the ladder reaches, plus slab thickness.
-2. Find walls whose `baseY` matches `exitWallY` (within half an inch).
-3. Among those, find walls positioned flush with the face the ladder is against.
-4. Carve a gap the width of the ladder.
+Every time you try to pin down a wall segment by calculating an exact Y from floor offsets and slab thickness, a rounding edge or row offset breaks it. The approach needs to work from structural facts instead.
 
-The problem is that after `applyWallDamage` runs, each wall is split into individual quadrant-height segments. A wall of full tier height becomes two rows of segments:
+### New approach — work from the ladder outward
 
-- **Lower row:** `baseY = exitWallY`, height = `tierHeight / 2`
-- **Upper row:** `baseY = exitWallY + tierHeight / 2`, height = `tierHeight / 2`
+The ladder already knows everything needed to identify the blocking wall segments. No Y offset arithmetic required.
 
-The current filter `Math.abs(wall.baseY - exitWallY) > 0.5` only matches lower-row segments. Upper-row segments have a `baseY` that is half a tier higher and fail the check. So the code finds and carves the lower half of the wall but leaves the upper half intact — the character still can't step through at head height.
+**Step 1 — Derive the exit tier from the ladder's top height**
 
-On seed 41, this is visible at several red and orange ladders where the upper wall quadrant remains unclipped above the exit.
+`exitTier = Math.round(ladder.y1 / tierHeight)`
 
-### Better approach
+This gives the floor number the ladder reaches.
 
-Instead of filtering walls by their `baseY` matching a specific Y exactly, check whether the wall **straddles the floor level the ladder reaches**. A wall segment blocks a ladder exit if:
+**Step 2 — Collect walls at that tier (w[])**
 
-- It is on the right axis and face (same position/axis checks as now).
-- It overlaps the ladder's width in the long axis of the wall (same XZ overlap check as now).
-- Its bottom (`baseY`) is **below** the top of the ladder's floor level, AND its top (`baseY + height`) is **above** the slab surface the ladder reaches.
+A wall segment belongs to tier F if its baseY falls within that tier's band:
 
-In plain numbers: if the floor the ladder reaches is at `floorSurfaceY = exitTier * tierHeight + slabThickness`, then a wall segment blocks the exit if:
+`Math.floor(wall.baseY / tierHeight) === exitTier`
 
-```
-wall.baseY < floorSurfaceY + tierHeight   AND
-wall.baseY + wall.height > floorSurfaceY
-```
+This is a simple integer comparison — no slab offset, no tolerance. It catches both the lower-row and upper-row segments at that tier because both have a baseY inside the same `tierHeight`-wide band.
 
-This catches both the lower and upper quadrant rows of any wall at that tier, without caring exactly which row they are. It also naturally ignores walls from a different tier.
+**Step 3 — Filter to the exit face (rw[])**
 
-Once a blocking segment is found, carve out the portion that overlaps the ladder's width, exactly as the current code does (split into left/right remnants). The gap only needs to be cut from `floorSurfaceY` upward to a player-passable height (one full tier height above the floor), so only segments in that Y range need carving — which is exactly what the new bounds check captures.
+From w[], keep only walls that are:
+- On the correct axis (`x` for north/south ladders, `z` for east/west ladders) — derived from `platformDir` as before.
+- Flush with the face the ladder is against — same position check as the current code (the wall's near or far edge sits at the same coordinate as the ladder's inner edge).
 
-### Summary of the fix
+**Step 4 — Filter to walls whose extent overlaps the ladder's width (rw)**
 
-Replace the single `baseY` equality check:
-```
-Math.abs(wall.baseY - exitWallY) > 0.5
-```
+For an x-axis wall, the wall spans from `wall.x` to `wall.x + wall.length`. The ladder spans from `ladder.x` to `ladder.x + ladder.w`. Keep walls where those ranges overlap:
 
-With a bounds-range check that matches any wall segment overlapping the ladder's exit zone vertically:
-```
-wall.baseY < floorSurfaceY + tierHeight  AND
-wall.baseY + wall.height > floorSurfaceY
-```
+`wall.x < ladder.x + ladder.w  AND  wall.x + wall.length > ladder.x`
 
-Keep all other logic (axis, position flush, XZ overlap, remnant carving) the same.
+For a z-axis wall, swap x/w for z/d.
+
+**Step 5 — Delete all overlapping quadrant segments (qrw[])**
+
+Each segment that passed all the filters above is a wall quadrant that sits in front of the ladder exit. Delete them all from the walls array — no carving, no remnants. The segments outside the ladder's width were already filtered out in step 4 and survive untouched.
+
+This naturally clears both the lower and upper quadrant rows because both pass the tier check in step 2 and the width overlap check in step 4. No Y coordinate arithmetic beyond the single integer tier derivation in step 1.
