@@ -20,7 +20,7 @@ import { generateGroundAndStreetCover } from './generate-ground-cover.js';
 export function generateCover(data, config, rng) {
   const { slabThickness } = config;
   const cover = generateRooftopCover(data, config, rng);
-  const interiorCover = generateInteriorCover(data, config, rng);
+  const interiorCover = generateInteriorCover(data, config, rng, cover);
 
   // Generate courtyard footprints first, cull, then place cover only on survivors
   const deleted = data.deletedBuildings || [];

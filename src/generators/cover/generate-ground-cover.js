@@ -16,6 +16,7 @@ export function generateGroundAndStreetCover(data, config, rng, cover, allLadder
       const piece = makeCoverPiece(fp, groundY, rng);
       if (!piece) continue;
       if (overlapsAny(piece, cover)) continue;
+      if (overlapsAny(piece, groundCover)) continue;
       if (overlapsAny(piece, allLadders)) continue;
       groundCover.push(piece);
     }
@@ -37,6 +38,7 @@ export function generateGroundAndStreetCover(data, config, rng, cover, allLadder
     if (hitsAnyWall(piece, data.walls, true)) continue;
     if (overlapsAny(piece, allLadders)) continue;
     if (overlapsAny(piece, cover)) continue;
+    if (overlapsAny(piece, groundCover)) continue;
     if (overlapsAny(piece, streetScatter)) continue;
     if (overlapsAny(piece, deletedFootprints)) continue;
     streetScatter.push(piece);
