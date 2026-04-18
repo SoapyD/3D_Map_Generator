@@ -42,12 +42,13 @@ async function main() {
   const gridData = generateGrid(config, rng);
   console.log(`  ${gridData.blocks.length} city blocks`);
   recorder?.capture(1, gridData);
+  recorder?.capture(2, gridData);
 
   // Stage 2: Building footprints
   console.log('[2/7] Placing buildings...');
   const buildingData = generateBuildings(gridData, config, rng);
   console.log(`  ${buildingData.buildings.length} buildings`);
-  recorder?.capture(2, buildingData);
+  recorder?.capture(3, buildingData);
 
   // Stage 3: Floor plates
   console.log('[3/7] Generating floor plates...');
@@ -55,26 +56,26 @@ async function main() {
   for (const f of floorData.floors) {
     console.log(`  Tier ${f.tier}: ${f.sections.length} sections`);
   }
-  recorder?.capture(3, floorData);
+  recorder?.capture(4, floorData);
 
   // Stage 4: Walls
   console.log('[4/7] Generating walls...');
   const wallData = generateWalls(floorData, config, rng);
   console.log(`  ${wallData.walls.length} wall segments`);
-  recorder?.capture(4, wallData);
+  recorder?.capture(5, wallData);
 
   // Stage 5: Connectivity
   console.log('[5/7] Connecting levels...');
   const connData = generateConnectivity(wallData, config, rng);
   const c = connData.connections;
   console.log(`  ${c.ladders.length} ladders, ${c.walkways.length} walkways`);
-  recorder?.capture(5, connData);
+  recorder?.capture(6, connData);
 
   // Stage 6: Cover
   console.log('[6/7] Placing cover...');
   const coverData = generateCover(connData, config, rng);
   console.log(`  ${coverData.cover.length} cover pieces`);
-  recorder?.capture(6, coverData);
+  recorder?.capture(7, coverData);
 
   // Build geometry primitives (shared handover)
   console.log('[7/8] Building geometry...');

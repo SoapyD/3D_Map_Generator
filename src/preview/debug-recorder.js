@@ -11,20 +11,22 @@
 
 const STAGE_COLORS = {
   1: '#5588cc', // Foundation
-  2: '#44bb88', // Buildings
-  3: '#ccaa33', // Floors
-  4: '#cc5533', // Walls
-  5: '#aa44cc', // Connectivity
-  6: '#33bbcc', // Cover
+  2: '#2244aa', // Streets
+  3: '#44bb88', // Buildings
+  4: '#ccaa33', // Floors
+  5: '#cc5533', // Walls
+  6: '#aa44cc', // Connectivity
+  7: '#33bbcc', // Cover
 };
 
 const STAGE_NAMES = {
   1: 'Foundation',
-  2: 'Buildings',
-  3: 'Floors',
-  4: 'Walls',
-  5: 'Connectivity',
-  6: 'Cover',
+  2: 'Streets',
+  3: 'Buildings',
+  4: 'Floors',
+  5: 'Walls',
+  6: 'Connectivity',
+  7: 'Cover',
 };
 
 export function createRecorder(seed, config) {
@@ -49,30 +51,32 @@ export function createRecorder(seed, config) {
 
 function stageToElements(stageIndex, data, color, config) {
   switch (stageIndex) {
-    case 1: return gridElements(data, color, config);
-    case 2: return buildingElements(data, color, config);
-    case 3: return floorElements(data, color, config);
-    case 4: return wallElements(data, color);
-    case 5: return connectivityElements(data, color, config);
-    case 6: return coverElements(data, color);
+    case 1: return foundationElements(data, color, config);
+    case 2: return streetElements(data, color, config);
+    case 3: return buildingElements(data, color, config);
+    case 4: return floorElements(data, color, config);
+    case 5: return wallElements(data, color);
+    case 6: return connectivityElements(data, color, config);
+    case 7: return coverElements(data, color);
     default: return [];
   }
 }
 
-function gridElements(data, color, config) {
+function foundationElements(data, color, config) {
   const total = data.blocks.length;
-  const elements = data.blocks.map((b, i) => ({
+  return data.blocks.map((b, i) => ({
     label: `Foundation — block ${i + 1}/${total}`,
     rects: [box('block', b.x, 0, b.z, b.w, 0.05, b.d, color)],
   }));
-  const streetRects = deriveStreetRects(data.blocks, config.mapWidth, config.mapDepth);
-  if (streetRects.length > 0) {
-    elements.push({
-      label: `Foundation — streets (${streetRects.length})`,
-      rects: streetRects.map(s => box('street', s.x, 0, s.z, s.w, 0.05, s.d, '#2244aa')),
-    });
-  }
-  return elements;
+}
+
+function streetElements(data, color, config) {
+  const rects = deriveStreetRects(data.blocks, config.mapWidth, config.mapDepth);
+  const total = rects.length;
+  return rects.map((s, i) => ({
+    label: `Streets — ${i + 1}/${total}`,
+    rects: [box('street', s.x, 0, s.z, s.w, 0.05, s.d, color)],
+  }));
 }
 
 // Build street rects by sweeping all block edge coordinates.
