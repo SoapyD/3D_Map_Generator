@@ -10,7 +10,7 @@
  */
 
 const STAGE_COLORS = {
-  1: '#5588cc', // Grid
+  1: '#5588cc', // Foundation
   2: '#44bb88', // Buildings
   3: '#ccaa33', // Floors
   4: '#cc5533', // Walls
@@ -19,7 +19,7 @@ const STAGE_COLORS = {
 };
 
 const STAGE_NAMES = {
-  1: 'Grid',
+  1: 'Foundation',
   2: 'Buildings',
   3: 'Floors',
   4: 'Walls',
@@ -62,13 +62,13 @@ function stageToElements(stageIndex, data, color, config) {
 function gridElements(data, color, config) {
   const total = data.blocks.length;
   const elements = data.blocks.map((b, i) => ({
-    label: `Grid — block ${i + 1}/${total}`,
+    label: `Foundation — block ${i + 1}/${total}`,
     rects: [box('block', b.x, 0, b.z, b.w, 0.05, b.d, color)],
   }));
   const streetRects = deriveStreetRects(data.blocks, config.mapWidth, config.mapDepth);
   if (streetRects.length > 0) {
     elements.push({
-      label: `Grid — streets (${streetRects.length})`,
+      label: `Foundation — streets (${streetRects.length})`,
       rects: streetRects.map(s => box('street', s.x, 0, s.z, s.w, 0.05, s.d, '#2244aa')),
     });
   }
