@@ -49,7 +49,7 @@ export function createRecorder(seed, config) {
 
 function stageToElements(stageIndex, data, color, config) {
   switch (stageIndex) {
-    case 1: return gridElements(data, color);
+    case 1: return gridElements(data, color, config);
     case 2: return buildingElements(data, color, config);
     case 3: return floorElements(data, color, config);
     case 4: return wallElements(data, color);
@@ -59,23 +59,47 @@ function stageToElements(stageIndex, data, color, config) {
   }
 }
 
-function gridElements(data, color) {
-  const elements = [];
+function gridElements(data, color, config) {
   const total = data.blocks.length;
-  for (let i = 0; i < data.blocks.length; i++) {
-    const b = data.blocks[i];
+  const elements = data.blocks.map((b, i) => ({
+    label: `Grid — block ${i + 1}/${total}`,
+    rects: [box('block', b.x, 0, b.z, b.w, 0.05, b.d, color)],
+  }));
+  const streetRects = deriveStreetRects(data.blocks, config.mapWidth, config.mapDepth);
+  if (streetRects.length > 0) {
     elements.push({
-      label: `Grid — block ${i + 1}/${total}`,
-      rects: [box('block', b.x, -0.02, b.z, b.w, 0.08, b.d, color)],
-    });
-  }
-  if (data.streets.length > 0) {
-    elements.push({
-      label: `Grid — streets (${data.streets.length})`,
-      rects: data.streets.map(s => box('street', s.x, -0.05, s.z, s.w, 0.1, s.d, '#3366aa')),
+      label: `Grid — streets (${streetRects.length})`,
+      rects: streetRects.map(s => box('street', s.x, 0, s.z, s.w, 0.05, s.d, '#2244aa')),
     });
   }
   return elements;
+}
+
+// Build street rects by sweeping all block edge coordinates.
+// Each cell between consecutive edge lines is checked against block coverage —
+// cells not covered by any block are streets. Results are perfectly aligned
+// with block boundaries because the grid is derived from them directly.
+function deriveStreetRects(blocks, mapWidth, mapDepth) {
+  const xs = new Set([0, mapWidth]);
+  const zs = new Set([0, mapDepth]);
+  for (const b of blocks) {
+    xs.add(b.x);       xs.add(b.x + b.w);
+    zs.add(b.z);       zs.add(b.z + b.d);
+  }
+  const sortedX = [...xs].sort((a, b) => a - b);
+  const sortedZ = [...zs].sort((a, b) => a - b);
+
+  const streets = [];
+  for (let i = 0; i < sortedX.length - 1; i++) {
+    for (let j = 0; j < sortedZ.length - 1; j++) {
+      const x0 = sortedX[i],     x1 = sortedX[i + 1];
+      const z0 = sortedZ[j],     z1 = sortedZ[j + 1];
+      const cx = (x0 + x1) / 2,  cz = (z0 + z1) / 2;
+      const inBlock = blocks.some(b => cx > b.x && cx < b.x + b.w && cz > b.z && cz < b.z + b.d);
+      if (!inBlock) streets.push({ x: x0, z: z0, w: x1 - x0, d: z1 - z0 });
+    }
+  }
+  return streets;
 }
 
 function buildingElements(data, color, config) {

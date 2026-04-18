@@ -136,6 +136,7 @@
 
     const DIM_OPACITY = 0.2;
     const SPEED_MS = { 0.5: 1000, 1: 500, 2: 250, 4: 125 };
+    const STAGE_PAUSE_MS = 1500;
 
     const STAGE_META = [
       { stage: 1, name: 'Grid',         color: '#5588cc' },
@@ -152,13 +153,23 @@
     let totalFrames = 0;
     let currentIndex = 0;
     let playing = false;
-    let playInterval = null;
+    let playTimeout = null;
     let speed = 1;
     let currentGroup = null;
 
     // --- Load data ---
-    const res = await fetch('/debug_frames.json');
-    const data = await res.json();
+    let data;
+    try {
+      const res = await fetch('/debug_frames.json');
+      data = await res.json();
+    } catch (e) {
+      document.getElementById('frame-label').textContent = `Failed to load debug_frames.json: ${e.message}`;
+      throw e;
+    }
+    if (!data.stages) {
+      document.getElementById('frame-label').textContent = 'debug_frames.json has no stages — re-run npm run visualize';
+      throw new Error('missing stages');
+    }
     stages = data.stages;
 
     // Build the flat frame index → (stageIdx, elementIdx) map
@@ -284,21 +295,27 @@
     }
 
     // --- Playback ---
+    function scheduleNext() {
+      const next = currentIndex + 1;
+      if (next >= totalFrames) { stopPlay(); return; }
+      const crossesBoundary = frameMap[currentIndex].stageIdx !== frameMap[next].stageIdx;
+      const delay = crossesBoundary ? STAGE_PAUSE_MS : SPEED_MS[speed];
+      playTimeout = setTimeout(() => {
+        if (!playing) return;
+        setFrame(next);
+        scheduleNext();
+      }, delay);
+    }
+
     function startPlay() {
       playing = true;
       document.getElementById('btn-play').textContent = '⏸ Pause';
-      playInterval = setInterval(() => {
-        if (currentIndex >= totalFrames - 1) {
-          stopPlay();
-        } else {
-          setFrame(currentIndex + 1);
-        }
-      }, SPEED_MS[speed]);
+      scheduleNext();
     }
 
     function stopPlay() {
       playing = false;
-      clearInterval(playInterval);
+      clearTimeout(playTimeout);
       document.getElementById('btn-play').textContent = '▶ Play';
     }
 
