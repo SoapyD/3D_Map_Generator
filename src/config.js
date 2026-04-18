@@ -16,6 +16,7 @@ export const DEFAULTS = {
   maxSightline: 24,   // max unbroken line of sight (inches)
   textureSet: 'base',
   preview: false,
+  visualize: false,
   debug: false,
   obj: false,
   outputDir: 'output',
@@ -269,6 +270,12 @@ export function parseArgs(argv) {
     const arg = argv[i];
 
     if (arg === '--preview') {
+      config.preview = true;
+      continue;
+    }
+
+    if (arg === '--visualize') {
+      config.visualize = true;
       config.preview = true;
       continue;
     }

@@ -25,6 +25,12 @@ async function main() {
   const config = parseArgs(process.argv);
   const rng = createRng(config.seed);
 
+  let recorder = null;
+  if (config.visualize) {
+    const { createRecorder } = await import('./preview/debug-recorder.js');
+    recorder = createRecorder(config.seed, config);
+  }
+
   console.log(`Generating map with seed ${config.seed}...`);
   console.log(`  Size: ${config.mapWidth}x${config.mapDepth} inches`);
   console.log(`  Tiers: ${config.tiers} (+ base)`);
@@ -35,11 +41,13 @@ async function main() {
   console.log('\n[1/7] Generating city grid...');
   const gridData = generateGrid(config, rng);
   console.log(`  ${gridData.blocks.length} city blocks`);
+  recorder?.capture(1, gridData);
 
   // Stage 2: Building footprints
   console.log('[2/7] Placing buildings...');
   const buildingData = generateBuildings(gridData, config, rng);
   console.log(`  ${buildingData.buildings.length} buildings`);
+  recorder?.capture(2, buildingData);
 
   // Stage 3: Floor plates
   console.log('[3/7] Generating floor plates...');
@@ -47,22 +55,26 @@ async function main() {
   for (const f of floorData.floors) {
     console.log(`  Tier ${f.tier}: ${f.sections.length} sections`);
   }
+  recorder?.capture(3, floorData);
 
   // Stage 4: Walls
   console.log('[4/7] Generating walls...');
   const wallData = generateWalls(floorData, config, rng);
   console.log(`  ${wallData.walls.length} wall segments`);
+  recorder?.capture(4, wallData);
 
   // Stage 5: Connectivity
   console.log('[5/7] Connecting levels...');
   const connData = generateConnectivity(wallData, config, rng);
   const c = connData.connections;
   console.log(`  ${c.ladders.length} ladders, ${c.walkways.length} walkways`);
+  recorder?.capture(5, connData);
 
   // Stage 6: Cover
   console.log('[6/7] Placing cover...');
   const coverData = generateCover(connData, config, rng);
   console.log(`  ${coverData.cover.length} cover pieces`);
+  recorder?.capture(6, coverData);
 
   // Build geometry primitives (shared handover)
   console.log('[7/8] Building geometry...');
@@ -70,6 +82,11 @@ async function main() {
 
   // Export
   await mkdir(config.outputDir, { recursive: true });
+
+  if (recorder) {
+    await writeFile(`${config.outputDir}/debug_frames.json`, recorder.serialize());
+    console.log(`  Visualizer frames written to ${config.outputDir}/debug_frames.json`);
+  }
   const { dir, baseName } = getObjOutputPath(config);
 
   // Write handover file
@@ -97,7 +114,7 @@ async function main() {
   if (config.preview) {
     console.log('\nStarting preview server...');
     const { startPreview } = await import('./preview/server.js');
-    startPreview(outputPath);
+    startPreview(outputPath, 3000, config.visualize ? 'visualize' : 'preview');
   }
 }
 

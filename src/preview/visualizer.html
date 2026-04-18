@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mordheim Map Visualizer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #12121f; font-family: monospace; color: #ccc; }
+    canvas { display: block; }
+
+    #controls {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: rgba(10, 10, 20, 0.92);
+      border-top: 1px solid #333;
+      padding: 10px 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #transport {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    #transport button {
+      background: #2a2a44;
+      border: 1px solid #555;
+      color: #ddd;
+      padding: 4px 12px;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 13px;
+      border-radius: 3px;
+    }
+    #transport button:hover { background: #3a3a60; }
+
+    #speed-group { display: flex; gap: 4px; }
+    #speed-group button { padding: 4px 8px; font-size: 12px; }
+    #speed-group button.active { background: #554488; border-color: #aa88cc; }
+
+    #scrubber {
+      width: 100%;
+      accent-color: #aa44cc;
+      cursor: pointer;
+    }
+
+    #label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+    }
+
+    #frame-label { color: #eee; }
+    #frame-count { color: #888; }
+
+    #legend {
+      display: flex;
+      gap: 14px;
+      font-size: 12px;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 3px;
+      border: 1px solid transparent;
+    }
+    .legend-item:hover { border-color: #555; }
+    .legend-item.active-stage { border-color: #888; background: #1e1e34; }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <div id="label-row">
+      <span id="frame-label">Loading...</span>
+      <span id="frame-count"></span>
+    </div>
+    <input id="scrubber" type="range" min="0" value="0">
+    <div id="transport">
+      <button id="btn-prev">&#9664; Prev</button>
+      <button id="btn-play">&#9654; Play</button>
+      <button id="btn-next">Next &#9654;</button>
+      <div id="speed-group">
+        <button data-speed="0.5">0.5×</button>
+        <button data-speed="1" class="active">1×</button>
+        <button data-speed="2">2×</button>
+        <button data-speed="4">4×</button>
+      </div>
+      <div id="legend"></div>
+    </div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // --- Scene setup ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x12121f);
+
+    const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 1000);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+    sun.position.set(1, 2, 1);
+    scene.add(sun);
+
+    const DIM_OPACITY = 0.2;
+    const SPEED_MS = { 0.5: 1000, 1: 500, 2: 250, 4: 125 };
+
+    const STAGE_META = [
+      { stage: 1, name: 'Grid',         color: '#5588cc' },
+      { stage: 2, name: 'Buildings',    color: '#44bb88' },
+      { stage: 3, name: 'Floors',       color: '#ccaa33' },
+      { stage: 4, name: 'Walls',        color: '#cc5533' },
+      { stage: 5, name: 'Connectivity', color: '#aa44cc' },
+      { stage: 6, name: 'Cover',        color: '#33bbcc' },
+    ];
+
+    // --- State ---
+    let stages = [];
+    let frameMap = [];      // frameMap[i] = { stageIdx, elementIdx }
+    let totalFrames = 0;
+    let currentIndex = 0;
+    let playing = false;
+    let playInterval = null;
+    let speed = 1;
+    let currentGroup = null;
+
+    // --- Load data ---
+    const res = await fetch('/debug_frames.json');
+    const data = await res.json();
+    stages = data.stages;
+
+    // Build the flat frame index → (stageIdx, elementIdx) map
+    for (let s = 0; s < stages.length; s++) {
+      for (let e = 0; e < stages[s].elements.length; e++) {
+        frameMap.push({ stageIdx: s, elementIdx: e });
+      }
+    }
+    totalFrames = frameMap.length;
+
+    const { mapWidth, mapDepth, tiers, tierHeight } = data.config;
+    const cx = mapWidth / 2;
+    const cz = mapDepth / 2;
+
+    // Grid helper
+    const gridHelper = new THREE.GridHelper(
+      Math.max(mapWidth, mapDepth),
+      Math.max(mapWidth, mapDepth),
+      0x333344, 0x222233
+    );
+    gridHelper.position.set(cx, -0.06, cz);
+    scene.add(gridHelper);
+
+    // Camera
+    camera.position.set(cx + mapWidth * 0.8, mapWidth * 0.7, cz + mapWidth * 0.8);
+    controls.target.set(cx, tiers * tierHeight * 0.3, cz);
+    controls.update();
+
+    // Scrubber
+    const scrubber = document.getElementById('scrubber');
+    scrubber.max = totalFrames - 1;
+
+    // Legend
+    const legendEl = document.getElementById('legend');
+    const legendItems = {};
+    for (const m of STAGE_META) {
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      item.innerHTML = `<div class="legend-dot" style="background:${m.color}"></div>${m.name}`;
+      item.addEventListener('click', () => {
+        const idx = frameMap.findIndex(f => stages[f.stageIdx].stage === m.stage);
+        if (idx >= 0) setFrame(idx);
+      });
+      legendEl.appendChild(item);
+      legendItems[m.stage] = item;
+    }
+
+    // --- Rendering ---
+    // Builds a mesh from a flat list of rects.
+    function buildMeshGroup(rects) {
+      const group = new THREE.Group();
+      for (const r of rects) {
+        if (r.w <= 0 || r.h <= 0 || r.d <= 0) continue;
+        const geo = new THREE.BoxGeometry(r.w, r.h, r.d);
+        const mat = new THREE.MeshLambertMaterial({
+          color: new THREE.Color(r.color),
+          transparent: r.opacity < 1,
+          opacity: r.opacity,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(r.x + r.w / 2, r.y + r.h / 2, r.z + r.d / 2);
+        group.add(mesh);
+      }
+      return group;
+    }
+
+    function disposeGroup(group) {
+      group.traverse(obj => {
+        if (obj.isMesh) {
+          obj.geometry.dispose();
+          obj.material.dispose();
+        }
+      });
+    }
+
+    // Assembles rects for a given frame from the compact stage data.
+    // Prior stages are dimmed; current stage accumulated up to elementIdx.
+    function assembleRects(stageIdx, elementIdx) {
+      const rects = [];
+
+      for (let s = 0; s < stageIdx; s++) {
+        for (const el of stages[s].elements) {
+          for (const r of el.rects) {
+            rects.push({ ...r, opacity: DIM_OPACITY, transparent: true });
+          }
+        }
+      }
+
+      const current = stages[stageIdx];
+      for (let e = 0; e <= elementIdx; e++) {
+        for (const r of current.elements[e].rects) {
+          rects.push(r);
+        }
+      }
+
+      return rects;
+    }
+
+    function setFrame(idx) {
+      currentIndex = Math.max(0, Math.min(totalFrames - 1, idx));
+      const { stageIdx, elementIdx } = frameMap[currentIndex];
+
+      const rects = assembleRects(stageIdx, elementIdx);
+
+      if (currentGroup) {
+        disposeGroup(currentGroup);
+        scene.remove(currentGroup);
+      }
+      currentGroup = buildMeshGroup(rects);
+      scene.add(currentGroup);
+
+      const stage = stages[stageIdx];
+      const el = stage.elements[elementIdx];
+      scrubber.value = currentIndex;
+      document.getElementById('frame-label').textContent = el.label;
+      document.getElementById('frame-count').textContent =
+        `${currentIndex + 1} / ${totalFrames}`;
+
+      // Highlight active stage in legend
+      for (const [stageNum, item] of Object.entries(legendItems)) {
+        item.classList.toggle('active-stage', String(stage.stage) === stageNum);
+      }
+    }
+
+    // --- Playback ---
+    function startPlay() {
+      playing = true;
+      document.getElementById('btn-play').textContent = '⏸ Pause';
+      playInterval = setInterval(() => {
+        if (currentIndex >= totalFrames - 1) {
+          stopPlay();
+        } else {
+          setFrame(currentIndex + 1);
+        }
+      }, SPEED_MS[speed]);
+    }
+
+    function stopPlay() {
+      playing = false;
+      clearInterval(playInterval);
+      document.getElementById('btn-play').textContent = '▶ Play';
+    }
+
+    // --- Controls ---
+    document.getElementById('btn-prev').addEventListener('click', () => { stopPlay(); setFrame(currentIndex - 1); });
+    document.getElementById('btn-next').addEventListener('click', () => { stopPlay(); setFrame(currentIndex + 1); });
+    document.getElementById('btn-play').addEventListener('click', () => {
+      if (playing) { stopPlay(); } else { startPlay(); }
+    });
+
+    scrubber.addEventListener('input', () => { stopPlay(); setFrame(parseInt(scrubber.value)); });
+
+    for (const btn of document.querySelectorAll('#speed-group button')) {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#speed-group button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        speed = parseFloat(btn.dataset.speed);
+        if (playing) { stopPlay(); startPlay(); }
+      });
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowLeft')  { stopPlay(); setFrame(currentIndex - 1); }
+      if (e.key === 'ArrowRight') { stopPlay(); setFrame(currentIndex + 1); }
+      if (e.key === ' ')          { e.preventDefault(); playing ? stopPlay() : startPlay(); }
+    });
+
+    // --- Resize ---
+    const controlsEl = document.getElementById('controls');
+    function resize() {
+      const h = window.innerHeight - controlsEl.offsetHeight;
+      renderer.setSize(window.innerWidth, h);
+      camera.aspect = window.innerWidth / h;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // --- Render loop ---
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    setFrame(0);
+  </script>
+</body>
+</html>
