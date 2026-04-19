@@ -17,12 +17,13 @@ export function generateCenterFirst(activeArea, rng, streetWidth, bbd) {
   const cx = ox + aw / 2;
   const cz = oz + ad / 2;
 
-  // Same sizing mechanism as BSP splits — rng.float in a valid range, BBD-snapped.
-  // Max leaves room for a street gap plus at least one surrounding block on each side.
+  // Same sizing mechanism AND range as BSP leaves:
+  // BSP stops splitting once a dimension is ≤ MIN_BLOCK * 2 + streetWidth,
+  // so every leaf falls in [MIN_BLOCK, MIN_BLOCK * 2 + streetWidth].
   const minSize = MIN_BLOCK;
-  const maxSize = Math.max(minSize, aw - 2 * (MIN_BLOCK + streetWidth));
+  const maxSize = MIN_BLOCK * 2 + streetWidth;
   const blockW = snapToBBD(rng.float(minSize, maxSize), bbd);
-  const blockD = snapToBBD(rng.float(minSize, Math.max(minSize, ad - 2 * (MIN_BLOCK + streetWidth))), bbd);
+  const blockD = snapToBBD(rng.float(minSize, maxSize), bbd);
 
   // Snap position so the block's centre lands as close as possible to the map centre.
   // Odd-BBD sizes sit half a BBD off — your spec allowed that ("offset a little").
