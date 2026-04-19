@@ -8,7 +8,7 @@
 
 import { DEFAULTS } from './config.js';
 import { createRng } from './core/rng.js';
-import { generateGrid } from './generators/grid.js';
+import { generateGrid } from './generators/foundations/grid.js';
 import { generateBuildings } from './generators/buildings/index.js';
 import { generateFloors } from './generators/floors/index.js';
 import { generateWalls } from './generators/walls/index.js';

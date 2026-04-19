@@ -8,7 +8,7 @@ import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
 import { parseArgs } from './config.js';
 import { createRng } from './core/rng.js';
-import { generateGrid } from './generators/grid.js';
+import { generateGrid } from './generators/foundations/grid.js';
 import { generateBuildings } from './generators/buildings/index.js';
 import { createCollisionMatrix } from './generators/collision/matrix.js';
 // import { generateFloors } from './generators/_old_system/floors/index.js';       // stage 3 — floor plates from building quadrants
