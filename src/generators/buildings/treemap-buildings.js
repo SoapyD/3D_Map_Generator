@@ -1,8 +1,8 @@
 import { createFoundationGrid } from './foundation-grid.js';
 import { placeInFoundation } from './place-in-foundation.js';
-import { cellTopLeft } from './spawn-patterns/cell-top-left.js';
+import { cellCenterOut } from './spawn-patterns/cell-center-out.js';
 
-const CELL_PATTERN = cellTopLeft; // TODO: make configurable
+const CELL_PATTERN = cellCenterOut; // TODO: make configurable
 
 export function treemapBuildings(blocks, rng, tiers) {
   const buildings = [];

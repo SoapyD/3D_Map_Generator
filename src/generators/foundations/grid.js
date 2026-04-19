@@ -11,8 +11,10 @@ import { GRID, GLOBAL_GRID } from '../../config.js';
 import { bspSplit } from './bsp-split.js';
 import { deriveStreetRects } from '../streets/derive-street-rects.js';
 import { biasedCenter } from './split-strategies/biased-center.js';
+import { foundationCenterOut } from './spawn-patterns/center-out.js';
 
-const SPLIT_STRATEGY = biasedCenter; // TODO: make configurable
+const SPLIT_STRATEGY      = biasedCenter;       // TODO: make configurable
+const FOUNDATION_PATTERN  = foundationCenterOut; // TODO: make configurable
 
 /**
  * @param {object} config
@@ -35,6 +37,7 @@ export function generateGrid(config, rng) {
   const leaves = [];
   bspSplit(root, rng, streetWidth, bbd, leaves, SPLIT_STRATEGY);
 
-  const streetBounds = deriveStreetRects(leaves, skirtX, skirtZ, activeW, activeD);
-  return { blocks: leaves, streetBounds, activeArea, skirt: { x: skirtX, z: skirtZ } };
+  const blocks = FOUNDATION_PATTERN(leaves, activeArea);
+  const streetBounds = deriveStreetRects(blocks, skirtX, skirtZ, activeW, activeD);
+  return { blocks, streetBounds, activeArea, skirt: { x: skirtX, z: skirtZ } };
 }
