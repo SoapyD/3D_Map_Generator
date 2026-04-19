@@ -1,6 +1,9 @@
 import { findBuildingForWall } from '../building-lookup/index.js';
 import { wallTextureKey } from '../wall-texture-key.js';
 
+// N/S walls run along X → axis 'x'; E/W walls run along Z → axis 'z'
+const DIR_AXIS = { N: 'x', S: 'x', E: 'z', W: 'z' };
+
 export function buildWallPrimitives(walls, buildings) {
   const primitives = [];
 
@@ -8,14 +11,13 @@ export function buildWallPrimitives(walls, buildings) {
     const wall = walls[i];
     const bi = findBuildingForWall(wall, buildings);
     const texKey = wallTextureKey(bi, buildings);
-    const wx = wall.axis === 'x' ? wall.length : wall.thickness;
-    const wz = wall.axis === 'z' ? wall.length : wall.thickness;
+    const axis = DIR_AXIS[wall.direction] ?? 'x';
 
     primitives.push({
       type: 'wall', name: `wall_${i}`,
-      x: wall.x, y: wall.baseY, z: wall.z, w: wx, h: wall.height, d: wz,
+      x: wall.x, y: wall.y, z: wall.z, w: wall.w, h: wall.h, d: wall.d,
       textureKey: texKey,
-      axis: wall.axis,
+      axis,
     });
   }
 

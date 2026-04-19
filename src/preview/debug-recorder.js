@@ -14,9 +14,10 @@ const STAGE_COLORS = {
   2: '#2244aa', // Streets
   3: '#44bb88', // Buildings
   4: '#ccaa33', // Floors
-  5: '#cc5533', // Walls
-  6: '#aa44cc', // Connectivity
-  7: '#33bbcc', // Cover
+  5: '#88aaff', // Roofs
+  6: '#cc5533', // Walls
+  7: '#aa44cc', // Connectivity
+  8: '#33bbcc', // Cover
 };
 
 const STAGE_NAMES = {
@@ -24,9 +25,10 @@ const STAGE_NAMES = {
   2: 'Streets',
   3: 'Buildings',
   4: 'Floors',
-  5: 'Walls',
-  6: 'Connectivity',
-  7: 'Cover',
+  5: 'Roofs',
+  6: 'Walls',
+  7: 'Connectivity',
+  8: 'Cover',
 };
 
 export function createRecorder(seed, config) {
@@ -55,9 +57,10 @@ function stageToElements(stageIndex, data, color, config) {
     case 2: return streetElements(data, color, config);
     case 3: return buildingElements(data, color, config);
     case 4: return floorElements(data, color, config);
-    case 5: return wallElements(data, color);
-    case 6: return connectivityElements(data, color, config);
-    case 7: return coverElements(data, color);
+    case 5: return roofElements(data, color, config);
+    case 6: return wallElements(data);
+    case 7: return connectivityElements(data, color, config);
+    case 8: return coverElements(data, color);
     default: return [];
   }
 }
@@ -111,7 +114,8 @@ function buildingElements(data, color, config) {
   const all = data.buildings;
   for (let i = 0; i < all.length; i++) {
     const b = all[i];
-    const h = b.maxTier * (config.tierHeight + config.slabThickness);
+    // Exclude roof slab thickness so the roof rect protrudes above the shell in the visualizer
+    const h = b.maxTier * (config.tierHeight + config.slabThickness) - config.slabThickness;
     elements.push({
       label: `Buildings — ${i + 1}/${all.length}`,
       rects: [box('building', b.x, 0, b.z, b.w, h, b.d, color)],
@@ -146,16 +150,22 @@ function floorElements(data, color, config) {
   return elements;
 }
 
-function wallElements(data, color) {
+function roofElements(data, color, config) {
+  const total = data.roofs.length;
+  return data.roofs.map((r, i) => ({
+    label: `Roofs — building ${i + 1}/${total}`,
+    rects: r.rects.map(rect => box('roof', rect.x, r.yCollisionLevel, rect.z, rect.w, config.slabThickness, rect.d, color)),
+  }));
+}
+
+const WALL_DIR_COLORS = { N: '#4488ff', S: '#ff8844', E: '#44ff88', W: '#ff44cc' };
+
+function wallElements(data) {
   const total = data.walls.length;
-  return data.walls.map((w, i) => {
-    const ww = w.axis === 'x' ? w.length : w.thickness;
-    const wd = w.axis === 'x' ? w.thickness : w.length;
-    return {
-      label: `Walls — ${i + 1}/${total}`,
-      rects: [box('wall', w.x, w.baseY, w.z, ww, w.height, wd, color)],
-    };
-  });
+  return data.walls.map((w, i) => ({
+    label: `Walls — ${w.direction} ${i + 1}/${total}`,
+    rects: [box('wall', w.x, w.y, w.z, w.w, w.h, w.d, WALL_DIR_COLORS[w.direction] ?? '#aaaaaa')],
+  }));
 }
 
 function connectivityElements(data, color, config) {

@@ -12,7 +12,8 @@ import { generateGrid } from './generators/foundations/grid.js';
 import { generateBuildings } from './generators/buildings/index.js';
 import { createCollisionMatrix } from './generators/collision/matrix.js';
 import { generateFloors } from './generators/floors/index.js';
-// import { generateWalls } from './generators/_old_system/walls/index.js';          // stage 4 — exterior/interior walls
+import { generateRoofs } from './generators/roofs/index.js';
+import { generateWalls } from './generators/walls/index.js';
 // import { generateConnectivity } from './generators/_old_system/connectivity/generate-connectivity.js'; // stage 5 — walkways, ladders, pillars
 // import { generateCover } from './generators/_old_system/cover/index.js';          // stage 6 — scatter cover pieces
 import { buildGeometry } from './generators/geometry/index.js';
@@ -54,12 +55,24 @@ async function main() {
   recorder?.capture(3, buildingData);
 
   // Stage 3: Floor plates
-  console.log('[3/3] Generating floors...');
+  console.log('[3/5] Generating floors...');
   const floorData = generateFloors(buildingData, config, rng, matrix);
   console.log(`  ${floorData.floors.length} floor plates`);
   recorder?.capture(4, floorData);
 
-  const geometry = buildGeometry(floorData, config);
+  // Stage 4: Roofs
+  console.log('[4/5] Generating roofs...');
+  const roofData = generateRoofs(floorData, config, matrix);
+  console.log(`  ${roofData.roofs.length} roof slabs`);
+  recorder?.capture(5, roofData);
+
+  // Stage 5: Walls
+  console.log('[5/5] Generating walls...');
+  const wallData = generateWalls(roofData, config, rng, matrix);
+  console.log(`  ${wallData.walls.length} wall segments`);
+  recorder?.capture(6, wallData);
+
+  const geometry = buildGeometry(wallData, config);
 
   // Export
   await mkdir(config.outputDir, { recursive: true });

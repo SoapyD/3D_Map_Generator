@@ -32,8 +32,16 @@ export const DEFAULTS = {
 // --- Buildings --- (_old_system only)
 // export const BUILDING = { ... };  // see _old_system/config.js
 
-// --- Walls --- (_old_system only)
-// export const WALL = { ... };  // see _old_system/config.js
+// --- Walls ---
+export const WALL = {
+  wallThickness: 0.25,              // outer face flush with cell edge, body extends inward
+  quadSize: 1.5,                    // inches per damage column (Phase 2)
+  externalUpperRemovalRatio: 0.7,   // Phase 2: max fraction of upper row removed on exterior walls
+  externalLowerRemovalRatio: 0.5,   // Phase 2: max fraction of lower row removed on exterior walls
+  internalUpperRemovalRatio: 0.6,   // Phase 2: interior walls
+  internalLowerRemovalRatio: 0.3,
+  interiorWallChance: { medium: 0.75, largeA: 1.0, largeB: 1.0 }, // Phase 2
+};
 
 // --- Floors ---
 export const FLOOR = {
