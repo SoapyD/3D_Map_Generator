@@ -9,7 +9,6 @@
 
 import { GRID } from '../config.js';
 import { bspSplit } from './bsp-split.js';
-import { extractStreets } from './extract-streets.js';
 import { deriveStreetRects } from './derive-street-rects.js';
 
 /**
@@ -27,10 +26,7 @@ export function generateGrid(config, rng) {
   const leaves = [];
   bspSplit(root, rng, streetWidth, leaves);
 
-  // Extract streets from the gaps between blocks
-  const streets = extractStreets(leaves, mapWidth, mapDepth, streetWidth);
-
   const streetBounds = deriveStreetRects(leaves, mapWidth, mapDepth);
-  return { blocks: leaves, streets, streetBounds };
+  return { blocks: leaves, streetBounds };
 }
 

@@ -10,7 +10,7 @@
   "scripts": {
     "generate": "node src/index.js",
     "preview": "node src/index.js --preview",
-    "visualize": "node src/index.js --visualize",
+    "visualize": "node src/index.js --seed 42 --visualize",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

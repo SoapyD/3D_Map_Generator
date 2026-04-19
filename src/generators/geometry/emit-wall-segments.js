@@ -1,5 +1,5 @@
 import { findBranchGaps } from '../building-lookup/index.js';
-import { splitWallSegments } from '../walls/index.js';
+// import { splitWallSegments } from '../walls/index.js'; // moved to _old_system/walls
 
 /**
  * Emit wall-segment primitives for one side of a bridge,

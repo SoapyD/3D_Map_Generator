@@ -10,10 +10,10 @@ import { parseArgs } from './config.js';
 import { createRng } from './core/rng.js';
 import { generateGrid } from './generators/grid.js';
 import { generateBuildings } from './generators/buildings/index.js';
-import { generateFloors } from './generators/floors/index.js';
-import { generateWalls } from './generators/walls/index.js';
-import { generateConnectivity } from './generators/connectivity/index.js';
-import { generateCover } from './generators/cover/index.js';
+// import { generateFloors } from './generators/_old_system/floors/index.js';       // stage 3 — floor plates from building quadrants
+// import { generateWalls } from './generators/_old_system/walls/index.js';          // stage 4 — exterior/interior walls
+// import { generateConnectivity } from './generators/_old_system/connectivity/generate-connectivity.js'; // stage 5 — walkways, ladders, pillars
+// import { generateCover } from './generators/_old_system/cover/index.js';          // stage 6 — scatter cover pieces
 import { buildGeometry } from './generators/geometry/index.js';
 import { buildScene } from './generators/scene/index.js';
 import { exportToGlb, getOutputPath } from './export/glb-exporter.js';
@@ -38,48 +38,19 @@ async function main() {
   console.log(`  Damage level: ${config.damageLevel}`);
 
   // Stage 1: Grid partitioning
-  console.log('\n[1/7] Generating city grid...');
+  console.log('\n[1/2] Generating city grid...');
   const gridData = generateGrid(config, rng);
   console.log(`  ${gridData.blocks.length} city blocks`);
   recorder?.capture(1, gridData);
   recorder?.capture(2, gridData);
 
-  // Stage 2: Building footprints
-  console.log('[2/7] Placing buildings...');
+  // Stage 2: Building shells
+  console.log('[2/2] Placing buildings...');
   const buildingData = generateBuildings(gridData, config, rng);
   console.log(`  ${buildingData.buildings.length} buildings`);
   recorder?.capture(3, buildingData);
 
-  // Stage 3: Floor plates
-  console.log('[3/7] Generating floor plates...');
-  const floorData = generateFloors(buildingData, config, rng);
-  for (const f of floorData.floors) {
-    console.log(`  Tier ${f.tier}: ${f.sections.length} sections`);
-  }
-  recorder?.capture(4, floorData);
-
-  // Stage 4: Walls
-  console.log('[4/7] Generating walls...');
-  const wallData = generateWalls(floorData, config, rng);
-  console.log(`  ${wallData.walls.length} wall segments`);
-  recorder?.capture(5, wallData);
-
-  // Stage 5: Connectivity
-  console.log('[5/7] Connecting levels...');
-  const connData = generateConnectivity(wallData, config, rng);
-  const c = connData.connections;
-  console.log(`  ${c.ladders.length} ladders, ${c.walkways.length} walkways`);
-  recorder?.capture(6, connData);
-
-  // Stage 6: Cover
-  console.log('[6/7] Placing cover...');
-  const coverData = generateCover(connData, config, rng);
-  console.log(`  ${coverData.cover.length} cover pieces`);
-  recorder?.capture(7, coverData);
-
-  // Build geometry primitives (shared handover)
-  console.log('[7/8] Building geometry...');
-  const geometry = buildGeometry(coverData, config);
+  const geometry = buildGeometry(buildingData, config);
 
   // Export
   await mkdir(config.outputDir, { recursive: true });
@@ -94,8 +65,7 @@ async function main() {
   const geometryPath = path.join(dir, `${baseName}_geometry.json`);
   await writeFile(geometryPath, JSON.stringify(geometry));
 
-  // Build 3D scene from primitives
-  console.log('[8/8] Building scene and exporting...');
+  console.log('Building scene and exporting...');
   const scene = buildScene(geometry, config);
 
   // Always export both GLB and OBJ with texture atlas
@@ -115,7 +85,7 @@ async function main() {
   if (config.preview) {
     console.log('\nStarting preview server...');
     const { startPreview } = await import('./preview/server.js');
-    startPreview(outputPath, 3000, config.visualize ? 'visualize' : 'preview');
+    startPreview(outputPath, 3010, config.visualize ? 'visualize' : 'preview');
   }
 }
 
