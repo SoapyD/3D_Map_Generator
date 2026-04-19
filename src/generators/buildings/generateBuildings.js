@@ -25,24 +25,14 @@ const FOOTPRINTS = BUILDING.footprints;
 export function generateBuildings(gridData, config, rng) {
   const { tiers } = config;
 
-  // Use the average small footprint size to determine grid count
-  const avgSize = (FOOTPRINTS.small.min + FOOTPRINTS.small.max) / 2;
-  const minCellSize = avgSize * BUILDING.cellSizeMultiplier;
-
-  // Figure out how many fit, then stretch the cell size to fill the map
-  const cols = Math.floor(config.mapWidth / minCellSize);
-  const rows = Math.floor(config.mapDepth / minCellSize);
-  const cellW = config.mapWidth / cols;
-  const cellD = config.mapDepth / rows;
-
-  const buildings = placeSmallBuildings(cols, rows, cellW, cellD, config, rng, tiers);
+  const buildings = placeSmallBuildings(gridData.blocks, gridData.streetBounds, config, rng, tiers);
 
   // Place larger buildings one at a time, validating each against existing buildings.
   // Small buildings earmarked for displacement are restored if the big building can't be placed.
   const layout = rng.int(0, 4);
   const specs = getLayoutSpecs(layout, config);
 
-  const { placedBig, displacedByBig } = placeBigBuildings(buildings, specs, config, rng, tiers);
+  const { placedBig, displacedByBig } = placeBigBuildings(buildings, specs, config, rng, tiers, gridData.streetBounds);
 
   // Surviving small buildings = all except those displaced by big buildings
   const surviving = buildings.filter(b => !displacedByBig.includes(b));

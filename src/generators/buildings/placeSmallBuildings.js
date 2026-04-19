@@ -9,52 +9,95 @@ import { buildSmallUShape } from './buildSmallUShape.js';
 const FOOTPRINTS = BUILDING.footprints;
 const HEIGHTS = BUILDING.heights;
 
-export function placeSmallBuildings(cols, rows, cellW, cellD, config, rng, tiers) {
+function getBounds(segments) {
+  const x  = Math.min(...segments.map(s => s.x));
+  const z  = Math.min(...segments.map(s => s.z));
+  const x2 = Math.max(...segments.map(s => s.x + s.w));
+  const z2 = Math.max(...segments.map(s => s.z + s.d));
+  return { x, z, w: x2 - x, d: z2 - z };
+}
+
+function overlaps(a, b) {
+  return a.x < b.x + b.w - 0.01 && a.x + a.w > b.x + 0.01
+      && a.z < b.z + b.d - 0.01 && a.z + a.d > b.z + 0.01;
+}
+
+function placementValid(candidates, blocks, streetBounds) {
+  const bounds = getBounds(candidates);
+  const blockCount = blocks.filter(b => overlaps(bounds, b)).length;
+  if (blockCount !== 1) return false;
+  if (streetBounds.some(s => overlaps(bounds, s))) return false;
+  return true;
+}
+
+export function placeSmallBuildings(blocks, streetBounds, config, rng, tiers) {
   const buildings = [];
   let towerCount = 0;
   const maxTowers = BUILDING.maxTowers || Infinity;
 
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const cellX = col * cellW;
-      const cellZ = row * cellD;
+  const avgSize = (FOOTPRINTS.small.min + FOOTPRINTS.small.max) / 2;
+  const minCellSize = avgSize * BUILDING.cellSizeMultiplier;
 
-      // Chance to place a tower instead of a small building
-      if (towerCount < maxTowers && BUILDING.towerChance && rng.chance(BUILDING.towerChance)) {
-        const tFp = FOOTPRINTS.tower || { min: 2, max: 3 };
-        const w = rng.float(tFp.min, tFp.max);
-        const d = rng.float(tFp.min, tFp.max);
-        const x = cellX + (cellW - w) / 2;
-        const z = cellZ + (cellD - d) / 2;
-        const pyramidRoof = rng.chance(BUILDING.pyramidRoofChance);
-        buildings.push({ x, z, w, d, maxTier: tiers, size: 'tower', height: 'tall', blockIndex: 0, pyramidRoof });
-        towerCount++;
-      } else {
-        // Standard small building
-        const w = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
-        const d = rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max);
-        const x = cellX + (cellW - w) / 2;
-        const z = cellZ + (cellD - d) / 2;
+  for (let bi = 0; bi < blocks.length; bi++) {
+    const block = blocks[bi];
+    const cols = Math.max(1, Math.floor(block.w / minCellSize));
+    const rows = Math.max(1, Math.floor(block.d / minCellSize));
+    const cellW = block.w / cols;
+    const cellD = block.d / rows;
 
-        const heightKey = rng.pick(['short', 'medium', 'tall']);
-        const height = HEIGHTS[heightKey];
-        const maxTier = rng.int(Math.min(height.tierMin, tiers), Math.min(height.tierMax, tiers));
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const cellX = block.x + col * cellW;
+        const cellZ = block.z + row * cellD;
 
-        // Pick a building shape
-        const shape = pickShape(rng);
-
-        if (shape === 'diagA' || shape === 'diagB') {
-          buildings.push(...buildDiagonalShape(shape, x, z, w, d, maxTier, heightKey, tiers, rng, buildings.length));
-        } else if (shape.startsWith('lShape')) {
-          buildings.push(...buildLShape(shape, x, z, maxTier, heightKey, rng, buildings.length));
-        } else if (shape.startsWith('uShape')) {
-          buildings.push(...buildUShape(shape, x, z, maxTier, heightKey, rng, buildings.length));
-        } else if (shape.startsWith('uNarrow')) {
-          buildings.push(...buildNarrowUShape(shape, x, z, maxTier, heightKey, rng, buildings.length));
-        } else if (shape.startsWith('uSmall')) {
-          buildings.push(...buildSmallUShape(shape, x, z, maxTier, heightKey, rng, buildings.length));
+        if (towerCount < maxTowers && BUILDING.towerChance && rng.chance(BUILDING.towerChance)) {
+          const tFp = FOOTPRINTS.tower || { min: 2, max: 3 };
+          const w = Math.min(rng.float(tFp.min, tFp.max), cellW);
+          const d = Math.min(rng.float(tFp.min, tFp.max), cellD);
+          const x = cellX + (cellW - w) / 2;
+          const z = cellZ + (cellD - d) / 2;
+          const pyramidRoof = rng.chance(BUILDING.pyramidRoofChance);
+          const towerCandidate = [{ x, z, w, d, maxTier: tiers, size: 'tower', height: 'tall', blockIndex: bi, pyramidRoof }];
+          if (placementValid(towerCandidate, blocks, streetBounds)) {
+            buildings.push(...towerCandidate);
+            towerCount++;
+          }
         } else {
-          buildings.push({ x, z, w, d, maxTier, size: 'small', height: heightKey, blockIndex: 0, shape });
+          const w = Math.min(rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max), cellW);
+          const d = Math.min(rng.float(FOOTPRINTS.small.min, FOOTPRINTS.small.max), cellD);
+          const x = cellX + (cellW - w) / 2;
+          const z = cellZ + (cellD - d) / 2;
+
+          const heightKey = rng.pick(['short', 'medium', 'tall']);
+          const height = HEIGHTS[heightKey];
+          const maxTier = rng.int(Math.min(height.tierMin, tiers), Math.min(height.tierMax, tiers));
+
+          const shape = pickShape(rng);
+
+          let candidates;
+          if (shape === 'diagA' || shape === 'diagB') {
+            candidates = buildDiagonalShape(shape, x, z, w, d, maxTier, heightKey, tiers, rng, buildings.length);
+          } else if (shape.startsWith('lShape')) {
+            candidates = buildLShape(shape, x, z, maxTier, heightKey, rng, buildings.length);
+          } else if (shape.startsWith('uShape')) {
+            candidates = buildUShape(shape, x, z, maxTier, heightKey, rng, buildings.length);
+          } else if (shape.startsWith('uNarrow')) {
+            candidates = buildNarrowUShape(shape, x, z, maxTier, heightKey, rng, buildings.length);
+          } else if (shape.startsWith('uSmall')) {
+            candidates = buildSmallUShape(shape, x, z, maxTier, heightKey, rng, buildings.length);
+          } else {
+            candidates = [{ x, z, w, d, maxTier, size: 'small', height: heightKey, blockIndex: bi, shape }];
+          }
+
+          if (placementValid(candidates, blocks, streetBounds)) {
+            candidates.forEach(seg => { seg.blockIndex = bi; });
+            buildings.push(...candidates);
+          } else {
+            const fallback = [{ x, z, w, d, maxTier, size: 'small', height: heightKey, blockIndex: bi, shape: 'full' }];
+            if (placementValid(fallback, blocks, streetBounds)) {
+              buildings.push(...fallback);
+            }
+          }
         }
       }
     }
@@ -62,3 +105,4 @@ export function placeSmallBuildings(cols, rows, cellW, cellD, config, rng, tiers
 
   return buildings;
 }
+
