@@ -2,7 +2,7 @@
  * Build geometry primitives for bridges (slab, walls, battlements).
  */
 
-import { CONNECTIVITY } from '../../config.js';
+// import { CONNECTIVITY } from '../../config.js'; // _old_system — inlined defaults below
 import { emitWallSegments } from './emit-wall-segments.js';
 import { emitBattlements } from './emit-battlements.js';
 
@@ -14,9 +14,9 @@ import { emitBattlements } from './emit-battlements.js';
  */
 export function buildBridgePrimitives(bridges, walkways, allBranches) {
   const primitives = [];
-  const bridgeThickness = CONNECTIVITY.bridgeThickness || 0.5;
-  const wallH = CONNECTIVITY.bridgeWallHeight || 0.75;
-  const wallT = CONNECTIVITY.bridgeWallThickness || 0.25;
+  const bridgeThickness = 0.5;
+  const wallH = 0.75;
+  const wallT = 0.25;
 
   for (let i = 0; i < bridges.length; i++) {
     const b = bridges[i];
@@ -56,9 +56,9 @@ export function buildBridgePrimitives(bridges, walkways, allBranches) {
 
     // Battlements — only within surviving wall segments
     if (b.variant === 'battlement') {
-      const battH = CONNECTIVITY.bridgeBattlementHeight - wallH;
-      const spacing = CONNECTIVITY.bridgeBattlementSpacing || 2.25;
-      const gap = CONNECTIVITY.bridgeBattlementGap || 1.5;
+      const battH = 1.5 - wallH;
+      const spacing = 2.25;
+      const gap = 1.5;
       const pillarW = spacing - gap;
       const battY = wallY + wallH;
 

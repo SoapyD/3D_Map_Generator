@@ -15,16 +15,9 @@ export function markCells(grid, col, row, bbdW, bbdD) {
       grid.cells[r][c] = true;
 }
 
-export function findFreeCell(grid, bbdW, bbdD) {
-  for (let r = 0; r <= grid.bbdD - bbdD; r++) {
-    for (let c = 0; c <= grid.bbdW - bbdW; c++) {
-      let free = true;
-      outer:
-      for (let dr = 0; dr < bbdD; dr++)
-        for (let dc = 0; dc < bbdW; dc++)
-          if (grid.cells[r + dr][c + dc]) { free = false; break outer; }
-      if (free) return { col: c, row: r };
-    }
-  }
-  return null;
+export function isCellRegionFree(grid, col, row, bbdW, bbdD) {
+  for (let dr = 0; dr < bbdD; dr++)
+    for (let dc = 0; dc < bbdW; dc++)
+      if (grid.cells[row + dr][col + dc]) return false;
+  return true;
 }

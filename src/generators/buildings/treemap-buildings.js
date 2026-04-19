@@ -1,13 +1,14 @@
 import { createFoundationGrid } from './foundation-grid.js';
 import { placeInFoundation } from './place-in-foundation.js';
-import { centerOut } from './spawn-patterns/center-out.js';
+import { cellTopLeft } from './spawn-patterns/cell-top-left.js';
 
-export function treemapBuildings(blocks, rng, tiers, activeArea) {
+const CELL_PATTERN = cellTopLeft; // TODO: make configurable
+
+export function treemapBuildings(blocks, rng, tiers) {
   const buildings = [];
-  const orderedBlocks = centerOut(blocks, activeArea);
 
-  for (let bi = 0; bi < orderedBlocks.length; bi++) {
-    const block = orderedBlocks[bi];
+  for (let bi = 0; bi < blocks.length; bi++) {
+    const block = blocks[bi];
     const grid = createFoundationGrid(block);
 
     // Always consume the same RNG calls per block for determinism
@@ -17,26 +18,25 @@ export function treemapBuildings(blocks, rng, tiers, activeArea) {
     const mediumChances = Array.from({ length: mediumAttempts }, () => rng.chance(0.5));
 
     if (tryLargeA) {
-      const b = placeInFoundation(grid, 'largeA', bi, rng, tiers);
+      const b = placeInFoundation(grid, 'largeA', bi, rng, tiers, CELL_PATTERN);
       if (b) buildings.push(b);
     }
     if (tryLargeB) {
-      const b = placeInFoundation(grid, 'largeB', bi, rng, tiers);
+      const b = placeInFoundation(grid, 'largeB', bi, rng, tiers, CELL_PATTERN);
       if (b) buildings.push(b);
     }
 
     for (let i = 0; i < mediumAttempts; i++) {
       if (mediumChances[i]) {
-        const b = placeInFoundation(grid, 'medium', bi, rng, tiers);
+        const b = placeInFoundation(grid, 'medium', bi, rng, tiers, CELL_PATTERN);
         if (b) buildings.push(b);
       }
     }
 
-    // Fill remaining cells with small buildings
-    let placed = placeInFoundation(grid, 'small', bi, rng, tiers);
+    let placed = placeInFoundation(grid, 'small', bi, rng, tiers, CELL_PATTERN);
     while (placed) {
       buildings.push(placed);
-      placed = placeInFoundation(grid, 'small', bi, rng, tiers);
+      placed = placeInFoundation(grid, 'small', bi, rng, tiers, CELL_PATTERN);
     }
   }
 

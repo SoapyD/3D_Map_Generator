@@ -7,6 +7,6 @@
 // export { generateBigBuilding } from './generateBigBuilding.js'; // old system — depends on shape builders
 // export { getLayoutSpecs } from './getLayoutSpecs.js';           // old system — big building layout strategies
 // export { overlapsAny } from './overlapsAny.js';  // relocated to utils/rects/index.js
-export { placeBigBuildings } from './placeBigBuildings.js';
-export { placeSmallBuildings } from './placeSmallBuildings.js';
+// export { placeBigBuildings } from './placeBigBuildings.js';   // _old_system — BUILDING/DELETIONS removed from config
+// export { placeSmallBuildings } from './placeSmallBuildings.js'; // _old_system
 export { generateBuildings } from './generateBuildings.js';

@@ -1,9 +1,9 @@
 import { BUILDING_SIZES, bbdCellToWorldPos } from './building-sizes.js';
-import { findFreeCell, markCells } from './foundation-grid.js';
+import { markCells } from './foundation-grid.js';
 
-export function placeInFoundation(grid, sizeKey, blockIndex, rng, tiers) {
+export function placeInFoundation(grid, sizeKey, blockIndex, rng, tiers, cellPattern) {
   const { bbdW, bbdD } = BUILDING_SIZES[sizeKey];
-  const cell = findFreeCell(grid, bbdW, bbdD);
+  const cell = cellPattern(grid, bbdW, bbdD);
   if (!cell) return null;
   markCells(grid, cell.col, cell.row, bbdW, bbdD);
   const pos = bbdCellToWorldPos(grid.block.x, grid.block.z, cell.col, cell.row, sizeKey);

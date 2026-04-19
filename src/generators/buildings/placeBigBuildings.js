@@ -1,4 +1,4 @@
-import { BUILDING, DELETIONS } from '../../config.js';
+// import { BUILDING, DELETIONS } from '../../config.js'; // _old_system — BUILDING/DELETIONS removed from config
 // import { generateBigBuilding } from './generateBigBuilding.js'; // old system — depends on shape builders
 import { overlapsAny } from '../utils/rects/index.js';
 

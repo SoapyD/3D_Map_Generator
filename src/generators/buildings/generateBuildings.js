@@ -25,7 +25,7 @@ import { treemapBuildings } from './treemap-buildings.js';
 export function generateBuildings(gridData, config, rng, matrix) {
   const { tiers, tierHeight } = config;
 
-  const buildings = treemapBuildings(gridData.blocks, rng, tiers, gridData.activeArea);
+  const buildings = treemapBuildings(gridData.blocks, rng, tiers);
 
   // Write building shells into the collision matrix at full height
   for (const b of buildings) {
