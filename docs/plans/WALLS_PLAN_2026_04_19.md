@@ -57,16 +57,20 @@ This catches the inner concave corner of an L-shaped floor where all four cardin
 
 ### Write label to matrix
 
-Add two new `CELL` constants to `matrix.js`:
+Add `CELL` constants to `matrix.js`:
 
 | Constant | Value | Meaning |
 |---|---|---|
-| `CELL.WALL_N` | `10` | floor cell facing north |
-| `CELL.WALL_S` | `11` | floor cell facing south |
-| `CELL.WALL_E` | `12` | floor cell facing east |
-| `CELL.WALL_W` | `13` | floor cell facing west |
+| `CELL.FLOOR_N` | `10` | floor cell whose north edge is exposed (faces a wall) |
+| `CELL.FLOOR_S` | `11` | floor cell whose south edge is exposed |
+| `CELL.FLOOR_E` | `12` | floor cell whose east edge is exposed |
+| `CELL.FLOOR_W` | `13` | floor cell whose west edge is exposed |
+| `CELL.WALL_N`  | `20` | wall geometry facing north |
+| `CELL.WALL_S`  | `21` | wall geometry facing south |
+| `CELL.WALL_E`  | `22` | wall geometry facing east |
+| `CELL.WALL_W`  | `23` | wall geometry facing west |
 
-Overwrite the cell's value in the matrix with its direction label. Unlabelled cells (interior, no open neighbour) remain `CELL.FLOOR`.
+Pass 1 overwrites each edge FLOOR cell with `FLOOR_N/S/E/W`. Unlabelled cells (interior, no exposed edge) remain `CELL.FLOOR = 1`.
 
 ---
 
@@ -85,8 +89,8 @@ For each direction, cells share one fixed axis value:
 | E | `cx` (all at same X face) | `cz` ascending | Z axis |
 | W | `cx` | `cz` ascending | Z axis |
 
-1. Collect all cells labelled `WALL_N` at this floor's Y level
-2. Group by fixed axis value (e.g. all `WALL_N` cells at `cz = 5`)
+1. Collect all cells labelled `FLOOR_N` at this floor's Y level
+2. Group by fixed axis value (e.g. all `FLOOR_N` cells at `cz = 5`)
 3. Within each group, sort by sort axis (`cx`)
 4. Walk the sorted list — each contiguous run (no gap > 1 cell) becomes one wall segment
 5. A wall segment's bounds = `min(sort axis)` to `max(sort axis) + 1` (the far edge of the last cell)
@@ -112,10 +116,13 @@ W wall: outer face at X = ox + cx*s     → x = ox + cx*s,            w = t,  z 
 
 ### Write walls to collision matrix
 
-After computing wall rects, write each wall into the matrix:
+After computing wall rects, write each wall into the matrix using its directional type:
 ```js
-matrix.fillBox(wall.x, wall.y, wall.z, wall.w, wall.h, wall.d, CELL.WALL)
+const wallCellType = { N: CELL.WALL_N, S: CELL.WALL_S, E: CELL.WALL_E, W: CELL.WALL_W };
+matrix.fillBox(wall.x, wall.y, wall.z, wall.w, wall.h, wall.d, wallCellType[wall.direction]);
 ```
+
+`CELL.WALL = 2` is kept as a generic fallback for interior walls (Phase 2) where direction is less meaningful.
 
 `CELL.WALL = 2` already exists.
 
@@ -163,17 +170,22 @@ wallThickness: 0.25,  // wall slab depth (inches) — outer face flush with cell
 
 Add to `CELL` in `matrix.js`:
 ```js
-WALL_N: 10, WALL_S: 11, WALL_E: 12, WALL_W: 13
+// Directional floor edge labels (floor cells with an exposed edge)
+FLOOR_N: 10, FLOOR_S: 11, FLOOR_E: 12, FLOOR_W: 13,
+// Directional wall geometry
+WALL_N: 20, WALL_S: 21, WALL_E: 22, WALL_W: 23,
 ```
+
+`CELL.WALL = 2` is retained for interior walls where a single direction isn't meaningful.
 
 ---
 
 ## Visualizer additions
 
-- Add `WALL` (`value: 2`) to `CELL_TYPES` in the grid dropdown (`color: 0x88cc44`)
-- Add directional labels as optional types (value 10–13) if fine-grained debug is needed
-- Add stage 5 recorder entry — one element per wall, coloured by direction:
-  - N = `#4488ff`, S = `#ff8844`, E = `#44ff88`, W = `#ff44cc`
+- Add to grid dropdown `CELL_TYPES`:
+  - Floor edges: `FLOOR_N/S/E/W` (values 10–13), colour `#ccaa33` (same as floor stage colour)
+  - Walls: `WALL_N` = `#4488ff`, `WALL_S` = `#ff8844`, `WALL_E` = `#44ff88`, `WALL_W` = `#ff44cc`
+- Add stage 5 recorder entry — one element per wall, coloured by direction (same colours as above)
 
 ---
 
