@@ -177,7 +177,7 @@ WALL_N: 10, WALL_S: 11, WALL_E: 12, WALL_W: 13
 
 ---
 
-## Execution order
+## Execution order (Phase 1)
 
 1. Add `wallThickness` to `config.js`
 2. Add `WALL_N/S/E/W` constants to `matrix.js`
@@ -187,3 +187,108 @@ WALL_N: 10, WALL_S: 11, WALL_E: 12, WALL_W: 13
 6. Update visualizer grid dropdown to show WALL type
 7. Add recorder capture for stage 5
 8. Verify visually: walls appear on all four sides of floor plates, correct height and direction colouring
+
+---
+
+---
+
+# Phase 2 — Wall Damage & Interior Walls
+
+Port the damage and interior wall systems from `_old_system/walls/`. Depends on Phase 1 walls being verified end-to-end first.
+
+---
+
+## Phase 2a — Wall Damage
+
+**Source:** `_old_system/walls/apply-wall-damage.js`, `_old_system/walls/merge-segments.js`
+
+Each exterior wall segment generated in Phase 1 is subdivided into a column × 2-row quadrant grid. Quadrants are randomly removed (adjacency-spreading) to produce the ruined aesthetic.
+
+### Algorithm (port directly, no structural changes needed)
+
+1. `cols = Math.max(1, Math.round(wallLength / WALL.quadSize))` — column count
+2. Each cell = `(wallLength / cols)` wide × `(wallHeight / 2)` tall
+3. **Upper row** removal: pick a random start column, spread adjacently; remove up to `externalUpperRemovalRatio` of columns
+4. **Lower row** removal: can only remove columns that are adjacent to an already-removed upper cell; remove up to `externalLowerRemovalRatio` of columns
+5. Remaining cells → merge contiguous same-row runs back into rect segments (`merge-segments.js`)
+6. Each output segment replaces the original wall entry
+
+### Config additions
+
+```js
+// src/config.js  WALL constants block:
+export const WALL = {
+  quadSize: 1.5,                    // inches per damage column (old system value)
+  externalUpperRemovalRatio: 0.7,   // max fraction of upper row removed on exterior walls
+  externalLowerRemovalRatio: 0.5,   // max fraction of lower row removed on exterior walls
+  internalUpperRemovalRatio: 0.6,   // interior walls
+  internalLowerRemovalRatio: 0.3,
+  interiorWallChance: { medium: 0.75, largeA: 1.0, largeB: 1.0 },
+};
+```
+
+> Note: old system used a single `large` size; new system has `largeA` and `largeB` — both get `1.0` chance.
+
+### New files
+
+| File | Purpose |
+|---|---|
+| `src/generators/walls/apply-wall-damage.js` | Port from old system — quadrant subdivision + removal |
+| `src/generators/walls/merge-segments.js` | Port from old system — merges contiguous wall segments |
+
+### Integration
+
+- Call `applyWallDamage(wallDef, rng, 'external')` on every wall segment produced by Phase 1 before pushing to the output array
+- `walls/index.js` replaces the flat segment push with the damage-expanded list
+
+---
+
+## Phase 2b — Interior Walls
+
+**Source:** `_old_system/walls/generate-interior-walls.js`
+
+For medium and large buildings, place internal dividing walls through the centre of each floor room. Walls have a door gap and are also damage-processed.
+
+### Eligibility
+
+- Building `size` is `medium`, `largeA`, or `largeB`
+- Per-floor random chance: `WALL.interiorWallChance[building.size]`
+- Only place if the floor above (floorIndex + 1) exists and has ≥ 2 quadrants present
+
+### Variants (port directly from old system)
+
+| Variant | Description |
+|---|---|
+| `centreNS` | Wall from north edge midpoint, runs half-depth toward centre, with door gap |
+| `centreSN` | Same from south edge midpoint |
+| `centreEW` | From west edge midpoint, runs half-width toward centre, with door gap |
+| `centreWE` | From east edge midpoint |
+| `cross` | Two crossing walls through building centre (no door gap on cross variant) |
+
+Weights from old system: `cross = 0.3`, each centre variant = `0.175`.
+
+Door gap = `WALL.quadSize` (1.5") cut from the midpoint of each interior wall segment.
+
+### Adaptation notes
+
+- Old system used `data.buildingQuadrants[bi].tiers[tier+1]` to check quadrant count above. New system: find the floor record with `buildingIndex === bi && floorIndex === i + 1` and check `4 - floor.removedQuadrants.length >= 2`
+- `pickInteriorVariant` selector is already in `src/generators/selectors/pickInteriorVariant.js` — uncomment its export in `selectors/index.js`
+- Apply `applyWallDamage(def, rng, 'internal')` to each interior wall definition before pushing
+
+### New files
+
+| File | Purpose |
+|---|---|
+| `src/generators/walls/generate-interior-walls.js` | Port + adapt from old system |
+
+---
+
+## Phase 2 execution order
+
+1. Port `merge-segments.js`
+2. Port and adapt `apply-wall-damage.js`
+3. Integrate damage into Phase 1 exterior walls — verify walls still appear correctly but now show ruined segments
+4. Port and adapt `generate-interior-walls.js`
+5. Wire interior walls into `walls/index.js`
+6. Re-enable `pickInteriorVariant` export in `selectors/index.js`
+7. Verify visually: interior walls appear in medium/large buildings, damage applied to both exterior and interior
