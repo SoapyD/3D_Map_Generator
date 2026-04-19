@@ -4,9 +4,9 @@
  * whose centre point falls outside every block — those are streets.
  * Results are perfectly aligned with block boundaries.
  */
-export function deriveStreetRects(blocks, mapWidth, mapDepth) {
-  const xs = new Set([0, mapWidth]);
-  const zs = new Set([0, mapDepth]);
+export function deriveStreetRects(blocks, originX, originZ, activeW, activeD) {
+  const xs = new Set([originX, originX + activeW]);
+  const zs = new Set([originZ, originZ + activeD]);
   for (const b of blocks) {
     xs.add(b.x);       xs.add(b.x + b.w);
     zs.add(b.z);       zs.add(b.z + b.d);

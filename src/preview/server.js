@@ -32,6 +32,11 @@ export function startPreview(glbPath, port = 3000, mode = 'preview') {
           'Access-Control-Allow-Origin': '*',
         });
         res.end(data);
+      } else if (req.url === '/geometry.json') {
+        const geometryPath = glbPath.replace(/\.glb$/, '_geometry.json');
+        const data = await readFile(geometryPath, 'utf-8');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(data);
       } else {
         res.writeHead(404);
         res.end('Not found');

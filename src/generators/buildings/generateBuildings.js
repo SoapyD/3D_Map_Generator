@@ -1,38 +1,36 @@
 /**
  * Stage 2: Building Footprint Generation
  *
- * Creates a haphazard mix of large, medium, and small ruins.
- * Targets ~70% coverage of the available block area.
- * Buildings vary significantly in size and are packed densely.
+ * Uses a treemap algorithm to fill each foundation block with buildings
+ * snapped to the BBD grid. Buildings are sized as small (1×1 BBD),
+ * medium (2×2 BBD), largeA (2×3 BBD), or largeB (3×2 BBD).
  *
  * Output: Array of buildings { x, z, w, d, maxTier, size, blockIndex }
  */
 
-import { BUILDING } from '../../config.js';
-// import { getLayoutSpecs } from './getLayoutSpecs.js';    // old system — big building layout strategies
-import { placeSmallBuildings } from './placeSmallBuildings.js';
-// import { placeBigBuildings } from './placeBigBuildings.js'; // old system — depends on shape builders
-// import { cullBuildings } from './cullBuildings.js';         // old system — post-placement overlap culling
-
-const FOOTPRINTS = BUILDING.footprints;
+import { CELL } from '../collision/matrix.js';
+import { treemapBuildings } from './treemap-buildings.js';
+// import { placeSmallBuildings } from './placeSmallBuildings.js';  // old system — random float-positioned buildings
+// import { getLayoutSpecs } from './getLayoutSpecs.js';            // old system — big building layout strategies
+// import { placeBigBuildings } from './placeBigBuildings.js';      // old system — depends on shape builders
+// import { cullBuildings } from './cullBuildings.js';              // old system — post-placement overlap culling
 
 /**
- * @param {{ blocks: Array<{x,z,w,d}> }} gridData
+ * @param {{ blocks, streetBounds, activeArea }} gridData
  * @param {object} config
  * @param {object} rng
+ * @param {object} matrix - collision matrix
  * @returns {{ buildings: Array, blocks: Array }}
  */
-export function generateBuildings(gridData, config, rng) {
-  const { tiers } = config;
+export function generateBuildings(gridData, config, rng, matrix) {
+  const { tiers, slabThickness } = config;
 
-  const buildings = placeSmallBuildings(gridData.blocks, gridData.streetBounds, config, rng, tiers);
+  const buildings = treemapBuildings(gridData.blocks, rng, tiers);
 
-  // const layout = rng.int(0, 4);
-  // const specs = getLayoutSpecs(layout, config);
-  // const { placedBig, displacedByBig } = placeBigBuildings(buildings, specs, config, rng, tiers, gridData.streetBounds);
-  // const surviving = buildings.filter(b => !displacedByBig.includes(b));
-  // const { finalBuildings, deletedBuildings } = cullBuildings(surviving, placedBig, displacedByBig, rng);
-  // return { ...gridData, buildings: [...placedBig, ...finalBuildings], deletedBuildings };
+  // Write building footprints into the collision matrix at ground level
+  for (const b of buildings) {
+    matrix.fillBox(b.x, 0, b.z, b.w, slabThickness, b.d, CELL.FLOOR);
+  }
 
   return { ...gridData, buildings };
 }

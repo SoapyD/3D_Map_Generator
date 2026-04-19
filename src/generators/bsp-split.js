@@ -2,7 +2,11 @@ import { GRID } from '../config.js';
 
 const MIN_BLOCK_SIZE = GRID.minBlockSize;
 
-export function bspSplit(region, rng, streetWidth, leaves) {
+function snapToBBD(value, bbd) {
+  return Math.round(value / bbd) * bbd;
+}
+
+export function bspSplit(region, rng, streetWidth, bbd, leaves) {
   const canSplitX = region.w > MIN_BLOCK_SIZE * 2 + streetWidth;
   const canSplitZ = region.d > MIN_BLOCK_SIZE * 2 + streetWidth;
 
@@ -20,10 +24,10 @@ export function bspSplit(region, rng, streetWidth, leaves) {
   }
 
   if (splitX) {
-    // Split along X axis
     const minSplit = region.x + MIN_BLOCK_SIZE;
     const maxSplit = region.x + region.w - MIN_BLOCK_SIZE - streetWidth;
-    const splitPos = rng.float(minSplit, maxSplit);
+    const raw = rng.float(minSplit, maxSplit);
+    const splitPos = Math.min(maxSplit, Math.max(minSplit, snapToBBD(raw, bbd)));
 
     const left = { x: region.x, z: region.z, w: splitPos - region.x, d: region.d };
     const right = {
@@ -33,13 +37,13 @@ export function bspSplit(region, rng, streetWidth, leaves) {
       d: region.d,
     };
 
-    bspSplit(left, rng, streetWidth, leaves);
-    bspSplit(right, rng, streetWidth, leaves);
+    bspSplit(left, rng, streetWidth, bbd, leaves);
+    bspSplit(right, rng, streetWidth, bbd, leaves);
   } else {
-    // Split along Z axis
     const minSplit = region.z + MIN_BLOCK_SIZE;
     const maxSplit = region.z + region.d - MIN_BLOCK_SIZE - streetWidth;
-    const splitPos = rng.float(minSplit, maxSplit);
+    const raw = rng.float(minSplit, maxSplit);
+    const splitPos = Math.min(maxSplit, Math.max(minSplit, snapToBBD(raw, bbd)));
 
     const top = { x: region.x, z: region.z, w: region.w, d: splitPos - region.z };
     const bottom = {
@@ -49,7 +53,7 @@ export function bspSplit(region, rng, streetWidth, leaves) {
       d: region.z + region.d - (splitPos + streetWidth),
     };
 
-    bspSplit(top, rng, streetWidth, leaves);
-    bspSplit(bottom, rng, streetWidth, leaves);
+    bspSplit(top, rng, streetWidth, bbd, leaves);
+    bspSplit(bottom, rng, streetWidth, bbd, leaves);
   }
 }

@@ -2,6 +2,13 @@
  * Centralised configuration — all tuneable parameters in one place.
  */
 
+// --- Global grid ---
+export const GLOBAL_GRID = {
+  bbd: 4,         // Base Building Dimension in inches (2x2 footprint + 1 skirt each side)
+  cellSize: 1,    // collision matrix cell size in inches
+  streetWidth: 4, // exactly 1 BBD — hardcoded for alignment
+};
+
 // --- CLI defaults ---
 export const DEFAULTS = {
   seed: Math.floor(Math.random() * 100000),
@@ -11,7 +18,7 @@ export const DEFAULTS = {
   tierHeight: 3,      // vertical spacing between tiers (inches)
   slabThickness: 0.5, // thickness of floor slabs (inches)
   wallThickness: 0.25,// thickness of wall slabs (inches)
-  streetWidth: 3.5,   // minimum street width (inches)
+  streetWidth: GLOBAL_GRID.streetWidth, // derived from GLOBAL_GRID — do not change independently
   damageLevel: 0.5,   // 0-1, how ruined the buildings are
   maxSightline: 24,   // max unbroken line of sight (inches)
   textureSet: 'base',
@@ -180,7 +187,7 @@ export const COVER = {
 
 // --- Grid ---
 export const GRID = {
-  minBlockSize: 10,        // minimum block dimension in inches
+  minBlockSize: 8,         // minimum block dimension in inches (2 × BBD)
 };
 
 // --- Geometry ---

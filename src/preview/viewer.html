@@ -18,10 +18,25 @@
       padding: 8px 12px;
       border-radius: 4px;
     }
+    #grid-toggle {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-family: monospace;
+      font-size: 13px;
+      background: rgba(0,0,0,0.7);
+      color: #ccc;
+      border: 1px solid #555;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #grid-toggle.active { color: #7af; border-color: #7af; }
   </style>
 </head>
 <body>
   <div id="info">Loading map... (drag to rotate, scroll to zoom)</div>
+  <button id="grid-toggle" title="Toggle 3D collision grid [G]">Grid [G]</button>
 
   <script type="importmap">
   {
@@ -53,7 +68,7 @@
     controls.target.set(24, 5, 24);
     controls.update();
 
-    // Grid helper
+    // 2D floor grid
     const grid = new THREE.GridHelper(48, 48, 0x444444, 0x222222);
     grid.position.set(24, -0.01, 24);
     scene.add(grid);
@@ -63,9 +78,7 @@
     loader.load('/model.glb', (gltf) => {
       scene.add(gltf.scene);
 
-      // Count meshes and triangles
-      let meshCount = 0;
-      let triCount = 0;
+      let meshCount = 0, triCount = 0;
       gltf.scene.traverse((child) => {
         if (child.isMesh) {
           meshCount++;
@@ -79,6 +92,74 @@
     }, undefined, (err) => {
       document.getElementById('info').textContent = `Error loading model: ${err.message}`;
     });
+
+    // --- 3D collision grid ---
+    let collisionGridGroup = null;
+    let gridVisible = false;
+
+    async function loadCollisionGrid() {
+      if (collisionGridGroup) return; // already loaded
+      try {
+        const res = await fetch('/geometry.json');
+        if (!res.ok) return;
+        const data = await res.json();
+        const cm = data.collisionMatrix;
+        if (!cm) return;
+
+        const { W, D, maxY, ox, oz, cellSize, cells } = cm;
+        const geo = new THREE.BufferGeometry();
+        const positions = [];
+
+        // Draw a unit-cube wireframe for each occupied cell
+        for (let cy = 0; cy < maxY; cy++) {
+          for (let cz = 0; cz < D; cz++) {
+            for (let cx = 0; cx < W; cx++) {
+              const cellVal = cells[cx + cz * W + cy * W * D];
+              if (!cellVal) continue;
+              const x = ox + cx * cellSize;
+              const y = cy * cellSize;
+              const z = oz + cz * cellSize;
+              const s = cellSize;
+              // 12 edges of a cube
+              const corners = [
+                [x,   y,   z  ], [x+s, y,   z  ],
+                [x,   y,   z+s], [x+s, y,   z+s],
+                [x,   y+s, z  ], [x+s, y+s, z  ],
+                [x,   y+s, z+s], [x+s, y+s, z+s],
+              ];
+              const edges = [
+                [0,1],[2,3],[4,5],[6,7], // X edges
+                [0,2],[1,3],[4,6],[5,7], // Z edges
+                [0,4],[1,5],[2,6],[3,7], // Y edges
+              ];
+              for (const [a, b] of edges) {
+                positions.push(...corners[a], ...corners[b]);
+              }
+            }
+          }
+        }
+
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        const mat = new THREE.LineBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.4 });
+        collisionGridGroup = new THREE.LineSegments(geo, mat);
+        collisionGridGroup.visible = false;
+        scene.add(collisionGridGroup);
+      } catch (e) {
+        console.warn('Could not load collision grid:', e);
+      }
+    }
+
+    function toggleGrid() {
+      loadCollisionGrid().then(() => {
+        if (!collisionGridGroup) return;
+        gridVisible = !gridVisible;
+        collisionGridGroup.visible = gridVisible;
+        document.getElementById('grid-toggle').classList.toggle('active', gridVisible);
+      });
+    }
+
+    document.getElementById('grid-toggle').addEventListener('click', toggleGrid);
+    window.addEventListener('keydown', (e) => { if (e.key === 'g' || e.key === 'G') toggleGrid(); });
 
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;

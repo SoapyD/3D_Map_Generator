@@ -10,6 +10,7 @@ import { parseArgs } from './config.js';
 import { createRng } from './core/rng.js';
 import { generateGrid } from './generators/grid.js';
 import { generateBuildings } from './generators/buildings/index.js';
+import { createCollisionMatrix } from './generators/collision/matrix.js';
 // import { generateFloors } from './generators/_old_system/floors/index.js';       // stage 3 — floor plates from building quadrants
 // import { generateWalls } from './generators/_old_system/walls/index.js';          // stage 4 — exterior/interior walls
 // import { generateConnectivity } from './generators/_old_system/connectivity/generate-connectivity.js'; // stage 5 — walkways, ladders, pillars
@@ -44,9 +45,11 @@ async function main() {
   recorder?.capture(1, gridData);
   recorder?.capture(2, gridData);
 
+  const matrix = createCollisionMatrix(gridData.activeArea, config.tiers, config.tierHeight);
+
   // Stage 2: Building shells
   console.log('[2/2] Placing buildings...');
-  const buildingData = generateBuildings(gridData, config, rng);
+  const buildingData = generateBuildings(gridData, config, rng, matrix);
   console.log(`  ${buildingData.buildings.length} buildings`);
   recorder?.capture(3, buildingData);
 
@@ -61,9 +64,10 @@ async function main() {
   }
   const { dir, baseName } = getObjOutputPath(config);
 
-  // Write handover file
+  // Write handover file — embed collision matrix for viewer grid toggle
+  const geometryWithMatrix = { ...geometry, collisionMatrix: matrix.toDebugJSON() };
   const geometryPath = path.join(dir, `${baseName}_geometry.json`);
-  await writeFile(geometryPath, JSON.stringify(geometry));
+  await writeFile(geometryPath, JSON.stringify(geometryWithMatrix));
 
   console.log('Building scene and exporting...');
   const scene = buildScene(geometry, config);
