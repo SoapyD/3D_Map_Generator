@@ -114,7 +114,7 @@ function buildingElements(data, color, config) {
     const h = b.maxTier * config.tierHeight;
     elements.push({
       label: `Buildings — ${i + 1}/${all.length}`,
-      rects: [box('building', b.x, 0, b.z, b.w, h, b.d, color)],
+      rects: [box('building', b.x, 0, b.z, b.w, h, b.d, color, 0.35)],
     });
   }
   for (const b of (data.deletedBuildings || [])) {

@@ -49,10 +49,13 @@ export function createCollisionMatrix(activeArea, maxTiers, tierHeight) {
     },
     fillBox(x, y, z, w, h, d, value = CELL.FLOOR) {
       const c0 = worldToCell(x, y, z);
-      const c1 = worldToCell(x + w, y + h, z + d);
-      for (let cy = c0.cy; cy < c1.cy; cy++)
-        for (let cz = c0.cz; cz < c1.cz; cz++)
-          for (let cx = c0.cx; cx < c1.cx; cx++)
+      // Use ceil so boxes smaller than one cell still mark at least one cell
+      const cxEnd = Math.ceil((x + w - ox) / cellSize);
+      const cyEnd = Math.ceil((y + h) / cellSize);
+      const czEnd = Math.ceil((z + d - oz) / cellSize);
+      for (let cy = c0.cy; cy < cyEnd; cy++)
+        for (let cz = c0.cz; cz < czEnd; cz++)
+          for (let cx = c0.cx; cx < cxEnd; cx++)
             if (inBounds(cx, cy, cz)) data[idx(cx, cy, cz)] = value;
     },
     toDebugJSON() {

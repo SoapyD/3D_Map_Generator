@@ -84,6 +84,8 @@
           meshCount++;
           const geo = child.geometry;
           triCount += geo.index ? geo.index.count / 3 : geo.attributes.position.count / 3;
+          child.material.transparent = true;
+          child.material.opacity = 0.35;
         }
       });
 
@@ -107,41 +109,54 @@
         if (!cm) return;
 
         const { W, D, maxY, ox, oz, cellSize, cells } = cm;
-        const geo = new THREE.BufferGeometry();
-        const positions = [];
 
-        // Draw a unit-cube wireframe for each occupied cell
+        // --- Full wireframe cage (grey grid lines across entire volume) ---
+        const gridPos = [];
+        for (let cy = 0; cy <= maxY; cy++) {
+          for (let cz = 0; cz <= D; cz++) {
+            const y = cy * cellSize, z = oz + cz * cellSize;
+            gridPos.push(ox, y, z, ox + W * cellSize, y, z);
+          }
+        }
+        for (let cy = 0; cy <= maxY; cy++) {
+          for (let cx = 0; cx <= W; cx++) {
+            const y = cy * cellSize, x = ox + cx * cellSize;
+            gridPos.push(x, y, oz, x, y, oz + D * cellSize);
+          }
+        }
+        for (let cz = 0; cz <= D; cz++) {
+          for (let cx = 0; cx <= W; cx++) {
+            const x = ox + cx * cellSize, z = oz + cz * cellSize;
+            gridPos.push(x, 0, z, x, maxY * cellSize, z);
+          }
+        }
+        const cageGeo = new THREE.BufferGeometry();
+        cageGeo.setAttribute('position', new THREE.Float32BufferAttribute(gridPos, 3));
+        const cageMat = new THREE.LineBasicMaterial({ color: 0x334455, transparent: true, opacity: 0.2 });
+
+        // --- Occupied cells (red cube wireframes) ---
+        const redPos = [];
+        const CUBE_EDGES = [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
         for (let cy = 0; cy < maxY; cy++) {
           for (let cz = 0; cz < D; cz++) {
             for (let cx = 0; cx < W; cx++) {
-              const cellVal = cells[cx + cz * W + cy * W * D];
-              if (!cellVal) continue;
-              const x = ox + cx * cellSize;
-              const y = cy * cellSize;
-              const z = oz + cz * cellSize;
-              const s = cellSize;
-              // 12 edges of a cube
-              const corners = [
-                [x,   y,   z  ], [x+s, y,   z  ],
-                [x,   y,   z+s], [x+s, y,   z+s],
-                [x,   y+s, z  ], [x+s, y+s, z  ],
-                [x,   y+s, z+s], [x+s, y+s, z+s],
+              if (!cells[cx + cz * W + cy * W * D]) continue;
+              const x = ox + cx * cellSize, y = cy * cellSize, z = oz + cz * cellSize, s = cellSize;
+              const c = [
+                [x,   y,   z  ], [x+s, y,   z  ], [x,   y,   z+s], [x+s, y,   z+s],
+                [x,   y+s, z  ], [x+s, y+s, z  ], [x,   y+s, z+s], [x+s, y+s, z+s],
               ];
-              const edges = [
-                [0,1],[2,3],[4,5],[6,7], // X edges
-                [0,2],[1,3],[4,6],[5,7], // Z edges
-                [0,4],[1,5],[2,6],[3,7], // Y edges
-              ];
-              for (const [a, b] of edges) {
-                positions.push(...corners[a], ...corners[b]);
-              }
+              for (const [a, b] of CUBE_EDGES) redPos.push(...c[a], ...c[b]);
             }
           }
         }
+        const redGeo = new THREE.BufferGeometry();
+        redGeo.setAttribute('position', new THREE.Float32BufferAttribute(redPos, 3));
+        const redMat = new THREE.LineBasicMaterial({ color: 0xff2200, transparent: true, opacity: 0.8 });
 
-        geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        const mat = new THREE.LineBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.4 });
-        collisionGridGroup = new THREE.LineSegments(geo, mat);
+        collisionGridGroup = new THREE.Group();
+        collisionGridGroup.add(new THREE.LineSegments(cageGeo, cageMat));
+        collisionGridGroup.add(new THREE.LineSegments(redGeo, redMat));
         collisionGridGroup.visible = false;
         scene.add(collisionGridGroup);
       } catch (e) {

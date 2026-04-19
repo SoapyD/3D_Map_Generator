@@ -1,11 +1,13 @@
 import { createFoundationGrid } from './foundation-grid.js';
 import { placeInFoundation } from './place-in-foundation.js';
+import { centerOut } from './spawn-patterns/center-out.js';
 
-export function treemapBuildings(blocks, rng, tiers) {
+export function treemapBuildings(blocks, rng, tiers, activeArea) {
   const buildings = [];
+  const orderedBlocks = centerOut(blocks, activeArea);
 
-  for (let bi = 0; bi < blocks.length; bi++) {
-    const block = blocks[bi];
+  for (let bi = 0; bi < orderedBlocks.length; bi++) {
+    const block = orderedBlocks[bi];
     const grid = createFoundationGrid(block);
 
     // Always consume the same RNG calls per block for determinism

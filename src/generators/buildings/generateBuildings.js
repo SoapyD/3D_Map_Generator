@@ -23,13 +23,13 @@ import { treemapBuildings } from './treemap-buildings.js';
  * @returns {{ buildings: Array, blocks: Array }}
  */
 export function generateBuildings(gridData, config, rng, matrix) {
-  const { tiers, slabThickness } = config;
+  const { tiers, tierHeight } = config;
 
-  const buildings = treemapBuildings(gridData.blocks, rng, tiers);
+  const buildings = treemapBuildings(gridData.blocks, rng, tiers, gridData.activeArea);
 
-  // Write building footprints into the collision matrix at ground level
+  // Write building shells into the collision matrix at full height
   for (const b of buildings) {
-    matrix.fillBox(b.x, 0, b.z, b.w, slabThickness, b.d, CELL.FLOOR);
+    matrix.fillBox(b.x, 0, b.z, b.w, b.maxTier * tierHeight, b.d, CELL.FLOOR);
   }
 
   return { ...gridData, buildings };
