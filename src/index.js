@@ -10,7 +10,7 @@ import { parseArgs } from './config.js';
 import { createRng } from './core/rng.js';
 import { generateGrid } from './generators/foundations/grid.js';
 import { generateBuildings } from './generators/buildings/index.js';
-import { createCollisionMatrix } from './generators/collision/matrix.js';
+import { createCollisionMatrix, CELL } from './generators/collision/matrix.js';
 import { generateFloors } from './generators/floors/index.js';
 import { generateRoofs } from './generators/roofs/index.js';
 import { generateWalls } from './generators/walls/index.js';
@@ -47,6 +47,17 @@ async function main() {
   recorder?.capture(2, gridData);
 
   const matrix = createCollisionMatrix(gridData.activeArea, config.tiers, config.tierHeight, config.slabThickness);
+
+  // Write ground-slab placeholders at Y=-slabThickness.
+  // Buildings will overwrite their footprints with SHELL; remaining cells mark
+  // non-building foundation and street areas for future geometry stages.
+  const slabY = -config.slabThickness;
+  for (const block of gridData.blocks) {
+    matrix.fillBox(block.x, slabY, block.z, block.w, config.slabThickness, block.d, CELL.FOUNDATION_PLACEHOLDER);
+  }
+  for (const street of gridData.streetBounds) {
+    matrix.fillBox(street.x, slabY, street.z, street.w, config.slabThickness, street.d, CELL.STREET_PLACEHOLDER);
+  }
 
   // Stage 2: Building shells
   console.log('[2/3] Placing buildings...');

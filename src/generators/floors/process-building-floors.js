@@ -5,7 +5,8 @@ import { quadrantsToSections } from './quadrants-to-sections.js';
 /**
  * Generates floor plates for a single building shell.
  *
- * Produces one slab per tier, placed at Y = floorIndex * (tierHeight + slabThickness) + tierHeight.
+ * Produces one slab per tier, placed at Y = floorIndex * (tierHeight + slabThickness) - slabThickness.
+ * Ground slab (i=0) sits at Y=-1; ground-floor walls therefore start at Y=0.
  * Quadrant removal escalates upward: higher floors lose more area, biased by damageLevel.
  */
 export function processBuildingFloors(building, buildingIndex, config, rng) {
@@ -40,7 +41,7 @@ export function processBuildingFloors(building, buildingIndex, config, rng) {
 
     const present = new Set([0, 1, 2, 3].filter(q => !removed.has(q)));
     const rects = quadrantsToSections(building, present);
-    const yCollisionLevel = i * levelHeight + tierHeight;
+    const yCollisionLevel = i * levelHeight - slabThickness;
 
     floors.push({
       buildingId: `b${buildingIndex}`,

@@ -114,11 +114,12 @@ function buildingElements(data, color, config) {
   const all = data.buildings;
   for (let i = 0; i < all.length; i++) {
     const b = all[i];
-    // Exclude roof slab thickness so the roof rect protrudes above the shell in the visualizer
-    const h = b.maxTier * (config.tierHeight + config.slabThickness) - config.slabThickness;
+    const levelHeight = config.tierHeight + config.slabThickness;
+    // Shell starts at Y=-slabThickness; height stops below roof slab so it protrudes above
+    const h = (b.maxTier - 1) * levelHeight;
     elements.push({
       label: `Buildings — ${i + 1}/${all.length}`,
-      rects: [box('building', b.x, 0, b.z, b.w, h, b.d, color)],
+      rects: [box('building', b.x, -config.slabThickness, b.z, b.w, h, b.d, color)],
     });
   }
   for (const b of (data.deletedBuildings || [])) {

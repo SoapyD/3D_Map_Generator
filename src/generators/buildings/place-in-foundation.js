@@ -7,6 +7,6 @@ export function placeInFoundation(grid, sizeKey, blockIndex, rng, tiers, cellPat
   if (!cell) return null;
   markCells(grid, cell.col, cell.row, bbdW, bbdD);
   const pos = bbdCellToWorldPos(grid.block.x, grid.block.z, cell.col, cell.row, sizeKey);
-  const maxTier = rng.int(1, tiers);
+  const maxTier = rng.int(2, tiers);
   return { ...pos, maxTier, size: sizeKey, blockIndex };
 }

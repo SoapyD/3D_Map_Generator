@@ -92,6 +92,45 @@ The topmost slab of each building is a separate pipeline stage between Floors an
 
 ---
 
+---
+
+## Work item — Ground-level origin + below-ground matrix extension
+
+**Status:** ⬜ Not started
+
+### Problem
+
+Floors currently don't generate at ground level. The ground floor slab sits at `slabY(0) = 3` (i.e. above Y 0–2 which is treated as an implicit ground room), so exterior walls on the ground floor also start above Y=0. This is wrong for the intended street-level aesthetic.
+
+### Decision
+
+Rather than push everything upward or add an implicit base room, shift the collision matrix origin down so the ground floor slab sits at Y=-1 and walls begin at Y=0. This also reserves below-ground space for future rivers, sewers, and tunnels without a later structural refactor.
+
+### Changes required
+
+1. **Extend collision matrix downward by 12 units.**
+   - Matrix Y range changes from `[0, height)` to `[-12, height)`.
+   - All existing Y index calculations must account for the offset (add 12 to get the array index).
+
+2. **Shift floor generation to start at Y=-1.**
+   - New formula: `slabY(i) = i * 4 - 1`
+   - Ground floor slab: Y=-1 (1" thick, occupies Y -1 to 0)
+   - Ground room: Y 0–2 (walls start at Y=0) ✓
+   - First upper floor slab: Y=3; room Y 4–6; etc.
+   - Update `slabY` helper in `src/generators/floors/process-building-floors.js` and all callers.
+
+3. **Make streets and foundations transparent after the building shell placement stage.**
+   - After shells are written to the collision matrix, mark street and foundation cells as a new type (e.g. `CELL.STREET_PLACEHOLDER` / `CELL.FOUNDATION_PLACEHOLDER`) rather than solid, so the visualiser and downstream stages can ignore them during floor generation.
+   - These placeholders will later be replaced by proper ground tiles, rivers, or pavement — they are 2D bounding geometry only at this stage.
+   - Visualiser: hide placeholder cells by default (or render at very low opacity) from the Floors stage onward.
+
+### Notes
+
+- The 12-unit below-ground reserve is intentional future-proofing for rivers (street cells → waterways) and sewer / tunnel layers. No below-ground generation work is planned yet.
+- Streets and foundations are explicitly **not** given real geometry at this stage; they are transparent stand-ins that will be replaced in a later pipeline stage.
+
+---
+
 ## Files produced
 
 | File | Purpose |

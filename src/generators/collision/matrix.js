@@ -20,26 +20,34 @@ export const CELL = {
   // Roof slab — top of building shell
   ROOF:   40,
   ROOF_N: 41, ROOF_S: 42, ROOF_E: 43, ROOF_W: 44,
+  // Ground-level placeholders (replaced by real geometry in later stages)
+  FOUNDATION_PLACEHOLDER: 50,
+  STREET_PLACEHOLDER:     51,
 };
+
+// Number of cells reserved below world Y=0 (for rivers, sewers, tunnels).
+export const BELOW_GROUND = 12;
 
 export function createCollisionMatrix(activeArea, maxTiers, tierHeight, slabThickness = 1) {
   const { cellSize } = GLOBAL_GRID;
   const W   = Math.ceil(activeArea.w / cellSize);
   const D   = Math.ceil(activeArea.d / cellSize);
-  const maxY = (maxTiers + 1) * (tierHeight + slabThickness); // +1 tier headroom
+  const maxY = (maxTiers + 1) * (tierHeight + slabThickness); // +1 tier headroom (above-ground only)
+  const totalY = maxY + BELOW_GROUND;
   const ox = activeArea.x;
   const oz = activeArea.z;
 
-  // Flat Uint8Array, row-major: index = cx + cz * W + cy * W * D
-  const data = new Uint8Array(W * D * maxY);
+  // Flat Uint8Array, row-major: index = cx + cz * W + (cy + BELOW_GROUND) * W * D
+  // cy is a world cell coordinate; negative values address below-ground cells.
+  const data = new Uint8Array(W * D * totalY);
   data.fill(CELL.EMPTY);
 
   function inBounds(cx, cy, cz) {
-    return cx >= 0 && cx < W && cy >= 0 && cy < maxY && cz >= 0 && cz < D;
+    return cx >= 0 && cx < W && cy >= -BELOW_GROUND && cy < maxY && cz >= 0 && cz < D;
   }
 
   function idx(cx, cy, cz) {
-    return cx + cz * W + cy * W * D;
+    return cx + cz * W + (cy + BELOW_GROUND) * W * D;
   }
 
   function worldToCell(x, y, z) {
@@ -83,7 +91,7 @@ export function createCollisionMatrix(activeArea, maxTiers, tierHeight, slabThic
             if (inBounds(cx, cy, cz)) data[idx(cx, cy, cz)] = value;
     },
     toDebugJSON() {
-      return { W, D, maxY, ox, oz, cellSize, cells: Array.from(data) };
+      return { W, D, maxY, belowGround: BELOW_GROUND, ox, oz, cellSize, cells: Array.from(data) };
     },
   };
 }

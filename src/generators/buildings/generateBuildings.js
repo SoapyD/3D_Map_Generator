@@ -27,10 +27,11 @@ export function generateBuildings(gridData, config, rng, matrix) {
 
   const buildings = treemapBuildings(gridData.blocks, rng, tiers);
 
-  // Write building shells into the collision matrix at full height
+  // Write building shells into the collision matrix.
+  // Shells start at Y=-slabThickness (bottom of ground floor slab) so walls begin at Y=0.
   const levelHeight = tierHeight + config.slabThickness;
   for (const b of buildings) {
-    matrix.fillBox(b.x, 0, b.z, b.w, b.maxTier * levelHeight, b.d, CELL.SHELL);
+    matrix.fillBox(b.x, -config.slabThickness, b.z, b.w, b.maxTier * levelHeight - config.tierHeight, b.d, CELL.SHELL);
   }
 
   return { ...gridData, buildings };
