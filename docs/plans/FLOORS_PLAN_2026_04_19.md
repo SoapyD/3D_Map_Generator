@@ -1,8 +1,9 @@
 # Floors Sub-Plan
 
-**Date:** 2026-04-19
+**Created:** 2026-04-19  
+**Last updated:** 2026-04-20  
+**Status:** ✅ Complete  
 **Parent plan:** PIPELINE_MIGRATION_PLAN_2026_04_19.md
-**Scope:** Port and adapt the old floor generation system to the new treemap/foundation pipeline.
 
 ---
 
@@ -10,141 +11,97 @@
 
 - Y resolution = **1 inch per cell**
 - **Room height** = 3" | **Slab thickness** = 1" | **Per-level total** = 4"
-- Ground room occupies Y 0–2; first floor slab sits at Y 3 (the 4th Y level, 0-indexed); first floor room occupies Y 4–6; second floor slab at Y 7; etc.
-- Formula: `slabY(floorIndex) = floorIndex * 4 + 3`
+- Ground room occupies Y 0–2; first floor slab at Y 3; first floor room Y 4–6; second slab at Y 7; etc.
+- Formula: `slabY(i) = i * 4 + 3`
 
 ---
 
-## What we are NOT doing yet
+## What was deferred
 
-- **Tier 0 / base slab** — the full-map ground floor is deferred.
-  - When added later, it should be split into two variants:
-    - **Foundation areas** — solid slab covering each foundation block footprint (same damage-cutout process as building floors).
-    - **Street areas** — can be converted to **rivers/waterways** instead of solid floor (see WATERWAYS_PLAN for context).
-
----
-
-## Step 1 — Audit treemap building shape vs floor input contract
-
-Read one real treemap building object from `src/generators/buildings/` output and verify it exposes:
-
-| Field needed by floors | Source in treemap building |
-|---|---|
-| `id` / `buildingId` | TBC |
-| bounding footprint (x, z, width, depth) | TBC — likely from cell placement data |
-| `height` (total shell height in inches) | TBC |
-| `damage` (0–1 factor for cutout bias) | TBC — may not exist yet, default to 0.5 |
-
-Document any missing fields and add them (or an adapter) before proceeding to Step 2.
+- **Tier 0 / base slab** — the full-map ground floor is still deferred.
+  - Foundation areas: solid slab per foundation block footprint (same damage-cutout process as building floors).
+  - Street areas: can be converted to rivers/waterways instead of solid floor.
 
 ---
 
-## Step 2 — Collision matrix: typed cell values
+## Implementation summary
 
-**File:** `src/generators/collision/`
+### Step 1 — Building shape audit ✅
 
-Currently the matrix stores occupied/unoccupied as a flat `Uint8Array`. Change so each cell stores a **type value**:
+Treemap buildings expose `x, z, w, d, maxTier` directly. No adapter needed.  
+`maxTier` drives floor count: `slabY(i) = i * (tierHeight + slabThickness) + tierHeight`.
 
-| Value | Meaning |
-|---|---|
-| `0` | Shell (wall/structural geometry) |
-| `1` | Floor plate |
-| (future) `2+` | Other types (walkway, cover, etc.) |
+### Step 2 — Typed collision cell values ✅
 
-> **Note:** empty/unoccupied cells will need a sentinel distinct from 0 — use `255` for "empty" (fits in Uint8Array, clearly out-of-band).
+Implemented directly in `src/generators/collision/matrix.js` (not a separate constants file as originally planned).
 
-Changes:
-- Add constants file `src/generators/collision/cell-types.js` exporting `EMPTY = 255`, `SHELL = 0`, `FLOOR = 1`
-- Update all existing collision writes (shell placement in buildings stage) to write `CELL_TYPES.SHELL` instead of `1`
-- Update all existing collision reads (overlap checks) to test `cell !== CELL_TYPES.EMPTY` instead of `cell !== 0`
-- Add a `setCellType(x, y, z, type)` helper alongside the existing `markOccupied`
+Full type table in `docs/architecture/collision_matrix.md`. Key types:
 
----
+| Value | Constant | Meaning |
+|---|---|---|
+| `255` | `CELL.EMPTY` | Unoccupied — array initialised with `fill(255)` |
+| `0` | `CELL.SHELL` | Building shell volume |
+| `1` | `CELL.FLOOR` | Interior floor slab |
+| `10–17` | `CELL.FLOOR_N/S/E/W`, `FLOOR_NE/NW/SE/SW` | Directional floor edge labels |
+| `30–34` | `CELL.FLOOR_END_N/S/E/W`, `FLOOR_ISLAND` | End (3 exposed edges) and island (4 exposed) cells |
+| `40–44` | `CELL.ROOF`, `ROOF_N/S/E/W` | Roof slab and directional labels |
+| `20–23` | `CELL.WALL_N/S/E/W` | Wall geometry |
 
-## Step 3 — Floor generation per building shell
+### Step 3 — Floor generation ✅
 
-**New file:** `src/generators/floors/index.js` (replaces old system)
+**Files:** `src/generators/floors/index.js`, `process-building-floors.js`, `quadrants-to-sections.js`
 
-### Input
+- `processBuildingFloors` runs the full escalating-damage pass for **all** tiers (0 to `maxTier-1`) in a single RNG sequence, preserving determinism.
+- `generateFloors` splits the result: interior slabs (`floorIndex < maxTier-1`) are written as `CELL.FLOOR`; the topmost slab is stored in `data.roofSlabs` and passed to the Roofs stage unwritten.
+- Floor labelling (`label-floor-cells.js`) runs at the end of `generateFloors` — floor edge cells are overwritten with `FLOOR_N/S/E/W` and corner/end/island variants.
 
+**Divergence from original plan:** damage cutouts use quadrant removal (NW/NE/SW/SE quadrants, not edge-inset rects). This is the old system's approach, ported directly.
+
+**Output shape per floor record:**
 ```js
 {
-  buildings: Building[],   // treemap output, shape confirmed in Step 1
-  collisionMatrix: CollisionMatrix,
-  rng: RNG,
+  buildingId, buildingIndex, floorIndex,
+  yCollisionLevel,    // i * (tierHeight + slabThickness) + tierHeight
+  rects,              // axis-aligned rects after quadrant removal
+  removedQuadrants,   // array of removed quadrant indices [0..3]
+  materialKey,        // 'stone_floor'
 }
 ```
 
-### Algorithm
+### Step 4 — Visualiser ✅
 
-For each building:
-
-1. Determine floor count: `Math.floor(building.height / 4)` — one slab per 4" level (3" room + 1" slab) up to shell height.
-2. For each floor `i` (0-indexed from 0 to floorCount - 1):
-   - **Y collision level** = `i * 4 + 3` (first slab at Y=3, second at Y=7, etc.)
-   - Start with building footprint as a single rect (from Step 1 adapter)
-   - Apply damage cutouts (same logic as old `apply-damage.js` — see below)
-   - Write each resulting rect cell into the collision matrix at the computed Y level with type `CELL_TYPES.FLOOR`
-3. Record output floor record (see Output Contract below)
-
-### Damage cutouts (port from `_old_system/floors/apply-damage.js`)
-
-- Sample cutout count from RNG, biased by `building.damage` and floor index (higher floors = more cutouts)
-- Per cutout: pick random edge (N/S/E/W), random inset depth, random width
-- Axis-aligned subtraction only
-- Enforce 2"×2" minimum walkable area per remaining section — if not met, restore last cutout
-- Tier 0 equivalent (ground floor of a shell, i=0) still receives cutouts unlike the old system's base slab
-
-### Output Contract
-
-```js
-{
-  // prior pipeline fields forwarded, plus:
-  floors: [
-    {
-      buildingId: string,
-      floorIndex: number,       // 0-indexed from ground up
-      yCollisionLevel: number,  // collision grid Y index = floorIndex*4+3
-      rects: Rect[],            // axis-aligned rects after damage subtraction
-      cutouts: Rect[],          // applied cutouts
-      materialKey: string,      // from floor-texture-key.js
-    }
-  ]
-}
-```
+- Per-type `THREE.LineSegments` in the collision grid overlay
+- Group checkboxes: Shell / Floors / Roofs / Walls
+- Visualiser stage 4 captures floor plates per building
+- "All Layers" toggle [A] renders everything at full opacity, hiding building shells
 
 ---
 
-## Step 4 — Grid draw system: typed collision visualisation
+## Roofs stage (added — not in original plan)
 
-**File:** wherever the current grid/debug overlay lives (likely `src/generators/scene/` or a debug util — locate before starting)
+The topmost slab of each building is a separate pipeline stage between Floors and Walls.
 
-Change the collision visualisation from a single on/off toggle to a **dropdown multi-select**:
+**Files:** `src/generators/roofs/index.js`, `label-roof-cells.js`
 
-- Dropdown lists available collision types; each has a checkbox
-- Initial options:
-  - ☑ Shell (`CELL_TYPES.SHELL = 0`)
-  - ☑ Floor (`CELL_TYPES.FLOOR = 1`)
-- Rendering: draw a cell only if its type is in the active set; use distinct colours per type (e.g. shell = red, floor = blue)
-- Empty cells (`255`) are never drawn
+- Consumes `data.roofSlabs` — already has the correct quadrant-damage shape from `processBuildingFloors`
+- Writes each rect as `CELL.ROOF`, then labels edge cells `ROOF_N/S/E/W`
+- Drops `roofSlabs` from the pipeline data; downstream sees only `data.roofs`
+- No walls are placed above roof slabs (walls only read `data.floors`)
 
-No changes to the underlying collision data structure beyond what Step 2 defines.
+**Shared utility:** `src/generators/utils/label-cells.js` — generic cardinal-neighbour scan used by both `labelFloorCells` and `labelRoofCells`.
 
 ---
 
-## Execution order
+## Files produced
 
-1. **Step 1** — audit treemap building shape, write adapter if needed
-2. **Step 2** — update collision matrix (typed cells + constants)
-3. **Step 3** — port floor generation
-4. **Step 4** — update grid draw system
-5. Verify visually: floors appear at correct heights inside shells, collision overlay shows shell vs floor correctly
-6. Commit, then mark Stage 1 done in PIPELINE_MIGRATION_PLAN_2026_04_19.md
-
----
-
-## Deferred / out of scope for this plan
-
-- Foundation slab generation (Tier 0 equivalent)
-- Street-to-river conversion
-- Walls, connectivity, cover (later stages in parent plan)
+| File | Purpose |
+|---|---|
+| `src/generators/collision/matrix.js` | Typed cell constants + matrix helpers |
+| `src/generators/floors/index.js` | Stage entry point — splits interior floors from roof slab |
+| `src/generators/floors/process-building-floors.js` | Escalating quadrant-damage pass, all tiers |
+| `src/generators/floors/quadrants-to-sections.js` | Merges present quadrant pairs into rects |
+| `src/generators/floors/label-floor-cells.js` | Labels exposed FLOOR edges with directional types |
+| `src/generators/roofs/index.js` | Writes roofSlabs as CELL.ROOF, runs roof labelling |
+| `src/generators/roofs/label-roof-cells.js` | Labels exposed ROOF edges ROOF_N/S/E/W |
+| `src/generators/utils/label-cells.js` | Shared cardinal-neighbour labelling utility |
+| `docs/architecture/collision_matrix.md` | Full cell type reference |

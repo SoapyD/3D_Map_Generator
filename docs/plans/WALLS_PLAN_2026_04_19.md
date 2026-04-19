@@ -1,130 +1,94 @@
 # Walls Sub-Plan
 
-**Date:** 2026-04-19
-**Parent plan:** PIPELINE_MIGRATION_PLAN_2026_04_19.md
-**Depends on:** FLOORS_PLAN_2026_04_19.md (floors must be in collision matrix first)
+**Created:** 2026-04-19  
+**Last updated:** 2026-04-20  
+**Parent plan:** PIPELINE_MIGRATION_PLAN_2026_04_19.md  
+**Depends on:** FLOORS_PLAN_2026_04_19.md
+
+---
+
+# Phase 1 — Exterior Wall Generation
+
+**Status:** ✅ Complete
 
 ---
 
 ## Wall thickness
 
-- `wallThickness: 0.25"` — quarter-inch, confirmed.
+`wallThickness: 0.25"` — outer face flush with cell edge, body extends inward.
 
 ---
 
-## Algorithm overview
+## Implementation summary
 
-Two passes after floor generation:
+### Pass 1 — Direction labelling ✅
 
-1. **Direction pass** — label each FLOOR cell in the matrix with which direction(s) it faces outward
-2. **Segment pass** — group labelled cells into contiguous runs, emit one wall rect per run
+**File:** `src/generators/floors/label-floor-cells.js` (moved to floors stage — runs at end of `generateFloors`)
 
----
+Uses shared utility `src/generators/utils/label-cells.js`.
 
-## Pass 1 — Direction labelling
+For each FLOOR cell at a known slab Y level, counts exposed cardinal edges and assigns a label. Precedence (highest first):
 
-Iterate the collision matrix at each known floor Y level (`yCollisionLevel` from the floor records).
-
-For each cell where `matrix.getCell(cx, cy, cz) === CELL.FLOOR`:
-
-### Cardinal checks (in priority order)
-
-Check the four neighbours **at the same Y level**. A neighbour is "open" if it is not `CELL.FLOOR`.
-
-| Condition | Label |
+| Count | Label assigned |
 |---|---|
-| North `(cx, cy, cz-1)` is open | `N` |
-| South `(cx, cy, cz+1)` is open | `S` |
-| East  `(cx+1, cy, cz)` is open | `E` |
-| West  `(cx-1, cy, cz)` is open | `W` |
+| 4 exposed | `CELL.FLOOR_ISLAND` |
+| 3 exposed | `CELL.FLOOR_END_N/S/E/W` (named by the one connected face) |
+| 2 exposed, right-angle pair | `CELL.FLOOR_NE/NW/SE/SW` |
+| 1 exposed | `CELL.FLOOR_N/S/E/W` |
+| 0 exposed | stays `CELL.FLOOR` (interior cell) |
 
-A cell can match multiple cardinal directions (outer corner). Apply checks **in N → S → E → W order**, writing over previous label — last match wins, so corner cells end up labelled by the final direction in sequence. This means NE outer corners become `E`, SE outer corners become `E`, SW corners become `W`, NW corners become `W`. (Consistent with "apply in sequence" rule.)
+**Divergence from original plan:**
+- Diagonal checks (internal concave corner logic) were removed — not needed in practice.
+- Corner types `FLOOR_NE/NW/SE/SW` (values 14–17) were added beyond the original `N/S/E/W` set.
+- End types `FLOOR_END_N/S/E/W` (values 30–33) and `FLOOR_ISLAND` (34) were added for 3- and 4-exposed-edge cells.
+- Internal corner walls were explicitly removed (diagonal check pass dropped).
 
-> **Alternative if needed:** keep the first match (break on first hit). Either is valid — pick one and stick to it. Recommended: **keep first match** so N/S take priority over E/W on outer corners, which keeps horizontal wall runs longer.
+### Pass 2 — Segment grouping ✅
 
-### Diagonal checks (internal concave corners)
+**File:** `src/generators/walls/extract-wall-segments.js`
 
-After cardinal checks, for cells where **all four cardinals are FLOOR** (no cardinal wall found), check diagonals:
+Each direction (N/S/E/W) collects its own label set plus both corner types that include it:
 
-| Condition | Label |
+| Direction | Floor labels collected |
 |---|---|
-| NE `(cx+1, cy, cz-1)` is open | `N` (priority: N before E) |
-| NW `(cx-1, cy, cz-1)` is open | `N` |
-| SE `(cx+1, cy, cz+1)` is open | `S` |
-| SW `(cx-1, cy, cz+1)` is open | `S` |
+| N | `FLOOR_N`, `FLOOR_NE`, `FLOOR_NW` |
+| S | `FLOOR_S`, `FLOOR_SE`, `FLOOR_SW` |
+| E | `FLOOR_E`, `FLOOR_NE`, `FLOOR_SE` |
+| W | `FLOOR_W`, `FLOOR_NW`, `FLOOR_SW` |
 
-This catches the inner concave corner of an L-shaped floor where all four cardinal neighbours are floor cells but the diagonal gap means a wall piece is required to close the corner.
+Contiguous runs along the shared axis are grouped into single wall rects.
 
-### Write label to matrix
+**Corner truncation:** N/S walls are trimmed by `wallThickness` at each end where an E/W wall meets them, preventing 0.25"×0.25" corner overlaps. E/W walls run full length.
 
-Add `CELL` constants to `matrix.js`:
-
-| Constant | Value | Meaning |
-|---|---|---|
-| `CELL.FLOOR_N` | `10` | floor cell whose north edge is exposed (faces a wall) |
-| `CELL.FLOOR_S` | `11` | floor cell whose south edge is exposed |
-| `CELL.FLOOR_E` | `12` | floor cell whose east edge is exposed |
-| `CELL.FLOOR_W` | `13` | floor cell whose west edge is exposed |
-| `CELL.WALL_N`  | `20` | wall geometry facing north |
-| `CELL.WALL_S`  | `21` | wall geometry facing south |
-| `CELL.WALL_E`  | `22` | wall geometry facing east |
-| `CELL.WALL_W`  | `23` | wall geometry facing west |
-
-Pass 1 overwrites each edge FLOOR cell with `FLOOR_N/S/E/W`. Unlabelled cells (interior, no exposed edge) remain `CELL.FLOOR = 1`.
-
----
-
-## Pass 2 — Segment grouping
-
-After all cells are labelled, iterate the floor records again and collect walls.
-
-### Grouping rules
-
-For each direction, cells share one fixed axis value:
-
-| Direction | Fixed axis | Sort axis | Wall runs along |
-|---|---|---|---|
-| N | `cz` (all at same Z face) | `cx` ascending | X axis |
-| S | `cz` | `cx` ascending | X axis |
-| E | `cx` (all at same X face) | `cz` ascending | Z axis |
-| W | `cx` | `cz` ascending | Z axis |
-
-1. Collect all cells labelled `FLOOR_N` at this floor's Y level
-2. Group by fixed axis value (e.g. all `FLOOR_N` cells at `cz = 5`)
-3. Within each group, sort by sort axis (`cx`)
-4. Walk the sorted list — each contiguous run (no gap > 1 cell) becomes one wall segment
-5. A wall segment's bounds = `min(sort axis)` to `max(sort axis) + 1` (the far edge of the last cell)
+**End and island cells** are handled in a separate per-cell pass after the main direction loop. N/S faces on end/island cells are trimmed where E/W faces co-exist on the same cell.
 
 ### Wall world position
 
-Given a segment and its direction. Each wall's **outer face** is flush with the cell's edge in the facing direction; the wall body (0.25") extends inward.
-
 ```
-t  = config.wallThickness   // 0.25"
-s  = config.cellSize        // 1" (from GLOBAL_GRID)
-wallY      = floor.yCollisionLevel + config.slabThickness   // top of slab
-wallHeight = config.tierHeight                               // 3"
+t  = wallThickness (0.25")
+s  = cellSize (1")
+wallY      = floor.yCollisionLevel + slabThickness   // top of slab
+wallHeight = tierHeight                               // 3"
 
-// Cell (cx, cz) world bounds: X ∈ [ox + cx*s, ox + (cx+1)*s],  Z ∈ [oz + cz*s, oz + (cz+1)*s]
-// Outer face at cell edge; wall body extends inward by t.
-
-N wall: outer face at Z = oz + cz*s     → z = oz + cz*s,           d = t,  x = ox + cx_min*s, w = runLength*s
-S wall: outer face at Z = oz + (cz+1)*s → z = oz + (cz+1)*s - t,   d = t,  x = ox + cx_min*s, w = runLength*s
-E wall: outer face at X = ox + (cx+1)*s → x = ox + (cx+1)*s - t,   w = t,  z = oz + cz_min*s, d = runLength*s
-W wall: outer face at X = ox + cx*s     → x = ox + cx*s,            w = t,  z = oz + cz_min*s, d = runLength*s
+N: z = oz + cz*s,           d = t,  x = ox + run_start*s,     w = runLength*s
+S: z = oz + (cz+1)*s - t,   d = t,  x = ox + run_start*s,     w = runLength*s
+E: x = ox + (cx+1)*s - t,   w = t,  z = oz + run_start*s,     d = runLength*s
+W: x = ox + cx*s,            w = t,  z = oz + run_start*s,     d = runLength*s
 ```
 
-### Write walls to collision matrix
+Walls are also written into the collision matrix as `CELL.WALL_N/S/E/W` (values 20–23).  
+Walls are **never placed above roof slabs** — the wall stage only reads `data.floors`, not `data.roofs`.
 
-After computing wall rects, write each wall into the matrix using its directional type:
-```js
-const wallCellType = { N: CELL.WALL_N, S: CELL.WALL_S, E: CELL.WALL_E, W: CELL.WALL_W };
-matrix.fillBox(wall.x, wall.y, wall.z, wall.w, wall.h, wall.d, wallCellType[wall.direction]);
-```
+---
 
-`CELL.WALL = 2` is kept as a generic fallback for interior walls (Phase 2) where direction is less meaningful.
+## Files produced
 
-`CELL.WALL = 2` already exists.
+| File | Purpose |
+|---|---|
+| `src/generators/walls/index.js` | Entry point — calls segment extraction, returns `{ ...data, walls }` |
+| `src/generators/walls/extract-wall-segments.js` | Pass 2 — grouping, truncation, end/island handling |
+
+*(Pass 1 labelling moved to `src/generators/floors/label-floor-cells.js`)*
 
 ---
 
@@ -132,14 +96,12 @@ matrix.fillBox(wall.x, wall.y, wall.z, wall.w, wall.h, wall.d, wallCellType[wall
 
 ```js
 {
-  // all prior fields forwarded, plus:
   walls: [
     {
       direction: 'N' | 'S' | 'E' | 'W',
-      buildingId: string,
-      floorIndex: number,
-      x: number, y: number, z: number,
-      w: number, h: number, d: number,
+      floorY: number,
+      x, y, z,   // world position (y = top of slab)
+      w, h, d,   // width, height (tierHeight), depth
     }
   ]
 }
@@ -147,66 +109,11 @@ matrix.fillBox(wall.x, wall.y, wall.z, wall.w, wall.h, wall.d, wallCellType[wall
 
 ---
 
-## New files
-
-| File | Purpose |
-|---|---|
-| `src/generators/walls/index.js` | Entry point — calls both passes, returns `{ ...data, walls }` |
-| `src/generators/walls/label-floor-cells.js` | Pass 1 — direction labelling |
-| `src/generators/walls/extract-wall-segments.js` | Pass 2 — segment grouping and world-rect computation |
-
----
-
-## Config additions
-
-```js
-// src/config.js
-wallThickness: 0.25,  // wall slab depth (inches) — outer face flush with cell edge, body extends inward
-```
-
----
-
-## Collision matrix additions
-
-Add to `CELL` in `matrix.js`:
-```js
-// Directional floor edge labels (floor cells with an exposed edge)
-FLOOR_N: 10, FLOOR_S: 11, FLOOR_E: 12, FLOOR_W: 13,
-// Directional wall geometry
-WALL_N: 20, WALL_S: 21, WALL_E: 22, WALL_W: 23,
-```
-
-`CELL.WALL = 2` is retained for interior walls where a single direction isn't meaningful.
-
----
-
-## Visualizer additions
-
-- Add to grid dropdown `CELL_TYPES`:
-  - Floor edges: `FLOOR_N/S/E/W` (values 10–13), colour `#ccaa33` (same as floor stage colour)
-  - Walls: `WALL_N` = `#4488ff`, `WALL_S` = `#ff8844`, `WALL_E` = `#44ff88`, `WALL_W` = `#ff44cc`
-- Add stage 5 recorder entry — one element per wall, coloured by direction (same colours as above)
-
----
-
-## Execution order (Phase 1)
-
-1. Add `wallThickness` to `config.js`
-2. Add `WALL_N/S/E/W` constants to `matrix.js`
-3. Implement `label-floor-cells.js`
-4. Implement `extract-wall-segments.js`
-5. Implement `walls/index.js` and wire into `src/index.js` after floors stage
-6. Update visualizer grid dropdown to show WALL type
-7. Add recorder capture for stage 5
-8. Verify visually: walls appear on all four sides of floor plates, correct height and direction colouring
-
----
-
 ---
 
 # Phase 2 — Wall Damage & Interior Walls
 
-Port the damage and interior wall systems from `_old_system/walls/`. Depends on Phase 1 walls being verified end-to-end first.
+**Status:** ⬜ Not started
 
 ---
 
@@ -214,44 +121,37 @@ Port the damage and interior wall systems from `_old_system/walls/`. Depends on 
 
 **Source:** `_old_system/walls/apply-wall-damage.js`, `_old_system/walls/merge-segments.js`
 
-Each exterior wall segment generated in Phase 1 is subdivided into a column × 2-row quadrant grid. Quadrants are randomly removed (adjacency-spreading) to produce the ruined aesthetic.
+Each exterior wall segment is subdivided into a column × 2-row quadrant grid. Quadrants are randomly removed (adjacency-spreading) to produce the ruined aesthetic.
 
-### Algorithm (port directly, no structural changes needed)
+### Algorithm (port directly)
 
-1. `cols = Math.max(1, Math.round(wallLength / WALL.quadSize))` — column count
+1. `cols = Math.max(1, Math.round(wallLength / WALL.quadSize))`
 2. Each cell = `(wallLength / cols)` wide × `(wallHeight / 2)` tall
-3. **Upper row** removal: pick a random start column, spread adjacently; remove up to `externalUpperRemovalRatio` of columns
-4. **Lower row** removal: can only remove columns that are adjacent to an already-removed upper cell; remove up to `externalLowerRemovalRatio` of columns
-5. Remaining cells → merge contiguous same-row runs back into rect segments (`merge-segments.js`)
-6. Each output segment replaces the original wall entry
+3. **Upper row** removal: random start column, spread adjacently; remove up to `externalUpperRemovalRatio` of columns
+4. **Lower row** removal: only remove columns adjacent to an already-removed upper cell; remove up to `externalLowerRemovalRatio`
+5. Merge contiguous same-row runs back into rect segments (`merge-segments.js`)
+6. Output segments replace the original wall entry
 
-### Config additions
+### Config (already in `src/config.js`)
 
 ```js
-// src/config.js  WALL constants block:
 export const WALL = {
-  quadSize: 1.5,                    // inches per damage column (old system value)
-  externalUpperRemovalRatio: 0.7,   // max fraction of upper row removed on exterior walls
-  externalLowerRemovalRatio: 0.5,   // max fraction of lower row removed on exterior walls
-  internalUpperRemovalRatio: 0.6,   // interior walls
+  wallThickness: 0.25,
+  quadSize: 1.5,
+  externalUpperRemovalRatio: 0.7,
+  externalLowerRemovalRatio: 0.5,
+  internalUpperRemovalRatio: 0.6,
   internalLowerRemovalRatio: 0.3,
   interiorWallChance: { medium: 0.75, largeA: 1.0, largeB: 1.0 },
 };
 ```
 
-> Note: old system used a single `large` size; new system has `largeA` and `largeB` — both get `1.0` chance.
-
 ### New files
 
 | File | Purpose |
 |---|---|
-| `src/generators/walls/apply-wall-damage.js` | Port from old system — quadrant subdivision + removal |
-| `src/generators/walls/merge-segments.js` | Port from old system — merges contiguous wall segments |
-
-### Integration
-
-- Call `applyWallDamage(wallDef, rng, 'external')` on every wall segment produced by Phase 1 before pushing to the output array
-- `walls/index.js` replaces the flat segment push with the damage-expanded list
+| `src/generators/walls/apply-wall-damage.js` | Port — quadrant subdivision + removal |
+| `src/generators/walls/merge-segments.js` | Port — merges contiguous wall segments |
 
 ---
 
@@ -259,15 +159,15 @@ export const WALL = {
 
 **Source:** `_old_system/walls/generate-interior-walls.js`
 
-For medium and large buildings, place internal dividing walls through the centre of each floor room. Walls have a door gap and are also damage-processed.
+For medium and large buildings, place internal dividing walls through the centre of each floor room.
 
 ### Eligibility
 
 - Building `size` is `medium`, `largeA`, or `largeB`
 - Per-floor random chance: `WALL.interiorWallChance[building.size]`
-- Only place if the floor above (floorIndex + 1) exists and has ≥ 2 quadrants present
+- Only place if the floor above (`floorIndex + 1`) exists and has ≥ 2 quadrants present
 
-### Variants (port directly from old system)
+### Variants (port directly)
 
 | Variant | Description |
 |---|---|
@@ -275,17 +175,15 @@ For medium and large buildings, place internal dividing walls through the centre
 | `centreSN` | Same from south edge midpoint |
 | `centreEW` | From west edge midpoint, runs half-width toward centre, with door gap |
 | `centreWE` | From east edge midpoint |
-| `cross` | Two crossing walls through building centre (no door gap on cross variant) |
+| `cross` | Two crossing walls through building centre |
 
-Weights from old system: `cross = 0.3`, each centre variant = `0.175`.
-
-Door gap = `WALL.quadSize` (1.5") cut from the midpoint of each interior wall segment.
+Weights: `cross = 0.3`, each centre variant = `0.175`. Door gap = `WALL.quadSize` (1.5").
 
 ### Adaptation notes
 
-- Old system used `data.buildingQuadrants[bi].tiers[tier+1]` to check quadrant count above. New system: find the floor record with `buildingIndex === bi && floorIndex === i + 1` and check `4 - floor.removedQuadrants.length >= 2`
-- `pickInteriorVariant` selector is already in `src/generators/selectors/pickInteriorVariant.js` — uncomment its export in `selectors/index.js`
-- Apply `applyWallDamage(def, rng, 'internal')` to each interior wall definition before pushing
+- Old system used `data.buildingQuadrants[bi].tiers[tier+1]`. New system: find `floors` where `buildingIndex === bi && floorIndex === i + 1`, check `4 - floor.removedQuadrants.length >= 2`.
+- `pickInteriorVariant` is in `src/generators/selectors/pickInteriorVariant.js` — re-enable its export in `selectors/index.js`.
+- Apply `applyWallDamage(def, rng, 'internal')` to each interior wall before pushing.
 
 ### New files
 
@@ -299,8 +197,8 @@ Door gap = `WALL.quadSize` (1.5") cut from the midpoint of each interior wall se
 
 1. Port `merge-segments.js`
 2. Port and adapt `apply-wall-damage.js`
-3. Integrate damage into Phase 1 exterior walls — verify walls still appear correctly but now show ruined segments
+3. Integrate damage into Phase 1 exterior walls
 4. Port and adapt `generate-interior-walls.js`
 5. Wire interior walls into `walls/index.js`
 6. Re-enable `pickInteriorVariant` export in `selectors/index.js`
-7. Verify visually: interior walls appear in medium/large buildings, damage applied to both exterior and interior
+7. Verify visually: interior walls appear in medium/large buildings, damage on both exterior and interior
