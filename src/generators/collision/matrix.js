@@ -1,17 +1,19 @@
 import { GLOBAL_GRID } from '../../config.js';
 
-export const CELL = { EMPTY: 0, FLOOR: 1, WALL: 2, OBJECT: 3 };
+// 255 = empty/unoccupied (Uint8Array default is 0, so we fill explicitly)
+export const CELL = { EMPTY: 255, SHELL: 0, FLOOR: 1, WALL: 2, OBJECT: 3 };
 
-export function createCollisionMatrix(activeArea, maxTiers, tierHeight) {
+export function createCollisionMatrix(activeArea, maxTiers, tierHeight, slabThickness = 1) {
   const { cellSize } = GLOBAL_GRID;
   const W   = Math.ceil(activeArea.w / cellSize);
   const D   = Math.ceil(activeArea.d / cellSize);
-  const maxY = Math.ceil(((maxTiers + 1) * tierHeight) / cellSize); // +1 tier headroom
+  const maxY = (maxTiers + 1) * (tierHeight + slabThickness); // +1 tier headroom
   const ox = activeArea.x;
   const oz = activeArea.z;
 
   // Flat Uint8Array, row-major: index = cx + cz * W + cy * W * D
   const data = new Uint8Array(W * D * maxY);
+  data.fill(CELL.EMPTY);
 
   function inBounds(cx, cy, cz) {
     return cx >= 0 && cx < W && cy >= 0 && cy < maxY && cz >= 0 && cz < D;
@@ -40,6 +42,9 @@ export function createCollisionMatrix(activeArea, maxTiers, tierHeight) {
     cellToWorld,
     isOccupied(cx, cy, cz) {
       return inBounds(cx, cy, cz) && data[idx(cx, cy, cz)] !== CELL.EMPTY;
+    },
+    setCellType(cx, cy, cz, type) {
+      if (inBounds(cx, cy, cz)) data[idx(cx, cy, cz)] = type;
     },
     getCell(cx, cy, cz) {
       return inBounds(cx, cy, cz) ? data[idx(cx, cy, cz)] : CELL.EMPTY;

@@ -39,8 +39,8 @@ export function createRecorder(seed, config) {
   }
 
   function serialize() {
-    const { mapWidth, mapDepth, tiers, tierHeight } = config;
-    return JSON.stringify({ seed, config: { mapWidth, mapDepth, tiers, tierHeight }, stages }, null, 2);
+    const { mapWidth, mapDepth, tiers, tierHeight, slabThickness } = config;
+    return JSON.stringify({ seed, config: { mapWidth, mapDepth, tiers, tierHeight, slabThickness }, stages }, null, 2);
   }
 
   return { capture, serialize };
@@ -111,10 +111,10 @@ function buildingElements(data, color, config) {
   const all = data.buildings;
   for (let i = 0; i < all.length; i++) {
     const b = all[i];
-    const h = b.maxTier * config.tierHeight;
+    const h = b.maxTier * (config.tierHeight + config.slabThickness);
     elements.push({
       label: `Buildings — ${i + 1}/${all.length}`,
-      rects: [box('building', b.x, 0, b.z, b.w, h, b.d, color, 0.35)],
+      rects: [box('building', b.x, 0, b.z, b.w, h, b.d, color)],
     });
   }
   for (const b of (data.deletedBuildings || [])) {
@@ -127,33 +127,21 @@ function buildingElements(data, color, config) {
 }
 
 function floorElements(data, color, config) {
-  // Group by building: one element per building (all its floor sections across all tiers).
-  // Tier 0 (base) is a single element first.
-  const elements = [];
-  const base = data.floors.find(f => f.tier === 0);
-  if (base) {
-    elements.push({
-      label: `Floors — tier 0 (base)`,
-      rects: base.sections.map(s => box('floor', s.x, 0, s.z, s.w, config.slabThickness, s.d, '#444455')),
-    });
+  // One element per building — all its floor plates across all levels.
+  const byBuilding = new Map();
+  for (const f of data.floors) {
+    if (!byBuilding.has(f.buildingIndex)) byBuilding.set(f.buildingIndex, []);
+    for (const r of f.rects) {
+      byBuilding.get(f.buildingIndex).push(
+        box('floor', r.x, f.yCollisionLevel, r.z, r.w, config.slabThickness, r.d, color)
+      );
+    }
   }
-  // Collect upper-tier sections per building via position matching
-  const buildings = data.buildings;
-  for (let bi = 0; bi < buildings.length; bi++) {
-    const b = buildings[bi];
-    const rects = [];
-    for (const f of data.floors) {
-      if (f.tier === 0) continue;
-      const y = f.tier * config.tierHeight;
-      for (const s of f.sections) {
-        if (s.x >= b.x - 0.1 && s.z >= b.z - 0.1 && s.x + s.w <= b.x + b.w + 0.1 && s.z + s.d <= b.z + b.d + 0.1) {
-          rects.push(box('floor', s.x, y, s.z, s.w, config.slabThickness, s.d, color));
-        }
-      }
-    }
-    if (rects.length > 0) {
-      elements.push({ label: `Floors — building ${bi + 1}/${buildings.length}`, rects });
-    }
+  const total = byBuilding.size;
+  let i = 0;
+  const elements = [];
+  for (const [bi, rects] of byBuilding) {
+    elements.push({ label: `Floors — building ${++i}/${total}`, rects });
   }
   return elements;
 }

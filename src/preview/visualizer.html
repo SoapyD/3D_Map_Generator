@@ -19,14 +19,14 @@
       gap: 8px;
     }
 
-    #transport {
+    #transport, #grid-row {
       display: flex;
       align-items: center;
       gap: 10px;
       flex-wrap: wrap;
     }
 
-    #transport button {
+    #transport button, #grid-row button {
       background: #2a2a44;
       border: 1px solid #555;
       color: #ddd;
@@ -36,8 +36,27 @@
       font-size: 13px;
       border-radius: 3px;
     }
-    #transport button:hover { background: #3a3a60; }
+    #transport button:hover, #grid-row button:hover { background: #3a3a60; }
     #btn-grid.active { background: #1a3a5a; border-color: #7af; color: #7af; }
+
+    #grid-panel {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+    #grid-panel label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      padding: 2px 6px;
+      border: 1px solid #444;
+      border-radius: 3px;
+      color: #ccc;
+    }
+    #grid-panel label:hover { border-color: #666; }
+    #grid-panel label.disabled { opacity: 0.4; }
 
     #speed-group { display: flex; gap: 4px; }
     #speed-group button { padding: 4px 8px; font-size: 12px; }
@@ -101,9 +120,15 @@
         <button data-speed="2">2×</button>
         <button data-speed="4">4×</button>
       </div>
-      <button id="btn-grid">Grid [G]</button>
-      <div id="legend"></div>
     </div>
+    <div id="grid-row">
+      <button id="btn-grid">Grid [G]</button>
+      <div id="grid-panel" style="display:none">
+        <label><input type="checkbox" id="grid-shell" checked> <span style="color:#ff4422">Buildings</span></label>
+        <label><input type="checkbox" id="grid-floor" checked> <span style="color:#2288ff">Floors</span></label>
+      </div>
+    </div>
+    <div id="legend"></div>
   </div>
 
   <script type="importmap">
@@ -137,6 +162,7 @@
     scene.add(sun);
 
     const DIM_OPACITY = 0.4;
+    const GRID_OPACITY = 0.12; // opacity for current-stage geometry when grid is visible
     const SPEED_MS = { 0.5: 1000, 1: 500, 2: 250, 4: 125 };
     const STAGE_PAUSE_MS = 1500;
 
@@ -250,6 +276,7 @@
 
     // Assembles rects for a given frame from the compact stage data.
     // Prior stages are dimmed; current stage accumulated up to elementIdx.
+    // When grid is visible, current-stage rects are rendered at GRID_OPACITY.
     function assembleRects(stageIdx, elementIdx) {
       const rects = [];
 
@@ -262,9 +289,10 @@
       }
 
       const current = stages[stageIdx];
+      const curOpacity = gridVisible ? GRID_OPACITY : 1;
       for (let e = 0; e <= elementIdx; e++) {
         for (const r of current.elements[e].rects) {
-          rects.push(r);
+          rects.push({ ...r, opacity: r.opacity !== undefined ? r.opacity * curOpacity : curOpacity, transparent: gridVisible });
         }
       }
 
@@ -348,11 +376,21 @@
     });
 
     // --- Collision grid toggle ---
-    let collisionGridGroup = null;
+    // Cell type values must match CELL constants in matrix.js
+    const CELL_TYPES = [
+      { value: 0,   label: 'Shell', color: 0xff4422, id: 'grid-shell' },
+      { value: 1,   label: 'Floor', color: 0x2288ff, id: 'grid-floor' },
+    ];
+    const CUBE_EDGES = [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
+
+    let cageLines = null;
+    let typeLines = {};   // value → THREE.LineSegments
+    let gridLoaded = false;
     let gridVisible = false;
 
     async function loadCollisionGrid() {
-      if (collisionGridGroup) return;
+      if (gridLoaded) return;
+      gridLoaded = true;
       try {
         const res = await fetch('/geometry.json');
         if (!res.ok) return;
@@ -361,70 +399,90 @@
         if (!cm) return;
 
         const { W, D, maxY, ox, oz, cellSize, cells } = cm;
+        const EMPTY = 255;
 
-        // --- Full wireframe cage (grey grid lines across entire volume) ---
-        const gridPos = [];
+        // Wireframe cage
+        const cagePos = [];
         for (let cy = 0; cy <= maxY; cy++) {
           for (let cz = 0; cz <= D; cz++) {
             const y = cy * cellSize, z = oz + cz * cellSize;
-            gridPos.push(ox, y, z, ox + W * cellSize, y, z);
+            cagePos.push(ox, y, z, ox + W * cellSize, y, z);
           }
         }
         for (let cy = 0; cy <= maxY; cy++) {
           for (let cx = 0; cx <= W; cx++) {
             const y = cy * cellSize, x = ox + cx * cellSize;
-            gridPos.push(x, y, oz, x, y, oz + D * cellSize);
+            cagePos.push(x, y, oz, x, y, oz + D * cellSize);
           }
         }
         for (let cz = 0; cz <= D; cz++) {
           for (let cx = 0; cx <= W; cx++) {
             const x = ox + cx * cellSize, z = oz + cz * cellSize;
-            gridPos.push(x, 0, z, x, maxY * cellSize, z);
+            cagePos.push(x, 0, z, x, maxY * cellSize, z);
           }
         }
         const cageGeo = new THREE.BufferGeometry();
-        cageGeo.setAttribute('position', new THREE.Float32BufferAttribute(gridPos, 3));
-        const cageMat = new THREE.LineBasicMaterial({ color: 0x334455, transparent: true, opacity: 0.2 });
+        cageGeo.setAttribute('position', new THREE.Float32BufferAttribute(cagePos, 3));
+        cageLines = new THREE.LineSegments(cageGeo,
+          new THREE.LineBasicMaterial({ color: 0x334455, transparent: true, opacity: 0.15 }));
+        cageLines.visible = false;
+        scene.add(cageLines);
 
-        // --- Occupied cells (red cube wireframes) ---
-        const redPos = [];
-        const CUBE_EDGES = [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
+        // Per-type cell wireframes
+        const posByType = {};
+        for (const t of CELL_TYPES) posByType[t.value] = [];
+
         for (let cy = 0; cy < maxY; cy++) {
           for (let cz = 0; cz < D; cz++) {
             for (let cx = 0; cx < W; cx++) {
-              if (!cells[cx + cz * W + cy * W * D]) continue;
+              const v = cells[cx + cz * W + cy * W * D];
+              if (v === EMPTY || !posByType[v]) continue;
               const x = ox + cx * cellSize, y = cy * cellSize, z = oz + cz * cellSize, s = cellSize;
               const c = [
                 [x,   y,   z  ], [x+s, y,   z  ], [x,   y,   z+s], [x+s, y,   z+s],
                 [x,   y+s, z  ], [x+s, y+s, z  ], [x,   y+s, z+s], [x+s, y+s, z+s],
               ];
-              for (const [a, b] of CUBE_EDGES) redPos.push(...c[a], ...c[b]);
+              for (const [a, b] of CUBE_EDGES) posByType[v].push(...c[a], ...c[b]);
             }
           }
         }
-        const redGeo = new THREE.BufferGeometry();
-        redGeo.setAttribute('position', new THREE.Float32BufferAttribute(redPos, 3));
-        const redMat = new THREE.LineBasicMaterial({ color: 0xff2200, transparent: true, opacity: 0.8 });
 
-        collisionGridGroup = new THREE.Group();
-        collisionGridGroup.add(new THREE.LineSegments(cageGeo, cageMat));
-        collisionGridGroup.add(new THREE.LineSegments(redGeo, redMat));
-        collisionGridGroup.visible = false;
-        scene.add(collisionGridGroup);
+        for (const t of CELL_TYPES) {
+          if (!posByType[t.value].length) continue;
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.Float32BufferAttribute(posByType[t.value], 3));
+          const lines = new THREE.LineSegments(geo,
+            new THREE.LineBasicMaterial({ color: t.color, transparent: true, opacity: 0.8 }));
+          lines.visible = false;
+          scene.add(lines);
+          typeLines[t.value] = lines;
+        }
       } catch (e) {
         console.warn('Could not load collision grid:', e);
       }
     }
 
+    function applyGridVisibility() {
+      if (cageLines) cageLines.visible = gridVisible;
+      for (const t of CELL_TYPES) {
+        const cb = document.getElementById(t.id);
+        if (typeLines[t.value]) typeLines[t.value].visible = gridVisible && cb?.checked;
+      }
+    }
+
     async function toggleGrid() {
       await loadCollisionGrid();
-      if (!collisionGridGroup) return;
       gridVisible = !gridVisible;
-      collisionGridGroup.visible = gridVisible;
+      applyGridVisibility();
       document.getElementById('btn-grid').classList.toggle('active', gridVisible);
+      document.getElementById('grid-panel').style.display = gridVisible ? 'flex' : 'none';
+      setFrame(currentIndex); // re-render scene with updated opacities
     }
 
     document.getElementById('btn-grid').addEventListener('click', toggleGrid);
+    for (const t of CELL_TYPES) {
+      document.getElementById(t.id)?.addEventListener('change', applyGridVisibility);
+    }
 
     // --- Resize ---
     const controlsEl = document.getElementById('controls');

@@ -15,11 +15,11 @@ export const DEFAULTS = {
   mapWidth: 48,       // inches
   mapDepth: 48,       // inches
   tiers: 4,           // number of elevated tiers (+ base tier 0)
-  tierHeight: 3,      // vertical spacing between tiers (inches)
-  slabThickness: 0.5, // thickness of floor slabs (inches)
+  tierHeight: 3,      // room height per tier (inches)
+  slabThickness: 1,   // floor slab thickness (inches)
   // wallThickness: 0.25,  // _old_system: wall slab thickness
   streetWidth: GLOBAL_GRID.streetWidth, // derived from GLOBAL_GRID — do not change independently
-  // damageLevel: 0.5,     // _old_system: ruin level 0–1
+  damageLevel: 0.5,   // ruin level 0–1, controls floor quadrant removal escalation
   // maxSightline: 24,     // _old_system: max unbroken line of sight (inches)
   textureSet: 'base',
   preview: false,
@@ -35,8 +35,13 @@ export const DEFAULTS = {
 // --- Walls --- (_old_system only)
 // export const WALL = { ... };  // see _old_system/config.js
 
-// --- Floors --- (_old_system only)
-// export const FLOOR = { ... };  // see _old_system/config.js
+// --- Floors ---
+export const FLOOR = {
+  maxIntactFloors: 2,        // max consecutive fully-intact floors before escalating removal
+  tier1EscalateChance: 0.5,  // chance to remove first quadrant (scaled by damageLevel)
+  tier2EscalateChance: 0.6,  // chance to remove second adjacent quadrant
+  tier3EscalateChance: 0.5,  // chance to remove third adjacent quadrant
+};
 
 // --- Connectivity --- (_old_system only)
 // export const CONNECTIVITY = { ... };  // see _old_system/config.js
