@@ -10,8 +10,9 @@
 import { GLOBAL_GRID } from '../../config.js';
 import { deriveStreetRects } from '../streets/derive-street-rects.js';
 import { generateCenterFirst } from './strategies/center-first.js';
+import { generateBspTopLeft } from './strategies/bsp-top-left.js';
 
-const FOUNDATION_STRATEGY = generateCenterFirst; // TODO: make configurable
+const FOUNDATION_STRATEGIES = [generateCenterFirst, generateBspTopLeft];
 
 /**
  * @param {object} config
@@ -28,7 +29,8 @@ export function generateGrid(config, rng) {
   const skirtZ = (mapDepth - activeD) / 2;
   const activeArea = { x: skirtX, z: skirtZ, w: activeW, d: activeD };
 
-  const blocks = FOUNDATION_STRATEGY(activeArea, rng, streetWidth, bbd);
+  const strategy = FOUNDATION_STRATEGIES[rng.chance(0.5) ? 0 : 1];
+  const blocks = strategy(activeArea, rng, streetWidth, bbd);
   const streetBounds = deriveStreetRects(blocks, skirtX, skirtZ, activeW, activeD);
   return { blocks, streetBounds, activeArea, skirt: { x: skirtX, z: skirtZ } };
 }
