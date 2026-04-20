@@ -4,6 +4,7 @@ import { buildWindowPlans, applyWindowPlan } from './place-windows.js';
 import { applyBlobDamage }     from './apply-blob-damage.js';
 import { mergeWallCells }      from './merge-wall-cells.js';
 import { CELL } from '../collision/matrix.js';
+import { WALL } from '../../config.js';
 
 const WALL_CELL = { N: CELL.WALL_N, S: CELL.WALL_S, E: CELL.WALL_E, W: CELL.WALL_W };
 
@@ -18,6 +19,14 @@ function findBuildingIndex(wall, buildings) {
   return 0;
 }
 
+function ruinsMediumKeep(dirs, size, rng) {
+  const longDirs  = size === 'ruins-medium-h' ? ['N', 'S'] : ['E', 'W'];
+  const shortDirs = size === 'ruins-medium-h' ? ['E', 'W'] : ['N', 'S'];
+  const long  = rng.pick(longDirs.filter(d => dirs.has(d)));
+  const short = rng.pick(shortDirs.filter(d => dirs.has(d)));
+  return new Set([long, short].filter(Boolean));
+}
+
 // For each building+floor, randomly keep at most 2 wall directions and discard the rest.
 function cullToTwoSides(walls, buildings, rng) {
   const kept = new Map(); // key → Set of 2 directions to keep
@@ -28,9 +37,15 @@ function cullToTwoSides(walls, buildings, rng) {
   }
   for (const [key, dirs] of kept) {
     if (dirs.size <= 2) continue;
-    const first  = rng.pick([...dirs]);
-    const second = rng.pick([...dirs].filter(d => d !== first));
-    kept.set(key, new Set([first, second]));
+    const bi = parseInt(key.split(':')[0]);
+    const size = buildings[bi].size;
+    if (size === 'ruins-medium-h' || size === 'ruins-medium-v') {
+      kept.set(key, ruinsMediumKeep(dirs, size, rng));
+    } else {
+      const first  = rng.pick([...dirs]);
+      const second = rng.pick([...dirs].filter(d => d !== first));
+      kept.set(key, new Set([first, second]));
+    }
   }
   return walls.filter(wall => {
     const key = `${findBuildingIndex(wall, buildings)}:${wall.floorY}`;
@@ -41,7 +56,7 @@ function cullToTwoSides(walls, buildings, rng) {
 export function generateWalls(data, config, rng, matrix) {
   const { walls: rawWalls, internalWalls } = extractWallSegments(data, config, matrix);
 
-  const culledWalls = cullToTwoSides(rawWalls, data.buildings, rng);
+  const culledWalls = WALL.applySegmentCull ? cullToTwoSides(rawWalls, data.buildings, rng) : rawWalls;
   const windowPlans = buildWindowPlans(data.buildings, rng);
 
   const walls = [];
@@ -53,8 +68,8 @@ export function generateWalls(data, config, rng, matrix) {
     const plan  = plans ? (isNS ? plans.ns : plans.ew) : null;
 
     const grid = subdivideWall(wall);
-    applyWindowPlan(grid, wall, plan, data.buildings[bi]);
-    applyBlobDamage(grid, rng);
+    if (WALL.applyBlobDamage) applyBlobDamage(grid, rng);
+    if (WALL.applyWindows) applyWindowPlan(grid, wall, plan, data.buildings[bi]);
 
     for (const seg of mergeWallCells(grid, wall)) {
       walls.push(seg);

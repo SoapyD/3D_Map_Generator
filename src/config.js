@@ -34,11 +34,17 @@ export const DEFAULTS = {
 
 // --- Walls ---
 export const WALL = {
-  wallThickness: 0.25,              // outer face flush with cell edge, body extends inward
+  wallThickness: 0.25,
+  applySegmentCull: true,   // cull walls to at most 2 sides per building per floor
+  applyWindows: true,        // cut window openings in wall segments
+  applyBlobDamage: true,     // apply random blob damage to wall segments              // outer face flush with cell edge, body extends inward
   quadSize: 1.5,                    // inches per damage column (Phase 2)
-  externalRow2RemovalRatio: 0.7,    // Phase 2: max fraction of row 2 (top) removed on exterior walls
-  externalRow1RemovalRatio: 0.5,    // Phase 2: max fraction of row 1 (mid) removed — cascades from row 2
-  externalRow0RemovalRatio: 0.3,    // Phase 2: max fraction of row 0 (base) removed — cascades from row 1
+  externalRow2RemovalRatio: 0.5,    // Phase 2: max fraction of row 2 (top) removed on exterior walls
+  externalRow2RemovalMin: 0.2,      // Phase 2: min fraction of row 2 removed on exterior walls
+  externalRow1RemovalRatio: 0.3,    // Phase 2: max fraction of row 1 (mid) removed — cascades from row 2
+  externalRow1RemovalMin: 0.1,      // Phase 2: min fraction of row 1 removed
+  externalRow0RemovalRatio: 0.2,    // Phase 2: max fraction of row 0 (base) removed — cascades from row 1
+  externalRow0RemovalMin: 0.0,      // Phase 2: min fraction of row 0 removed
   internalRow2RemovalRatio: 0.6,    // Phase 2: interior wall ratios
   internalRow1RemovalRatio: 0.3,
   internalRow0RemovalRatio: 0.15,

@@ -5,6 +5,13 @@ import { cellTopLeft } from './spawn-patterns/cell-top-left.js';
 
 const CELL_PATTERNS = [cellCenterOut, cellTopLeft];
 
+function placeRuinsFit(grid, baseKey, bi, rng, tiers, cellPattern) {
+  const first = rng.chance(0.5) ? `${baseKey}-h` : `${baseKey}-v`;
+  const second = first.endsWith('-h') ? `${baseKey}-v` : `${baseKey}-h`;
+  return placeInFoundation(grid, first, bi, rng, tiers, cellPattern)
+      ?? placeInFoundation(grid, second, bi, rng, tiers, cellPattern);
+}
+
 export function treemapBuildings(blocks, rng, tiers) {
   const buildings = [];
 
@@ -39,6 +46,18 @@ export function treemapBuildings(blocks, rng, tiers) {
     while (placed) {
       buildings.push(placed);
       placed = placeInFoundation(grid, 'small', bi, rng, tiers, cellPattern);
+    }
+
+    let ruinsMedium = placeRuinsFit(grid, 'ruins-medium', bi, rng, tiers, cellPattern);
+    while (ruinsMedium) {
+      buildings.push(ruinsMedium);
+      ruinsMedium = placeRuinsFit(grid, 'ruins-medium', bi, rng, tiers, cellPattern);
+    }
+
+    let ruinsSmall = placeInFoundation(grid, 'ruins-small', bi, rng, tiers, cellPattern);
+    while (ruinsSmall) {
+      buildings.push(ruinsSmall);
+      ruinsSmall = placeInFoundation(grid, 'ruins-small', bi, rng, tiers, cellPattern);
     }
   }
 
