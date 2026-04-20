@@ -184,15 +184,26 @@ Pruning, prioritisation, and conflict resolution happen in Phase 3.
 
 ## Phase 3 — Filter pass
 
-Phase 2 produced every possible anchor pair. Phase 3 trims that list down to a curated set per tier, then removes vertical duplicates across tiers.
+Phase 2 produced every possible anchor pair. Phase 3 trims that list down to a curated set per tier. It begins by collapsing vertically-stacked duplicates across all tiers before any per-tier filtering runs.
 
-### Step 6a — Group and sort
+### Step 6a — Vertical stacking detection and cull
 
-For each tier's candidate list:
+A vertical stack occurs when two or more candidates from **different tiers** share the same XZ footprint — i.e. they occupy the same x, z, w, d on the ground plane (same axis, same start/end positions projected down). They are the same walkway path repeated at multiple heights.
+
+1. Collect all candidates from all tiers into a single flat list
+2. For each candidate, compute a **stack key** from its `debugRect`: `"${axis}|${x}|${z}|${w}|${d}"` (y is excluded — the tier)
+3. Group candidates by stack key. Groups with only one member are not stacks
+4. Assign each stack group a unique `stackGroupId`
+5. For each group of 2+, randomly select one survivor (seeded RNG). Mark the rest with `stackCulled: true`
+6. Remove culled candidates before the per-tier passes below
+
+### Step 6b — Group and sort
+
+For each tier's remaining candidate list:
 1. Group candidates by `fromBuildingId`
 2. Within each group, sort by `length` ascending
 
-### Step 6b — Per-building selection strategy
+### Step 6c — Per-building selection strategy
 
 A config key `filterStrategy` selects one of:
 
@@ -203,7 +214,7 @@ A config key `filterStrategy` selects one of:
 | `shortest` | Keep the N shortest per building |
 | `random` | Keep N seeded-random per building |
 
-### Step 6c — Per-building filter loop
+### Step 6d — Per-building filter loop
 
 For each building's sorted candidate list:
 
@@ -214,21 +225,9 @@ For each building's sorted candidate list:
 5. Repeat until N has been satisfied for this building, or no candidates remain
 6. Move to the next building
 
-### Step 6d — Per-tier scope
+### Step 6e — Per-tier scope
 
-Each tier's filter runs independently and writes into its own filtered array. The same two buildings *can* be connected at multiple tiers — that's desirable for verticality. Cross-tier stacking is addressed next.
-
-### Step 6e — Cross-tier overlap cull
-
-Tier 1 is exempt (ground is the baseline — no walkways below it to compare).
-
-For every tier N > 1:
-
-1. For each filtered connection at tier N, test its `(startXZ, endXZ)` span against every filtered connection at tier N-1
-2. If the two spans **overlap along the same axis** (any XZ overlap — not just exact match, because connections may be different lengths reaching different floor segments of the same buildings) → **discard the tier N connection**
-3. The lower connection is never culled — always the upper
-
-Rationale: a tier 2 walkway running directly above a tier 1 walkway produces stacked connections with identical top-down footprint, which reads as redundant clutter on the tabletop.
+Each tier's filter runs independently and writes into its own filtered array. The same two buildings *can* be connected at multiple tiers — vertical stacking has already been resolved by Step 6a, so any multi-tier connections that survive to this point are genuinely distinct paths.
 
 ---
 

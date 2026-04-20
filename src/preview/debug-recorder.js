@@ -184,9 +184,10 @@ function connectivityElements(data, color, config) {
 
   const allAnchors = c.anchors || [];
   for (const a of allAnchors) {
+    const anchorColor = a.stackCulled ? '#882244' : '#ff44aa';
     elements.push({
-      label: `Connectivity — anchor ${a.id} ${a.direction} (${a.cells[0].cx},${a.cells[0].cz})`,
-      rects: [box('anchor', a.x, a.y, a.z, a.w, 0.1, a.d, '#ff44aa')],
+      label: `Connectivity — anchor ${a.id} ${a.direction} (${a.cells[0].cx},${a.cells[0].cz})${a.stackCulled ? ' [CULLED]' : ''}`,
+      rects: [box('anchor', a.x, a.y, a.z, a.w, 0.1, a.d, anchorColor)],
     });
   }
 
@@ -196,7 +197,7 @@ function connectivityElements(data, color, config) {
     const conn = allCandidates[i];
     const r = conn.debugRect;
     elements.push({
-      label: `Connectivity — candidate ${i + 1}/${totalC} ${conn.axis} ${conn.fromBuildingId}→${conn.toBuildingId} (${conn.length}c)`,
+      label: `Connectivity — candidate ${i + 1}/${totalC} ${conn.axis} ${conn.fromBuildingId}→${conn.toBuildingId} (${conn.length}c)${conn.stackGroupId ? ` [${conn.stackGroupId} SURVIVOR]` : ''}`,
       rects: [box('connection', r.x, r.y, r.z, r.w, r.h, r.d, '#44ddff', 0.6)],
     });
   }
