@@ -174,6 +174,22 @@ function connectivityElements(data, color, config) {
   const elements = [];
   const c = data.connections;
 
+  const allTriggers = c.triggerCells || [];
+  for (const t of allTriggers) {
+    elements.push({
+      label: `Connectivity — trigger ${t.id} faces:${t.faces} (${t.cx},${t.cz})`,
+      rects: [{ ...box('trigger', t.x, t.y, t.z, t.w, 0.05, t.d, '#ffee44'), label: `${t.id}` }],
+    });
+  }
+
+  const allAnchors = c.anchors || [];
+  for (const a of allAnchors) {
+    elements.push({
+      label: `Connectivity — anchor ${a.direction} (${a.cells[0].cx},${a.cells[0].cz})`,
+      rects: [box('anchor', a.x, a.y, a.z, a.w, 0.1, a.d, '#ff44aa')],
+    });
+  }
+
   const walkways = [...(c.walkways || []), ...(c.bridges || [])];
   const totalW = walkways.length;
   for (let i = 0; i < walkways.length; i++) {

@@ -125,6 +125,7 @@
     <div id="grid-row">
       <button id="btn-grid">Grid [G]</button>
       <button id="btn-show-all">All Layers [A]</button>
+      <button id="btn-debug-markers">Debug Markers [D]</button>
       <div id="grid-panel" style="display:none">
         <label><input type="checkbox" id="group-shell"  checked> <span style="color:#ff4422">Shell</span></label>
         <label><input type="checkbox" id="group-floors" checked> <span style="color:#2288ff">Floors</span></label>
@@ -328,6 +329,7 @@
           for (const el of stage.elements) {
             for (const r of el.rects) {
               if (r.type === 'building') continue;
+              if (!showDebugMarkers && (r.type === 'trigger' || r.type === 'anchor')) continue;
               rects.push({ ...r, opacity: 1, transparent: false });
             }
           }
@@ -354,6 +356,7 @@
       const curOpacity = gridVisible ? GRID_OPACITY : 1;
       for (let e = 0; e <= elementIdx; e++) {
         for (const r of current.elements[e].rects) {
+          if (!showDebugMarkers && (r.type === 'trigger' || r.type === 'anchor')) continue;
           rects.push({ ...r, opacity: r.opacity !== undefined ? r.opacity * curOpacity : curOpacity, transparent: gridVisible });
         }
       }
@@ -436,6 +439,7 @@
       if (e.key === ' ')                { e.preventDefault(); playing ? stopPlay() : startPlay(); }
       if (e.key === 'g' || e.key === 'G') toggleGrid();
       if (e.key === 'a' || e.key === 'A') toggleShowAll();
+      if (e.key === 'd' || e.key === 'D') toggleDebugMarkers();
     });
 
     // --- Collision grid toggle ---
@@ -502,6 +506,7 @@
     let gridLoaded = false;
     let gridVisible = false;
     let showAll = false;
+    let showDebugMarkers = false;
 
     async function loadCollisionGrid() {
       if (gridLoaded) return;
@@ -605,8 +610,15 @@
       setFrame(currentIndex);
     }
 
+    function toggleDebugMarkers() {
+      showDebugMarkers = !showDebugMarkers;
+      document.getElementById('btn-debug-markers').classList.toggle('active', showDebugMarkers);
+      setFrame(currentIndex);
+    }
+
     document.getElementById('btn-grid').addEventListener('click', toggleGrid);
     document.getElementById('btn-show-all').addEventListener('click', toggleShowAll);
+    document.getElementById('btn-debug-markers').addEventListener('click', toggleDebugMarkers);
     for (const g of CELL_GROUPS) {
       document.getElementById(g.id)?.addEventListener('change', applyGridVisibility);
     }

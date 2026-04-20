@@ -14,7 +14,7 @@ import { createCollisionMatrix, CELL } from './generators/collision/matrix.js';
 import { generateFloors } from './generators/floors/index.js';
 import { generateRoofs } from './generators/roofs/index.js';
 import { generateWalls } from './generators/walls/index.js';
-// import { generateConnectivity } from './generators/_old_system/connectivity/generate-connectivity.js'; // stage 5 — walkways, ladders, pillars
+import { generateConnectivity } from './generators/connectivity/index.js';
 // import { generateCover } from './generators/_old_system/cover/index.js';          // stage 6 — scatter cover pieces
 import { buildGeometry } from './generators/geometry/index.js';
 import { buildScene } from './generators/scene/index.js';
@@ -83,7 +83,13 @@ async function main() {
   console.log(`  ${wallData.walls.length} wall segments`);
   recorder?.capture(6, wallData);
 
-  const geometry = buildGeometry(wallData, config);
+  // Stage 6: Connectivity
+  console.log('[6/6] Generating connectivity...');
+  const connectivityData = generateConnectivity(wallData, config, rng, matrix);
+  console.log(`  ${connectivityData.connections.anchors.length} anchors`);
+  recorder?.capture(7, connectivityData);
+
+  const geometry = buildGeometry(connectivityData, config);
 
   // Export
   await mkdir(config.outputDir, { recursive: true });
