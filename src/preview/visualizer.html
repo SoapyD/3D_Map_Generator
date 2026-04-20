@@ -298,6 +298,13 @@
         const mesh = new THREE.Mesh(geo, mat);
         mesh.position.set(r.x + r.w / 2, r.y + r.h / 2, r.z + r.d / 2);
         group.add(mesh);
+        // Wall ID debug labels — re-enable wallLabel in debug-recorder.js to activate
+        // if (r.wallLabel) {
+        //   const sprite = makeTextSprite(r.wallLabel, '#ffffff');
+        //   sprite.scale.set(0.6, 0.3, 1);
+        //   sprite.position.set(r.x + r.w / 2, r.y + r.h / 2 + 0.5, r.z + r.d / 2);
+        //   group.add(sprite);
+        // }
       }
       return group;
     }

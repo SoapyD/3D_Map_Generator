@@ -1,7 +1,7 @@
 # Walls Sub-Plan
 
 **Created:** 2026-04-19  
-**Last updated:** 2026-04-20  
+**Last updated:** 2026-04-20 (archived)  
 **Parent plan:** PIPELINE_MIGRATION_PLAN_2026_04_19.md  
 **Depends on:** FLOORS_PLAN_2026_04_19.md
 
@@ -237,47 +237,116 @@ export function generateWalls(data, config, rng, matrix) {
 
 ---
 
-# Phase 2 — Wall Damage & Interior Walls
+# Phase 2 — Wall Segment Damage
 
-**Status:** ⬜ Not started
+**Status:** ✅ Complete
 
 ---
 
-## Phase 2a — Wall Damage
+## Overview
 
-**Source:** `_old_system/walls/apply-wall-damage.js`, `_old_system/walls/merge-segments.js`
+Phase 1 produces clean, undamaged wall rects. Phase 2 applies a series of deletion passes to exterior walls before writing survivors to the collision matrix. The pipeline in order:
 
-Each exterior wall segment is subdivided into a column × 2-row quadrant grid. Quadrants are randomly removed (adjacency-spreading) to produce the ruined aesthetic.
+1. **Two-sides cull** — per building floor, randomly keep 2 directions, discard the other 2
+2. **Window placement** — deterministic openings based on building shell dimensions
+3. **Cascade damage** — top-down row deletion at configurable ratios
+4. **Merge + matrix write** — surviving cells merged into rects and written
 
-### Algorithm (port directly)
+---
 
-1. `cols = Math.max(1, Math.round(wallLength / WALL.quadSize))`
-2. Each cell = `(wallLength / cols)` wide × `(wallHeight / 2)` tall
-3. **Upper row** removal: random start column, spread adjacently; remove up to `externalUpperRemovalRatio` of columns
-4. **Lower row** removal: only remove columns adjacent to an already-removed upper cell; remove up to `externalLowerRemovalRatio`
-5. Merge contiguous same-row runs back into rect segments (`merge-segments.js`)
-6. Output segments replace the original wall entry
+## Phase 2a — Exterior Wall Damage
 
-### Config (already in `src/config.js`)
+### Implementation summary
 
-```js
-export const WALL = {
-  wallThickness: 0.25,
-  quadSize: 1.5,
-  externalUpperRemovalRatio: 0.7,
-  externalLowerRemovalRatio: 0.5,
-  internalUpperRemovalRatio: 0.6,
-  internalLowerRemovalRatio: 0.3,
-  interiorWallChance: { medium: 0.75, largeA: 1.0, largeB: 1.0 },
-};
+**Entry point:** `src/generators/walls/index.js` — `generateWalls()`
+
+Pipeline per wall:
+```
+extractWallSegments → cullToTwoSides → buildWindowPlans → subdivideWall
+  → applyWindowPlan → applyBlobDamage → mergeWallCells → matrix.fillBox
 ```
 
-### New files
+---
+
+### Two-sides cull
+
+Before any per-wall processing, walls are grouped by `(buildingIndex, floorY)`. For each group with more than 2 directions present, 2 are picked at random (`rng.pick`) and the rest discarded entirely. Groups with ≤ 2 directions are untouched.
+
+---
+
+### Wall slab guard
+
+Walls are only extracted for floor cells that have a slab (`isSlabCell`) at `cy + levelHeight` — i.e. there must be a floor or roof above the wall. Walls with no ceiling are not generated.
+
+---
+
+### Cell grid
+
+Each wall rect is subdivided into a 2D grid (`subdivide-wall.js`):
+
+```
+cols = round(wallLength)   — 1" columns along the length axis
+rows = 3                   — row 0 = base, row 1 = mid, row 2 = top
+```
+
+---
+
+### Window placement
+
+**File:** `src/generators/walls/place-windows.js`
+
+Windows only on **medium, largeA, largeB** buildings. Small buildings: no windows.
+
+**Per building** — roll one window width from `[1, 2, 4]` columns (all 2 rows tall).
+
+**Per face-length group** — N/S walls share a face length (`building.w`), E/W share a face length (`building.d`). If equal, one group covers all four faces.
+
+For each group, find the first combination that fits with `spacing >= 1`:
+- Try counts `[4, 3, 2]` with chosen width; if none fit, step down width (`4→2→1`); if still none, no windows.
+
+```
+spacing = (faceLength - count × windowWidth) / (count + 1)
+```
+
+Window positions are computed relative to the building face origin and clipped per segment, so the pattern is consistent across run segments and all tiers.
+
+---
+
+### Cascade damage
+
+**File:** `src/generators/walls/apply-blob-damage.js`
+
+Rows removed top-down. Each row can only be seeded from the row above it; once seeded it spreads horizontally.
+
+| Row | Seed source | Max removal (external) |
+|---|---|---|
+| 2 (top) | random seed anywhere in row | 70% of cols |
+| 1 (mid) | directly below a removed row 2 cell | 50% of cols |
+| 0 (base) | directly below a removed row 1 cell | 30% of cols |
+
+Internal wall ratios: 60% / 30% / 15%.
+
+Config keys in `WALL`: `externalRow2RemovalRatio`, `externalRow1RemovalRatio`, `externalRow0RemovalRatio` (and `internal*` equivalents).
+
+---
+
+### Post-damage merge and matrix write
+
+**File:** `src/generators/walls/merge-wall-cells.js`
+
+Surviving cells in the same row with contiguous columns are merged into single rects. Each rect is written to the matrix as `CELL.WALL_N/S/E/W`.
+
+---
+
+### Files
 
 | File | Purpose |
 |---|---|
-| `src/generators/walls/apply-wall-damage.js` | Port — quadrant subdivision + removal |
-| `src/generators/walls/merge-segments.js` | Port — merges contiguous wall segments |
+| `src/generators/walls/index.js` | Pipeline orchestration, two-sides cull |
+| `src/generators/walls/subdivide-wall.js` | Splits wall rect into col×row cell grid |
+| `src/generators/walls/place-windows.js` | Window size selection, spacing, per-segment deletion |
+| `src/generators/walls/apply-blob-damage.js` | Top-down cascade row deletion |
+| `src/generators/walls/merge-wall-cells.js` | Merges surviving rows back into rects |
 
 ---
 
@@ -309,7 +378,7 @@ Weights: `cross = 0.3`, each centre variant = `0.175`. Door gap = `WALL.quadSize
 
 - Old system used `data.buildingQuadrants[bi].tiers[tier+1]`. New system: find `floors` where `buildingIndex === bi && floorIndex === i + 1`, check `4 - floor.removedQuadrants.length >= 2`.
 - `pickInteriorVariant` is in `src/generators/selectors/pickInteriorVariant.js` — re-enable its export in `selectors/index.js`.
-- Apply `applyWallDamage(def, rng, 'internal')` to each interior wall before pushing.
+- Apply blob damage (Phase 2a algorithm, `'internal'` ratios) to each interior wall before writing.
 
 ### New files
 
@@ -321,10 +390,19 @@ Weights: `cross = 0.3`, each centre variant = `0.175`. Door gap = `WALL.quadSize
 
 ## Phase 2 execution order
 
-1. Port `merge-segments.js`
-2. Port and adapt `apply-wall-damage.js`
-3. Integrate damage into Phase 1 exterior walls
-4. Port and adapt `generate-interior-walls.js`
-5. Wire interior walls into `walls/index.js`
-6. Re-enable `pickInteriorVariant` export in `selectors/index.js`
-7. Verify visually: interior walls appear in medium/large buildings, damage on both exterior and interior
+1. Refactor `extract-wall-segments.js` to defer matrix writes for exterior walls
+2. Write `subdivide-wall.js`
+3. Write `place-windows.js`
+4. Write `apply-blob-damage.js`
+5. Write `merge-wall-cells.js`
+6. Wire Phase 2a into `walls/index.js` for exterior walls
+7. Port and adapt `generate-interior-walls.js` (Phase 2b)
+8. Wire Phase 2b into `walls/index.js`
+9. Re-enable `pickInteriorVariant` export in `selectors/index.js`
+10. Verify visually: exterior wall damage, window gaps in top 2 rows only, interior walls in medium/large buildings
+
+---
+
+## DEFERRED — Final wall cull
+
+> **Note (not yet planned):** Each floor of each building will eventually have all but 2 of its walls deleted entirely as a final pre-output pass. This represents maximum ruin state and will be the last stage of wall generation before the pipeline moves to connectivity. Design and implementation are deferred until Phase 2a and 2b are stable.

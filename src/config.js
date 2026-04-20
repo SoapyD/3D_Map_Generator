@@ -36,11 +36,15 @@ export const DEFAULTS = {
 export const WALL = {
   wallThickness: 0.25,              // outer face flush with cell edge, body extends inward
   quadSize: 1.5,                    // inches per damage column (Phase 2)
-  externalUpperRemovalRatio: 0.7,   // Phase 2: max fraction of upper row removed on exterior walls
-  externalLowerRemovalRatio: 0.5,   // Phase 2: max fraction of lower row removed on exterior walls
-  internalUpperRemovalRatio: 0.6,   // Phase 2: interior walls
-  internalLowerRemovalRatio: 0.3,
+  externalRow2RemovalRatio: 0.7,    // Phase 2: max fraction of row 2 (top) removed on exterior walls
+  externalRow1RemovalRatio: 0.5,    // Phase 2: max fraction of row 1 (mid) removed — cascades from row 2
+  externalRow0RemovalRatio: 0.3,    // Phase 2: max fraction of row 0 (base) removed — cascades from row 1
+  internalRow2RemovalRatio: 0.6,    // Phase 2: interior wall ratios
+  internalRow1RemovalRatio: 0.3,
+  internalRow0RemovalRatio: 0.15,
   interiorWallChance: { medium: 0.75, largeA: 1.0, largeB: 1.0 }, // Phase 2
+  blobMin: 1,  // minimum cells deleted per blob damage run
+  blobMax: 4,  // maximum cells deleted per blob damage run
 };
 
 // --- Floors ---

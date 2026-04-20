@@ -166,6 +166,7 @@ function wallElements(data) {
   return data.walls.map((w, i) => ({
     label: `Walls — ${w.direction} ${i + 1}/${total}`,
     rects: [box('wall', w.x, w.y, w.z, w.w, w.h, w.d, WALL_DIR_COLORS[w.direction] ?? '#aaaaaa')],
+    // rects: [{ ...box('wall', ...), wallLabel: `${w.direction}${i}` }],  // re-enable for wall ID debug
   }));
 }
 

@@ -39,16 +39,11 @@ const DIRECTIONS = [
   },
 ];
 
-// N/S walls yield to E/W walls at corners — trim where the perpendicular cell
-// has W or E exposure. Includes both exterior and interior variants.
-const W_EXPOSED = new Set([
-  CELL.FLOOR_W,  CELL.FLOOR_NW,  CELL.FLOOR_SW,
-  CELL.IFLOOR_W, CELL.IFLOOR_NW, CELL.IFLOOR_SW,
-]);
-const E_EXPOSED = new Set([
-  CELL.FLOOR_E,  CELL.FLOOR_NE,  CELL.FLOOR_SE,
-  CELL.IFLOOR_E, CELL.IFLOOR_NE, CELL.IFLOOR_SE,
-]);
+// N/S walls yield to E/W walls at corners — trim only where an EXTERIOR E/W wall
+// will actually be generated. Interior (IFLOOR) labels never produce real walls
+// so they must not trigger truncation.
+const W_EXPOSED = new Set([CELL.FLOOR_W, CELL.FLOOR_NW, CELL.FLOOR_SW]);
+const E_EXPOSED = new Set([CELL.FLOOR_E, CELL.FLOOR_NE, CELL.FLOOR_SE]);
 
 const END_ISLAND_CELLS = new Set([
   CELL.FLOOR_END_N,  CELL.FLOOR_END_S,  CELL.FLOOR_END_E,  CELL.FLOOR_END_W,  CELL.FLOOR_ISLAND,
@@ -68,6 +63,13 @@ const END_FACES = {
   [CELL.IFLOOR_ISLAND]: ['N', 'S', 'E', 'W'],
 };
 
+function isSlabCell(v) {
+  return v === CELL.FLOOR
+    || (v >= 10 && v <= 34)   // FLOOR_N … FLOOR_ISLAND
+    || (v >= 40 && v <= 44)   // ROOF … ROOF_W
+    || (v >= 60 && v <= 74);  // IFLOOR variants
+}
+
 const FACE_OFFSET = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] };
 const FACE_EXT_WALL = { N: CELL.WALL_N, S: CELL.WALL_S, E: CELL.WALL_E, W: CELL.WALL_W };
 const FACE_INT_WALL = {
@@ -77,14 +79,12 @@ const FACE_INT_WALL = {
 
 function hasWExposure(v) {
   return W_EXPOSED.has(v)
-    || v === CELL.FLOOR_END_N || v === CELL.FLOOR_END_S || v === CELL.FLOOR_ISLAND
-    || v === CELL.IFLOOR_END_N || v === CELL.IFLOOR_END_S || v === CELL.IFLOOR_ISLAND;
+    || v === CELL.FLOOR_END_N || v === CELL.FLOOR_END_S || v === CELL.FLOOR_ISLAND;
 }
 
 function hasEExposure(v) {
   return E_EXPOSED.has(v)
-    || v === CELL.FLOOR_END_N || v === CELL.FLOOR_END_S || v === CELL.FLOOR_ISLAND
-    || v === CELL.IFLOOR_END_N || v === CELL.IFLOOR_END_S || v === CELL.IFLOOR_ISLAND;
+    || v === CELL.FLOOR_END_N || v === CELL.FLOOR_END_S || v === CELL.FLOOR_ISLAND;
 }
 
 // Group cells by fixedAxis and find contiguous runs along sortAxis.
@@ -111,6 +111,7 @@ function buildRuns(cells, fixedAxis, sortAxis) {
 export function extractWallSegments(data, config, matrix) {
   const { wallThickness } = WALL;
   const { tierHeight, slabThickness } = config;
+  const levelHeight = tierHeight + slabThickness;
   const { cellSize, ox, oz } = matrix;
   const s = cellSize;
   const t = wallThickness;
@@ -130,6 +131,7 @@ export function extractWallSegments(data, config, matrix) {
       for (let cz = 0; cz < matrix.D; cz++) {
         for (let cx = 0; cx < matrix.W; cx++) {
           if (!labels.has(matrix.getCell(cx, cy, cz))) continue;
+          if (!isSlabCell(matrix.getCell(cx, cy + levelHeight, cz))) continue;
           const neighbour = matrix.getCell(cx + dcx, cy, cz + dcz);
           if (neighbour === CELL.SHELL) {
             intCells.push({ cx, cz });
@@ -145,15 +147,19 @@ export function extractWallSegments(data, config, matrix) {
         let x, z, w, d;
 
         if (dir === 'N') {
-          const trimW = hasWExposure(matrix.getCell(runStart, cy, fixedVal));
-          const trimE = hasEExposure(matrix.getCell(runEnd,   cy, fixedVal));
+          const trimW = hasWExposure(matrix.getCell(runStart, cy, fixedVal))
+            && matrix.getCell(runStart - 1, cy, fixedVal) !== CELL.SHELL;
+          const trimE = hasEExposure(matrix.getCell(runEnd,   cy, fixedVal))
+            && matrix.getCell(runEnd   + 1, cy, fixedVal) !== CELL.SHELL;
           x = ox + runStart * s + (trimW ? t : 0);
           w = runLength * s - (trimW ? t : 0) - (trimE ? t : 0);
           z = oz + fixedVal * s;
           d = t;
         } else if (dir === 'S') {
-          const trimW = hasWExposure(matrix.getCell(runStart, cy, fixedVal));
-          const trimE = hasEExposure(matrix.getCell(runEnd,   cy, fixedVal));
+          const trimW = hasWExposure(matrix.getCell(runStart, cy, fixedVal))
+            && matrix.getCell(runStart - 1, cy, fixedVal) !== CELL.SHELL;
+          const trimE = hasEExposure(matrix.getCell(runEnd,   cy, fixedVal))
+            && matrix.getCell(runEnd   + 1, cy, fixedVal) !== CELL.SHELL;
           x = ox + runStart * s + (trimW ? t : 0);
           w = runLength * s - (trimW ? t : 0) - (trimE ? t : 0);
           z = oz + (fixedVal + 1) * s - t;
@@ -171,7 +177,6 @@ export function extractWallSegments(data, config, matrix) {
         }
 
         walls.push({ direction: dir, floorY: cy, x, y: wallWorldY, z, w, h: tierHeight, d });
-        matrix.fillBox(x, wallWorldY, z, w, tierHeight, d, extWallCell);
       }
 
       // Interior runs — no truncation, no geometry, write internal wall marker to matrix
@@ -204,9 +209,10 @@ export function extractWallSegments(data, config, matrix) {
         const v = matrix.getCell(cx, cy, cz);
         const faces = END_FACES[v];
         if (!faces) continue;
+        if (!isSlabCell(matrix.getCell(cx, cy + levelHeight, cz))) continue;
 
-        const hasE = faces.includes('E');
-        const hasW = faces.includes('W');
+        const hasE = faces.includes('E') && matrix.getCell(cx + 1, cy, cz) !== CELL.SHELL;
+        const hasW = faces.includes('W') && matrix.getCell(cx - 1, cy, cz) !== CELL.SHELL;
 
         for (const face of faces) {
           const [fdcx, fdcz] = FACE_OFFSET[face];
@@ -232,7 +238,6 @@ export function extractWallSegments(data, config, matrix) {
             matrix.fillBox(x, wallWorldY, z, w, tierHeight, d, FACE_INT_WALL[face]);
           } else {
             walls.push({ direction: face, floorY: cy, x, y: wallWorldY, z, w, h: tierHeight, d });
-            matrix.fillBox(x, wallWorldY, z, w, tierHeight, d, FACE_EXT_WALL[face]);
           }
         }
       }
