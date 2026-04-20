@@ -153,7 +153,11 @@ Before registering a candidate pair `(A, B)`:
 {
   from: anchorA,
   to: anchorB,
-  length: distanceInCells,  // also the length in inches (1 cell = 1")
+  fromBuildingId: 'b12',
+  toBuildingId:   'b17',
+  startXZ: { x, z },             // from-anchor cell position
+  endXZ:   { x, z },             // to-anchor cell position
+  length: distanceInCells,       // also the length in inches (1 cell = 1")
   axis: 'NS' | 'WE',
 }
 ```
@@ -169,13 +173,63 @@ Every tier runs its own Phase 2 pass and writes into its own registry array. No 
 - It does **not** check for walls along the span (Step 6 does that, as a `blocked` flag)
 - It does **not** sort or prioritise — every valid pair is kept
 
-Pruning, prioritisation, and conflict resolution are deferred to a later phase (TBD).
+Pruning, prioritisation, and conflict resolution happen in Phase 3.
 
 ---
 
-## Step 6 — Walkway rasterisation and validation
+## Phase 3 — Filter pass
 
-Once a pair is accepted:
+Phase 2 produced every possible anchor pair. Phase 3 trims that list down to a curated set per tier, then removes vertical duplicates across tiers.
+
+### Step 6a — Group and sort
+
+For each tier's candidate list:
+1. Group candidates by `fromBuildingId`
+2. Within each group, sort by `length` ascending
+
+### Step 6b — Per-building selection strategy
+
+A config key `filterStrategy` selects one of:
+
+| Strategy | Behaviour |
+|---|---|
+| `longestAndShortest` | Keep the N longest *and* N shortest per building (up to 2N total) |
+| `longest` | Keep the N longest per building |
+| `shortest` | Keep the N shortest per building |
+| `random` | Keep N seeded-random per building |
+
+### Step 6c — Per-building filter loop
+
+For each building's sorted candidate list:
+
+1. Take the next candidate in strategy order (e.g. shortest-first for `shortest`)
+2. Check the **tier's filtered registry** for an existing connection between this pair of buildings. Building-pair match is bidirectional — `(A, B) == (B, A)` — because from/to can swap depending on which anchor fired first during Phase 2.
+3. If a connection between this pair already exists in the filtered registry → skip this candidate, try the next one
+4. If no existing connection → append to the filtered registry
+5. Repeat until N has been satisfied for this building, or no candidates remain
+6. Move to the next building
+
+### Step 6d — Per-tier scope
+
+Each tier's filter runs independently and writes into its own filtered array. The same two buildings *can* be connected at multiple tiers — that's desirable for verticality. Cross-tier stacking is addressed next.
+
+### Step 6e — Cross-tier overlap cull
+
+Tier 1 is exempt (ground is the baseline — no walkways below it to compare).
+
+For every tier N > 1:
+
+1. For each filtered connection at tier N, test its `(startXZ, endXZ)` span against every filtered connection at tier N-1
+2. If the two spans **overlap along the same axis** (any XZ overlap — not just exact match, because connections may be different lengths reaching different floor segments of the same buildings) → **discard the tier N connection**
+3. The lower connection is never culled — always the upper
+
+Rationale: a tier 2 walkway running directly above a tier 1 walkway produces stacked connections with identical top-down footprint, which reads as redundant clutter on the tabletop.
+
+---
+
+## Step 7 — Walkway rasterisation and validation
+
+After Phase 3 has produced the filtered per-tier connection list, for each surviving connection:
 
 1. Stamp the walkway rect into the collision matrix with a dedicated cell value (e.g. `CELL.WALKWAY`)
 2. Scan the walkway span for wall cells (`20–23`) encountered along the way
@@ -191,6 +245,8 @@ Once a pair is accepted:
 | `anchorPeriod` (P) | 4 | Cells between anchor slots. Smaller = more anchors, denser connections. |
 | `walkwayWidth` | 2 (cells) | Two consecutive C=0/C=1 edge cells → width = 2. If changed, the "two consecutive edge cells" check becomes "P-aligned run of W cells". |
 | `maxConnectionLength` | `mapSize / 2` | Carried from v1. |
+| `filterStrategy` | `longestAndShortest` | One of: `longestAndShortest`, `longest`, `shortest`, `random`. |
+| `filterN` | 2 | Quota per building per tier. For `longestAndShortest` this is N *each* (up to 2N total). |
 
 ---
 
@@ -210,9 +266,13 @@ data.connections = {
     {
       from: anchor,           // { direction, buildingId, cells, tier }
       to: anchor,
+      fromBuildingId: 'b12',
+      toBuildingId:   'b17',
+      startXZ: { x, z },
+      endXZ:   { x, z },
       length: 7,              // in cells / inches
       axis: 'NS' | 'WE',
-      blocked: false,         // set by Step 6 if walls intersect
+      blocked: false,         // set by Step 7 if walls intersect
     },
     ...
   ],
@@ -221,6 +281,7 @@ data.connections = {
 }
 ```
 
+Only Phase 3's filtered connections survive to this output — Phase 2's raw candidate list is discarded.
 One array per tier. Ladders, pillars, and platforms are added by subsequent sub-stages (not covered here).
 
 ---
@@ -265,16 +326,17 @@ One array per tier. Ladders, pillars, and platforms are added by subsequent sub-
 
 ## Open questions
 
-1. **Pruning / conflict resolution** — Phase 2 allows overlaps and redundancy. A later phase (TBD) must decide which connections survive. Strategy not yet defined.
-2. **Walkway cell value** — introduce `CELL.WALKWAY` or reuse an existing label?
-3. **P tuning** — is `P=4` (= 4" in Mordheim scale) the right cadence? Should it scale with `walkwayWidth`?
-4. **Orphan anchors** — anchors that fail to pair. Drop silently, or pass to the ladder sub-stage as candidates?
-5. **Interior-only walkways** — `IFLOOR_*` anchors can pair with each other within one building. Is that desirable, or should those be filtered?
+1. **Walkway cell value** — introduce `CELL.WALKWAY` or reuse an existing label?
+2. **P tuning** — is `P=4` (= 4" in Mordheim scale) the right cadence? Should it scale with `walkwayWidth`?
+3. **Orphan anchors** — anchors that fail to pair. Drop silently, or pass to the ladder sub-stage as candidates?
+4. **Interior-only walkways** — `IFLOOR_*` anchors can pair with each other within one building. Is that desirable, or should those be filtered?
+5. **Phase 3 processing order** — when iterating buildings for the filter loop, does order matter? (Alphabetical by buildingId? Shuffled by seeded RNG?) Early buildings may "claim" connections before later buildings get a chance.
+6. **Perpendicular walkway crossings** — Phase 3 only culls same-axis XZ overlaps across tiers. A same-tier N-S walkway crossing a same-tier W-E walkway is not filtered. Intentional or a gap?
 
 ---
 
 ## Next steps
 
-- Prototype Phase 1 (anchor emission) + Phase 2 (pair discovery) against an existing seed and visualise in the preview tool
-- Define the pruning phase (overlap resolution, redundancy culling)
+- Prototype Phase 1 (anchor emission) + Phase 2 (pair discovery) + Phase 3 (filter) against an existing seed and visualise each phase's output in the preview tool
+- Tune `filterStrategy` and `filterN` defaults after visual inspection
 - Revisit `anchorPeriod` default after visual inspection
