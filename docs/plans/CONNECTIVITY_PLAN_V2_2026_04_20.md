@@ -324,6 +324,35 @@ One array per tier. Ladders, pillars, and platforms are added by subsequent sub-
 
 ---
 
+## ⚠️ IMPORTANT — Phases still to be designed
+
+Two further phases must be specified before this plan is implementation-ready. They cannot be skipped — the pipeline will produce structurally valid but gameplay-broken maps without them. Design work on both should begin **once Phases 1–3 are prototyped and visualised** so the actual output shapes can inform the design.
+
+### Phase 4 — Final connection culling *(not yet designed)*
+
+Phase 3 filters per-building and removes cross-tier stacks, but the surviving set may still contain:
+
+- Perpendicular same-tier crossings (N-S walkway intersecting a W-E walkway)
+- Visually cluttered clusters of short connections around dense building groups
+- Connections that pass too close to other connections or structural features
+
+Phase 4 must define the final pass that resolves these conflicts. Open question already flagged (#6). Strategy, priority rules, and config keys TBD.
+
+### Phase 5 — Trigger/anchor doorway deletion *(not yet designed)*
+
+The trigger cell (the `FLOOR_*` / `IFLOOR_*` edge where an anchor fired from) may have a wall cell directly above it. Without removal, the walkway connects to a floor edge that is *behind* a wall — the player can reach the walkway but cannot step from the walkway onto the building.
+
+Phase 5 must define how trigger-point walls are cleared to form doorways:
+
+- Which wall cells get removed (trigger cell, anchor cell, or both sides of the gap?)
+- Doorway height and width (carry over from the old `carveLadderDoorway` logic?)
+- Interaction with partial walls (`FLOOR_NE` corner cells border two wall runs)
+- What happens when a walkway is flagged `blocked=true` by Step 7 — skip the doorway carve?
+
+Equivalent to the old system's `carve-ladder-doorway.js` but applied to walkway trigger points.
+
+---
+
 ## Open questions
 
 1. **Walkway cell value** — introduce `CELL.WALKWAY` or reuse an existing label?
