@@ -86,7 +86,7 @@ async function main() {
   // Stage 6: Connectivity
   console.log('[6/6] Generating connectivity...');
   const connectivityData = generateConnectivity(wallData, config, rng, matrix);
-  console.log(`  ${connectivityData.connections.anchors.length} anchors`);
+  console.log(`  ${connectivityData.connections.anchors.length} anchors, ${connectivityData.connections.candidates.length} candidate connections`);
   recorder?.capture(7, connectivityData);
 
   const geometry = buildGeometry(connectivityData, config);

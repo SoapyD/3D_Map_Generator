@@ -38,21 +38,44 @@ function isEmpty(v) {
   return v === CELL.EMPTY || v === CELL.SHELL;
 }
 
-function makeAnchor(direction, cx0, cy, cz0, cx1, cz1, matrix) {
+let anchorCounter = 0;
+
+function makeAnchor(direction, cx0, cy, cz0, cx1, cz1, matrix, buildingId) {
   const cs = matrix.cellSize;
   const wp = matrix.cellToWorld(cx0, cy, cz0);
   const isNS = direction === 'N' || direction === 'S';
   return {
+    id:               `A${String(++anchorCounter).padStart(4, '0')}`,
     direction,
+    buildingId:       buildingId ?? null,
+    pairedBuildingId: null, // populated by Phase 2 when a connection is registered
     cells: [{ cx: cx0, cy, cz: cz0 }, { cx: cx1, cy, cz: cz1 }],
     tier: cy,
-    // World-space rect for Phase 2 ray casting and debug rendering
     x: wp.x,
     y: wp.y + matrix.cellSize - 0.25,
     z: wp.z,
     w: isNS ? 2 * cs : cs,
     d: isNS ? cs : 2 * cs,
   };
+}
+
+// Maps every cell position covered by a floor or roof rect to its buildingId.
+function buildCellBuildingMap(data, matrix) {
+  const map = new Map();
+  const cs = matrix.cellSize;
+  for (const level of [...data.floors, ...data.roofs]) {
+    const cy = level.yCollisionLevel;
+    for (const rect of level.rects) {
+      const cx0 = Math.floor((rect.x - matrix.ox) / cs);
+      const cz0 = Math.floor((rect.z - matrix.oz) / cs);
+      const cxEnd = cx0 + Math.ceil(rect.w / cs);
+      const czEnd = cz0 + Math.ceil(rect.d / cs);
+      for (let cz = cz0; cz < czEnd; cz++)
+        for (let cx = cx0; cx < cxEnd; cx++)
+          map.set(`${cx},${cy},${cz}`, level.buildingId);
+    }
+  }
+  return map;
 }
 
 /**
@@ -98,8 +121,10 @@ function makeTriggerCell(id, cx, cy, cz, faces, matrix) {
 }
 
 export function emitAnchors(data, matrix, config) {
+  anchorCounter = 0;
   const period = config.anchorPeriod ?? 4;
   const anchors = [];
+  const cellBuilding = buildCellBuildingMap(data, matrix);
   const triggerCells = [];
   let triggerId = 0;
 
@@ -143,13 +168,15 @@ export function emitAnchors(data, matrix, config) {
 
         if (FACING_N.has(v0) && FACING_N.has(v1)) {
           if (isEmpty(matrix.getCell(cx, cy, cz - 1)) && isEmpty(matrix.getCell(cx + 1, cy, cz - 1))) {
-            anchors.push(makeAnchor('N', cx, cy, cz - 1, cx + 1, cz - 1, matrix));
+            anchors.push(makeAnchor('N', cx, cy, cz - 1, cx + 1, cz - 1, matrix,
+              cellBuilding.get(`${cx},${cy},${cz}`)));
           }
         }
 
         if (FACING_S.has(v0) && FACING_S.has(v1)) {
           if (isEmpty(matrix.getCell(cx, cy, cz + 1)) && isEmpty(matrix.getCell(cx + 1, cy, cz + 1))) {
-            anchors.push(makeAnchor('S', cx, cy, cz + 1, cx + 1, cz + 1, matrix));
+            anchors.push(makeAnchor('S', cx, cy, cz + 1, cx + 1, cz + 1, matrix,
+              cellBuilding.get(`${cx},${cy},${cz}`)));
           }
         }
       }
@@ -165,13 +192,15 @@ export function emitAnchors(data, matrix, config) {
 
         if (FACING_E.has(v0) && FACING_E.has(v1)) {
           if (isEmpty(matrix.getCell(cx + 1, cy, cz)) && isEmpty(matrix.getCell(cx + 1, cy, cz + 1))) {
-            anchors.push(makeAnchor('E', cx + 1, cy, cz, cx + 1, cz + 1, matrix));
+            anchors.push(makeAnchor('E', cx + 1, cy, cz, cx + 1, cz + 1, matrix,
+              cellBuilding.get(`${cx},${cy},${cz}`)));
           }
         }
 
         if (FACING_W.has(v0) && FACING_W.has(v1)) {
           if (isEmpty(matrix.getCell(cx - 1, cy, cz)) && isEmpty(matrix.getCell(cx - 1, cy, cz + 1))) {
-            anchors.push(makeAnchor('W', cx - 1, cy, cz, cx - 1, cz + 1, matrix));
+            anchors.push(makeAnchor('W', cx - 1, cy, cz, cx - 1, cz + 1, matrix,
+              cellBuilding.get(`${cx},${cy},${cz}`)));
           }
         }
       }

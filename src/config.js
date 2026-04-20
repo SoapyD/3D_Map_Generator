@@ -134,6 +134,11 @@ export function parseArgs(argv) {
       continue;
     }
 
+    if (arg === '--debug-connectivity') {
+      config.debugConnectivity = true;
+      continue;
+    }
+
     if (arg === '--obj') {
       config.obj = true;
       continue;

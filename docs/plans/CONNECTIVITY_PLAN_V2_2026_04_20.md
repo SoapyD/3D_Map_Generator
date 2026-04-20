@@ -127,7 +127,8 @@ Each anchor must carry enough metadata for Phase 2 and beyond:
 ```js
 {
   direction: 'N' | 'S' | 'W' | 'E',
-  buildingId: 'b12',            // the shell the anchor attaches to
+  buildingId:       'b12',  // the building whose edge this anchor sits on — set in Phase 1
+  pairedBuildingId: 'b17',  // the building on the other end — null until paired in Phase 2
   cells: [{ cx, cz }, { cx, cz }], // the 2 empty cells the anchor occupies
   tier: 1,
 }

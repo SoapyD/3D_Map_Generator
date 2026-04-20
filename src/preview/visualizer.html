@@ -299,13 +299,24 @@
         const mesh = new THREE.Mesh(geo, mat);
         mesh.position.set(r.x + r.w / 2, r.y + r.h / 2, r.z + r.d / 2);
         group.add(mesh);
-        // Wall ID debug labels — re-enable wallLabel in debug-recorder.js to activate
-        // if (r.wallLabel) {
-        //   const sprite = makeTextSprite(r.wallLabel, '#ffffff');
-        //   sprite.scale.set(0.6, 0.3, 1);
-        //   sprite.position.set(r.x + r.w / 2, r.y + r.h / 2 + 0.5, r.z + r.d / 2);
-        //   group.add(sprite);
-        // }
+        if (r.label) {
+          const canvas = document.createElement('canvas');
+          canvas.width = 256; canvas.height = 64;
+          const ctx = canvas.getContext('2d');
+          ctx.font = 'bold 36px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#000000';
+          ctx.fillText(r.label, 129, 33);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(r.label, 128, 32);
+          const tex = new THREE.CanvasTexture(canvas);
+          const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+          const sprite = new THREE.Sprite(mat);
+          sprite.scale.set(2, 0.5, 1);
+          sprite.position.set(r.x + r.w / 2, r.y + r.h + 0.3, r.z + r.d / 2);
+          group.add(sprite);
+        }
       }
       return group;
     }
@@ -329,7 +340,7 @@
           for (const el of stage.elements) {
             for (const r of el.rects) {
               if (r.type === 'building') continue;
-              if (!showDebugMarkers && (r.type === 'trigger' || r.type === 'anchor')) continue;
+              if (!showDebugMarkers && (r.type === 'trigger' || r.type === 'anchor' || r.type === 'connection')) continue;
               rects.push({ ...r, opacity: 1, transparent: false });
             }
           }
@@ -356,7 +367,7 @@
       const curOpacity = gridVisible ? GRID_OPACITY : 1;
       for (let e = 0; e <= elementIdx; e++) {
         for (const r of current.elements[e].rects) {
-          if (!showDebugMarkers && (r.type === 'trigger' || r.type === 'anchor')) continue;
+          if (!showDebugMarkers && (r.type === 'trigger' || r.type === 'anchor' || r.type === 'connection')) continue;
           rects.push({ ...r, opacity: r.opacity !== undefined ? r.opacity * curOpacity : curOpacity, transparent: gridVisible });
         }
       }

@@ -178,15 +178,26 @@ function connectivityElements(data, color, config) {
   for (const t of allTriggers) {
     elements.push({
       label: `Connectivity — trigger ${t.id} faces:${t.faces} (${t.cx},${t.cz})`,
-      rects: [{ ...box('trigger', t.x, t.y, t.z, t.w, 0.05, t.d, '#ffee44'), label: `${t.id}` }],
+      rects: [box('trigger', t.x, t.y, t.z, t.w, 0.05, t.d, '#ffee44')],
     });
   }
 
   const allAnchors = c.anchors || [];
   for (const a of allAnchors) {
     elements.push({
-      label: `Connectivity — anchor ${a.direction} (${a.cells[0].cx},${a.cells[0].cz})`,
+      label: `Connectivity — anchor ${a.id} ${a.direction} (${a.cells[0].cx},${a.cells[0].cz})`,
       rects: [box('anchor', a.x, a.y, a.z, a.w, 0.1, a.d, '#ff44aa')],
+    });
+  }
+
+  const allCandidates = c.candidates || [];
+  const totalC = allCandidates.length;
+  for (let i = 0; i < allCandidates.length; i++) {
+    const conn = allCandidates[i];
+    const r = conn.debugRect;
+    elements.push({
+      label: `Connectivity — candidate ${i + 1}/${totalC} ${conn.axis} ${conn.fromBuildingId}→${conn.toBuildingId} (${conn.length}c)`,
+      rects: [box('connection', r.x, r.y, r.z, r.w, r.h, r.d, '#44ddff', 0.6)],
     });
   }
 
