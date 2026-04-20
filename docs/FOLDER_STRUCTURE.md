@@ -4,9 +4,22 @@
 3d_map_generator/
 ├── docs/                        # Project documentation
 │   ├── PROJECT_OVERVIEW.md
-│   ├── GENERATION_PIPELINE.md
+│   ├── GENERATION_PIPELINE.md   # Design spec for all 8 stages
 │   ├── IMPLEMENTATION_PHASES.md
-│   └── FOLDER_STRUCTURE.md
+│   ├── FOLDER_STRUCTURE.md
+│   ├── architecture/
+│   │   └── design_philosophy.md # Stack-agnostic principles behind the project
+│   └── processes/
+│       ├── FORMAT.md            # How to write pipeline flow docs
+│       └── pipeline-flows/      # One flow doc per pipeline stage
+│           ├── 1-grid.md
+│           ├── 2-buildings.md
+│           ├── 3-floors.md
+│           ├── 4-walls.md
+│           ├── 5-connectivity.md
+│           ├── 6-sightlines.md
+│           ├── 7-textures.md
+│           └── 8-export.md
 │
 ├── src/
 │   ├── index.js                 # CLI entry point

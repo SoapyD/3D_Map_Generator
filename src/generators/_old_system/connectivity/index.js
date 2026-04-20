@@ -13,5 +13,4 @@ export { postFilterLadders } from './post-filter-ladders.js';
 export { generateTowerLadders } from './generate-tower-ladders.js';
 export { generateLadderPlatforms } from './generate-ladder-platforms.js';
 export { generateConnectivity } from './generate-connectivity.js';
-export { generateBranches } from './branching.js';
 export { generatePillars } from './pillars.js';

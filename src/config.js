@@ -2,184 +2,74 @@
  * Centralised configuration — all tuneable parameters in one place.
  */
 
+// --- Global grid ---
+export const GLOBAL_GRID = {
+  bbd: 4,         // Base Building Dimension in inches (2x2 footprint + 1 skirt each side)
+  cellSize: 1,    // collision matrix cell size in inches
+  streetWidth: 4, // exactly 1 BBD — hardcoded for alignment
+};
+
 // --- CLI defaults ---
 export const DEFAULTS = {
   seed: Math.floor(Math.random() * 100000),
   mapWidth: 48,       // inches
   mapDepth: 48,       // inches
   tiers: 4,           // number of elevated tiers (+ base tier 0)
-  tierHeight: 3,      // vertical spacing between tiers (inches)
-  slabThickness: 0.5, // thickness of floor slabs (inches)
-  wallThickness: 0.25,// thickness of wall slabs (inches)
-  streetWidth: 3.5,   // minimum street width (inches)
-  damageLevel: 0.5,   // 0-1, how ruined the buildings are
-  maxSightline: 24,   // max unbroken line of sight (inches)
+  tierHeight: 3,      // room height per tier (inches)
+  slabThickness: 1,   // floor slab thickness (inches)
+  // wallThickness: 0.25,  // _old_system: wall slab thickness
+  streetWidth: GLOBAL_GRID.streetWidth, // derived from GLOBAL_GRID — do not change independently
+  damageLevel: 0.5,   // ruin level 0–1, controls floor quadrant removal escalation
+  // maxSightline: 24,     // _old_system: max unbroken line of sight (inches)
   textureSet: 'base',
   preview: false,
+  visualize: false,
   debug: false,
   obj: false,
   outputDir: 'output',
 };
 
-// --- Buildings ---
-export const BUILDING = {
-  footprints: {
-    small:  { min: 4, max: 7 },
-    medium: { min: 7, max: 12 },
-    large:  { min: 11, max: 18 },
-  },
-  heights: {
-    short:  { tierMin: 2, tierMax: 2 },
-    medium: { tierMin: 2, tierMax: 3 },
-    tall:   { tierMin: 3, tierMax: 4 },
-  },
-  tower: { min: 2, max: 3 }, // tower footprint range
-  gap: 0.5,                // minimum gap between buildings (inches)
-  cellSizeMultiplier: 1.5,// grid cell = avg small footprint × this
-  deleteRatio: 0.20,       // fraction of small buildings randomly deleted
-  towerChance: 0.3,        // chance of a tower replacing a small building in placement
-  maxTowers: 2,            // maximum towers per map
-  pyramidRoofChance: 0.5,  // chance a tower gets a pyramid roof
-  // Building shapes by size category
-  // Small shapes: used for small buildings (single cell or quadrant-based)
-  smallShapes: {
-    full:     { removed: [], weight: 0.4 },       // all 4 quadrants present (rectangle)
-    corner0:  { removed: [3], weight: 0.075 },    // missing SE
-    corner1:  { removed: [2], weight: 0.075 },    // missing SW
-    corner2:  { removed: [1], weight: 0.075 },    // missing NE
-    corner3:  { removed: [0], weight: 0.075 },    // missing NW
-    diagA:    { removed: [1, 2], weight: 0.05 },  // missing NE + SW (diagonal)
-    diagB:    { removed: [0, 3], weight: 0.05 },  // missing NW + SE (diagonal)
-    uSmallN:  { weight: 0.02 },   // small U, gap at middle-right (tower-sized cells)
-    uSmallS:  { weight: 0.02 },   // small U, gap at middle-left
-    uSmallE:  { weight: 0.02 },   // small U, gap at bottom-middle (rotated)
-    uSmallW:  { weight: 0.02 },   // small U, gap at top-middle (rotated)
-  },
-  // Medium shapes: used for medium buildings (multi-segment composites)
-  mediumShapes: {
-    full:      { weight: 0.4 },    // standard rectangle
-    lShapeSW:  { weight: 0.075 },  // L-shape, elbow at SW
-    lShapeSE:  { weight: 0.075 },  // L-shape, elbow at SE
-    lShapeNW:  { weight: 0.075 },  // L-shape, elbow at NW
-    lShapeNE:  { weight: 0.075 },  // L-shape, elbow at NE
-    uNarrowN:  { weight: 0.05 },   // narrow U, indent top-right
-    uNarrowS:  { weight: 0.05 },   // narrow U, indent bottom-right
-    uNarrowE:  { weight: 0.05 },   // narrow U, indent right-middle (rotated)
-    uNarrowW:  { weight: 0.05 },   // narrow U, indent left-middle (rotated)
-  },
-  // Large shapes: used for large buildings (wide composites)
-  largeShapes: {
-    full:     { weight: 0.5 },     // standard rectangle
-    uShapeN:  { weight: 0.125 },   // wide U, open top
-    uShapeS:  { weight: 0.125 },   // wide U, open bottom
-    uShapeE:  { weight: 0.125 },   // wide U, open right
-    uShapeW:  { weight: 0.125 },   // wide U, open left
-  },
-};
+// --- Buildings --- (_old_system only)
+// export const BUILDING = { ... };  // see _old_system/config.js
 
 // --- Walls ---
 export const WALL = {
-  quadSize: 1.5,           // inches per wall quadrant column
-  externalUpperRemovalRatio: 0.7,  // max fraction of upper row removed (external)
-  externalLowerRemovalRatio: 0.5,  // max fraction of lower row removed (external)
-  internalUpperRemovalRatio: 0.6,  // max fraction of upper row removed (internal)
-  internalLowerRemovalRatio: 0.3, // max fraction of lower row removed (internal)
-  // Interior walls (medium/large buildings, mid-floors)
-  interiorWallChance: { medium: 0.75, large: 1.0 }, // chance per eligible floor
-  interiorWallVariants: {
-    centreNS:  { weight: 0.175 }, // wall from north edge midpoint toward centre
-    centreEW:  { weight: 0.175 }, // wall from west edge midpoint toward centre
-    centreSN:  { weight: 0.175 }, // wall from south edge midpoint toward centre
-    centreWE:  { weight: 0.175 }, // wall from east edge midpoint toward centre
-    cross:     { weight: 0.3 },   // cross shape in centre
-  },
+  wallThickness: 0.25,
+  applySegmentCull: true,   // cull walls to at most 2 sides per building per floor
+  applyWindows: true,        // cut window openings in wall segments
+  applyBlobDamage: true,     // apply random blob damage to wall segments              // outer face flush with cell edge, body extends inward
+  quadSize: 1.5,                    // inches per damage column (Phase 2)
+  externalRow2RemovalRatio: 0.5,    // Phase 2: max fraction of row 2 (top) removed on exterior walls
+  externalRow2RemovalMin: 0.2,      // Phase 2: min fraction of row 2 removed on exterior walls
+  externalRow1RemovalRatio: 0.3,    // Phase 2: max fraction of row 1 (mid) removed — cascades from row 2
+  externalRow1RemovalMin: 0.1,      // Phase 2: min fraction of row 1 removed
+  externalRow0RemovalRatio: 0.2,    // Phase 2: max fraction of row 0 (base) removed — cascades from row 1
+  externalRow0RemovalMin: 0.0,      // Phase 2: min fraction of row 0 removed
+  internalRow2RemovalRatio: 0.6,    // Phase 2: interior wall ratios
+  internalRow1RemovalRatio: 0.3,
+  internalRow0RemovalRatio: 0.15,
+  interiorWallChance: { medium: 0.75, largeA: 1.0, largeB: 1.0 }, // Phase 2
+  blobMin: 1,  // minimum cells deleted per blob damage run
+  blobMax: 4,  // maximum cells deleted per blob damage run
 };
 
 // --- Floors ---
 export const FLOOR = {
-  minWalkable: 2,          // minimum walkable area dimension (inches)
-  maxTier0Floors: 2,       // max floors at removal tier 0 (fully intact)
-  tier1EscalateChance: 0.5,
-  tier2EscalateChance: 0.6,
-  tier3EscalateChance: 0.5,
+  maxIntactFloors: 2,        // max consecutive fully-intact floors before escalating removal
+  tier1EscalateChance: 0.5,  // chance to remove first quadrant (scaled by damageLevel)
+  tier2EscalateChance: 0.6,  // chance to remove second adjacent quadrant
+  tier3EscalateChance: 0.5,  // chance to remove third adjacent quadrant
 };
 
-// --- Connectivity ---
-export const CONNECTIVITY = {
-  walkwayWidth: 2.0,       // inches
-  walkwayThickness: 0.3,   // inches
-  // Bridges — upgraded walkways at tier 2+
-  bridgeChance: 0.4,       // chance a tier 2+ walkway becomes a bridge
-  bridgeWidth: 3.0,        // inches (wider than walkway)
-  bridgeThickness: 0.5,    // inches (thicker than walkway)
-  bridgeWallHeight: 0.75,  // low wall height on both sides
-  bridgeWallThickness: 0.25,
-  bridgeBattlementHeight: 1.5, // tall section height for battlement variant
-  bridgeBattlementSpacing: 2.25, // spacing between tall sections
-  bridgeBattlementGap: 1.5,    // gap width between tall sections
-  bridgeVariants: {
-    low:        { weight: 0.5 },  // continuous low walls
-    battlement: { weight: 0.5 },  // low walls + spaced tall sections
-  },
-  ladderWidth: 1.0,        // inches (half walkway width)
-  ladderDepth: 0.5,        // inches
-  ladderWallOffset: 0.3,   // offset from wall to prevent clashing
-  maxWalkwayLength: 24,    // inches (half map width)
-  minWalkwayLength: 3,     // inches
-  // Forced connections (gap detection)
-  forcedMinGap: 6,         // minimum gap size in inches to force a connection
-  forcedMaxCount: [3, 6],   // [min, max] longest forced connections kept per map
-  forcedDiagTolerance: 4,  // max offset in cells to still connect diagonally
-  // Branching walkways (T-junctions off forced connections)
-  branchMaxPerMap: 2,       // max branch walkways per map
-  branchMinLength: 3,       // min branch length in inches
-  branchMaxLength: 14,      // max branch length in inches
-  walkwayKeepRatio: 0.6,   // fraction of walkways kept per tier
-  ladderCullRatio: 0.6,    // fraction of red/orange ladders kept
-  proximity: 3,            // minimum distance between same-type connectors
-  mapBoundaryMargin: 2,    // keep ladders away from map edge (inches)
-  // Orange ladder spawn chances per tier
-  orangeSpawnChance: { ground: 0.10, tier1: 0.20, tier2Plus: 0.30 },
-  orangeMinSpan: 2,        // minimum tiers an orange ladder must span
-  // Ground ladder wall check margin
-  wallCheckMargin: 0.3,
-  // Cyan (interior) ladder cull ratio
-  cyanLadderCullRatio: 0.4,
-  // Distance for ladder-top near walkway check
-  ladderTopWalkwayDist: 2,
-  // Minimum wall remnant length kept when carving a ladder doorway (inches)
-  ladderDoorwayMinRemnant: 0.25,
-  // Pillar supports for long walkways/bridges
-  pillarWidth: 0.5,          // pillar cross-section (inches)
-  pillarSpacing: 6,          // max distance between pillars along walkway
-  pillarEdgeInset: 1.0,      // inset from walkway ends to first pillar
-  pillarMinWalkwayLength: 8, // min walkway length to get pillars
-  pillarMinHeight: 1.0,      // don't generate pillars shorter than this
-};
+// --- Connectivity --- (_old_system only)
+// export const CONNECTIVITY = { ... };  // see _old_system/config.js
 
-// --- Cover ---
-export const COVER = {
-  thin: 1.5,               // standard cover dimension (inches)
-  types: [
-    { height: 0.75, chance: 0.75 }, // low rubble/debris
-    { height: 1.5, chance: 0.25 },  // low wall
-  ],
-  rooftopChance: 0.5,      // chance per rooftop quadrant
-  placementPadding: 0.25,  // edge inset for placing cover within quadrants (inches)
-  groundCoverY: 0.65,      // Y position for ground-level cover (on top of courtyard slab)
-  courtyardExpansion: 0.75, // how far courtyards extend beyond deleted footprint per side (inches)
-  // Interior cover
-  interiorMaxMedium: 1,    // max objects per mid-floor for medium buildings
-  interiorMaxLarge: 3,     // max objects per mid-floor for large buildings
-  interiorShortChance: 0.75, // chance of 0.75" height vs 1.5" for interior cover
-  // Street scatter
-  streetScatterTarget: 20, // target number of street scatter objects
-  streetScatterAttempts: 200, // max placement attempts for street scatter
-};
+// --- Cover --- (_old_system only)
+// export const COVER = { ... };  // see _old_system/config.js
 
 // --- Grid ---
 export const GRID = {
-  minBlockSize: 10,        // minimum block dimension in inches
+  minBlockSize: 8,         // minimum block dimension in inches (2 × BBD)
 };
 
 // --- Geometry ---
@@ -218,48 +108,8 @@ export const LADDER_DISPLAY = {
   rungInset: 0.1,            // how far rungs sit inside the poles
 };
 
-// --- Deletion Toggles ---
-// Set any to false to disable that deletion rule (useful for debugging)
-export const DELETIONS = {
-  // Buildings
-  buildingRandomCull: true,        // delete 15% of small buildings randomly
-  buildingDisplaceByLarge: true,   // delete small buildings overlapping large ones
-  courtyardWallCull: true,          // remove courtyards that intersect visible walls
-
-  // Walkways
-  walkwayWallCollision: true,      // drop walkways that hit walls on their tier
-  walkwayBothEndsCheck: true,      // drop walkways where one end has no floor
-  walkwayIntersectionStrip: true,  // drop walkways that overlap other walkways
-  walkwayKeepRatioCull: true,      // cull walkways to keepRatio per tier
-  walkwayProximityCull: true,      // drop walkways too close to other walkways
-
-  // Yellow ladders (walkway-wall ladders)
-  yellowLadderProximityCull: true, // drop yellow ladders too close to red/orange
-
-  // Red ladders (ground)
-  redLadderWalkwayOverlap: true,   // drop red ladders touching walkways
-  redLadderCull: true,             // cull red ladders to ladderCullRatio
-  redLadderProximityCull: true,    // drop red ladders too close to red/orange
-
-  // Orange ladders (free-standing)
-  orangeLadderWalkwayOverlap: true,// drop orange ladders touching walkways
-  orangeLadderRedOverlap: true,    // drop orange ladders touching red ladders
-  orangeLadderCull: true,          // cull orange ladders to ladderCullRatio
-  orangeLadderProximityCull: true, // drop orange ladders too close to other orange
-
-  // Cyan ladders (interior)
-  cyanLadderCull: true,            // cull cyan ladders to cyanLadderCullRatio
-  cyanLadderProximityCull: true,   // drop cyan ladders too close to other cyan
-  cyanLadderOrangeOverlap: true,   // drop cyan ladders touching orange ladders
-  cyanLadderTopNearWalkway: true,  // drop cyan ladders whose top is near a walkway
-  orangeLadderTopNearWalkway: true,// drop orange ladders whose top is near a walkway
-
-  // Ladder top-wall doorway carving
-  ladderTopWallClearance: true,    // carve doorway in wall at top exit of each ladder
-
-  // Pillars
-  pillarGeneration: true,          // generate support pillars under walkways/bridges
-};
+// --- Deletion Toggles --- (_old_system only)
+// export const DELETIONS = { ... };  // see _old_system/config.js
 
 // --- CLI parser ---
 export function parseArgs(argv) {
@@ -269,6 +119,12 @@ export function parseArgs(argv) {
     const arg = argv[i];
 
     if (arg === '--preview') {
+      config.preview = true;
+      continue;
+    }
+
+    if (arg === '--visualize') {
+      config.visualize = true;
       config.preview = true;
       continue;
     }

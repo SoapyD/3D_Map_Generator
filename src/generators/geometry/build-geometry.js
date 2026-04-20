@@ -21,6 +21,7 @@ import { buildJunctionPlatformPrimitives } from './build-junction-platform-primi
 import { buildBridgePrimitives } from './build-bridge-primitives.js';
 import { buildBoxSlabPrimitives } from './build-scatter-primitives.js';
 import { buildCourtyardPrimitives } from './build-courtyard-primitives.js';
+import { buildBuildingFootprintPrimitives } from './build-building-footprint-primitives.js';
 
 // ─── Main builder ─────────────────────────────────────────────────────
 
@@ -40,7 +41,11 @@ export function buildGeometry(data, config) {
   const bridges = data.connections ? data.connections.bridges || [] : [];
   const pillars = data.connections ? data.connections.pillars || [] : [];
 
-  primitives.push(...buildFloorPrimitives(floorData, buildings, config));
+  if (floorData.length > 0) {
+    primitives.push(...buildFloorPrimitives(floorData, buildings, config));
+  } else {
+    primitives.push(...buildBuildingFootprintPrimitives(buildings, config));
+  }
   primitives.push(...buildWallPrimitives(walls, buildings));
   primitives.push(...buildWalkwayPrimitives(walkways));
 

@@ -1,67 +1,70 @@
-import { FLOOR, BUILDING } from '../../config.js';
+import { FLOOR } from '../../config.js';
 import { pickAdjacentToRemoved } from '../selectors/index.js';
 import { quadrantsToSections } from './quadrants-to-sections.js';
+import { ruinsToSections } from './ruins-small-to-sections.js';
 
-export function processBuildingFloors(building, buildingIndex, data, config, rng) {
-  const bq = { tiers: {} };
+/**
+ * Generates floor plates for a single building shell.
+ *
+ * Produces one slab per tier, placed at Y = floorIndex * (tierHeight + slabThickness) - slabThickness.
+ * Ground slab (i=0) sits at Y=-1; ground-floor walls therefore start at Y=0.
+ * Quadrant removal escalates upward: higher floors lose more area, biased by damageLevel.
+ */
+export function processBuildingFloors(building, buildingIndex, config, rng) {
+  const { tierHeight, slabThickness, damageLevel } = config;
+  const levelHeight = tierHeight + slabThickness;
   const removed = new Set();
-  let tier0Count = 0;
-  const isTower = building.size === 'tower';
-  const tierSections = [];
-  const roofs = [];
+  let intactCount = 0;
+  const floors = [];
 
-  if (building.shape && BUILDING.smallShapes && BUILDING.smallShapes[building.shape]) {
-    for (const q of BUILDING.smallShapes[building.shape].removed) removed.add(q);
-  }
+  const isRuins = building.size.startsWith('ruins');
 
-  const hasShape = building.shape && BUILDING.smallShapes && BUILDING.smallShapes[building.shape] && BUILDING.smallShapes[building.shape].removed.length > 0;
-  for (let tier = 1; tier <= building.maxTier; tier++) {
-    if (hasShape && tier === 1) {
-      const present = new Set([0, 1, 2, 3].filter(q => !removed.has(q)));
-      bq.tiers[tier] = present;
-      const sections = quadrantsToSections(building, present);
-      const isRoofTier = tier === building.maxTier;
-      if (isRoofTier && building.pyramidRoof) {
-        roofs.push({ type: 'pyramid', tier, building, buildingIndex });
-      } else if (isRoofTier) {
-        for (const s of sections) roofs.push({ type: 'flat', tier, section: s, buildingIndex });
-      } else {
-        tierSections.push({ tier, sections });
-      }
-      continue;
-    }
+  for (let i = 0; i < building.maxTier; i++) {
+    if (!isRuins) {
+      const removalCount = removed.size;
 
-    const removalCount = removed.size;
-    if (removalCount === 0) {
-      tier0Count++;
-      if (!isTower && (tier0Count > FLOOR.maxTier0Floors || (tier > 1 && rng.chance(FLOOR.tier1EscalateChance)))) {
-        const available = [0, 1, 2, 3].filter(q => !removed.has(q));
-        removed.add(rng.pick(available));
-      }
-    } else if (removalCount === 1) {
-      if (rng.chance(FLOOR.tier2EscalateChance)) {
-        const adj = pickAdjacentToRemoved(removed, rng);
-        if (adj !== null) removed.add(adj);
-      }
-    } else if (removalCount === 2) {
-      if (rng.chance(FLOOR.tier3EscalateChance)) {
-        const adj = pickAdjacentToRemoved(removed, rng);
-        if (adj !== null) removed.add(adj);
+      if (removalCount === 0) {
+        intactCount++;
+        const overLimit = intactCount > FLOOR.maxIntactFloors;
+        const chanceEscalate = i > 0 && rng.chance(FLOOR.tier1EscalateChance * damageLevel * 2);
+        if (overLimit || chanceEscalate) {
+          const available = [0, 1, 2, 3].filter(q => !removed.has(q));
+          removed.add(rng.pick(available));
+        }
+      } else if (removalCount === 1) {
+        if (rng.chance(FLOOR.tier2EscalateChance)) {
+          const adj = pickAdjacentToRemoved(removed, rng);
+          if (adj !== null) removed.add(adj);
+        }
+      } else if (removalCount === 2) {
+        if (rng.chance(FLOOR.tier3EscalateChance)) {
+          const adj = pickAdjacentToRemoved(removed, rng);
+          if (adj !== null) removed.add(adj);
+        }
       }
     }
 
     const present = new Set([0, 1, 2, 3].filter(q => !removed.has(q)));
-    bq.tiers[tier] = present;
-    const sections = quadrantsToSections(building, present);
-    const isRoofTier = tier === building.maxTier;
-    if (isRoofTier && building.pyramidRoof) {
-      roofs.push({ type: 'pyramid', tier, building, buildingIndex });
-    } else if (isRoofTier) {
-      for (const s of sections) roofs.push({ type: 'flat', tier, section: s, buildingIndex });
+    let rects;
+    if (building.size === 'ruins-small') {
+      rects = ruinsToSections(building);
+    } else if (isRuins) {
+      rects = [{ x: building.x, z: building.z, w: building.w, d: building.d }];
     } else {
-      tierSections.push({ tier, sections });
+      rects = quadrantsToSections(building, present);
     }
+    const yCollisionLevel = i * levelHeight - slabThickness;
+
+    floors.push({
+      buildingId: `b${buildingIndex}`,
+      buildingIndex,
+      floorIndex: i,
+      yCollisionLevel,
+      rects,
+      removedQuadrants: [...removed],
+      materialKey: 'stone_floor',
+    });
   }
 
-  return { bq, tierSections, roofs };
+  return floors;
 }

@@ -1,10 +1,10 @@
-import { BUILDING, DELETIONS } from '../../config.js';
-import { generateBigBuilding } from './generateBigBuilding.js';
-import { overlapsAny } from './overlapsAny.js';
+// import { BUILDING, DELETIONS } from '../../config.js'; // _old_system — BUILDING/DELETIONS removed from config
+// import { generateBigBuilding } from './generateBigBuilding.js'; // old system — depends on shape builders
+import { overlapsAny } from '../utils/rects/index.js';
 
 const BUILDING_GAP = BUILDING.gap;
 
-export function placeBigBuildings(buildings, specs, config, rng, tiers) {
+export function placeBigBuildings(buildings, specs, config, rng, tiers, streetBounds) {
   const placedBig = [];
   const displacedByBig = [];
 
@@ -34,9 +34,9 @@ export function placeBigBuildings(buildings, specs, config, rng, tiers) {
         }
       }
 
-      // Check candidate against: already-placed big buildings + non-earmarked small buildings
+      // Check candidate against: already-placed big buildings + non-earmarked small buildings + streets
       const checkAgainst = [...placedBig, ...notEarmarked];
-      if (!overlapsAny(candidate, checkAgainst)) {
+      if (!overlapsAny(candidate, checkAgainst) && (!streetBounds || !overlapsAny(candidate, streetBounds))) {
         // Success — confirm this placement
         placedBig.push(...candidate);
         displacedByBig.push(...earmarked);

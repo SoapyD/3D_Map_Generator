@@ -8,12 +8,14 @@ import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
 import { parseArgs } from './config.js';
 import { createRng } from './core/rng.js';
-import { generateGrid } from './generators/grid.js';
+import { generateGrid } from './generators/foundations/grid.js';
 import { generateBuildings } from './generators/buildings/index.js';
+import { createCollisionMatrix, CELL } from './generators/collision/matrix.js';
 import { generateFloors } from './generators/floors/index.js';
+import { generateRoofs } from './generators/roofs/index.js';
 import { generateWalls } from './generators/walls/index.js';
-import { generateConnectivity } from './generators/connectivity/index.js';
-import { generateCover } from './generators/cover/index.js';
+// import { generateConnectivity } from './generators/_old_system/connectivity/generate-connectivity.js'; // stage 5 — walkways, ladders, pillars
+// import { generateCover } from './generators/_old_system/cover/index.js';          // stage 6 — scatter cover pieces
 import { buildGeometry } from './generators/geometry/index.js';
 import { buildScene } from './generators/scene/index.js';
 import { exportToGlb, getOutputPath } from './export/glb-exporter.js';
@@ -25,6 +27,12 @@ async function main() {
   const config = parseArgs(process.argv);
   const rng = createRng(config.seed);
 
+  let recorder = null;
+  if (config.visualize) {
+    const { createRecorder } = await import('./preview/debug-recorder.js');
+    recorder = createRecorder(config.seed, config);
+  }
+
   console.log(`Generating map with seed ${config.seed}...`);
   console.log(`  Size: ${config.mapWidth}x${config.mapDepth} inches`);
   console.log(`  Tiers: ${config.tiers} (+ base)`);
@@ -32,52 +40,66 @@ async function main() {
   console.log(`  Damage level: ${config.damageLevel}`);
 
   // Stage 1: Grid partitioning
-  console.log('\n[1/7] Generating city grid...');
+  console.log('\n[1/2] Generating city grid...');
   const gridData = generateGrid(config, rng);
   console.log(`  ${gridData.blocks.length} city blocks`);
+  recorder?.capture(1, gridData);
+  recorder?.capture(2, gridData);
 
-  // Stage 2: Building footprints
-  console.log('[2/7] Placing buildings...');
-  const buildingData = generateBuildings(gridData, config, rng);
-  console.log(`  ${buildingData.buildings.length} buildings`);
+  const matrix = createCollisionMatrix(gridData.activeArea, config.tiers, config.tierHeight, config.slabThickness);
 
-  // Stage 3: Floor plates
-  console.log('[3/7] Generating floor plates...');
-  const floorData = generateFloors(buildingData, config, rng);
-  for (const f of floorData.floors) {
-    console.log(`  Tier ${f.tier}: ${f.sections.length} sections`);
+  // Write ground-slab placeholders at Y=-slabThickness.
+  // Buildings will overwrite their footprints with SHELL; remaining cells mark
+  // non-building foundation and street areas for future geometry stages.
+  const slabY = -config.slabThickness;
+  for (const block of gridData.blocks) {
+    matrix.fillBox(block.x, slabY, block.z, block.w, config.slabThickness, block.d, CELL.FOUNDATION_PLACEHOLDER);
+  }
+  for (const street of gridData.streetBounds) {
+    matrix.fillBox(street.x, slabY, street.z, street.w, config.slabThickness, street.d, CELL.STREET_PLACEHOLDER);
   }
 
-  // Stage 4: Walls
-  console.log('[4/7] Generating walls...');
-  const wallData = generateWalls(floorData, config, rng);
+  // Stage 2: Building shells
+  console.log('[2/3] Placing buildings...');
+  const buildingData = generateBuildings(gridData, config, rng, matrix);
+  console.log(`  ${buildingData.buildings.length} buildings`);
+  recorder?.capture(3, buildingData);
+
+  // Stage 3: Floor plates
+  console.log('[3/5] Generating floors...');
+  const floorData = generateFloors(buildingData, config, rng, matrix);
+  console.log(`  ${floorData.floors.length} floor plates`);
+  recorder?.capture(4, floorData);
+
+  // Stage 4: Roofs
+  console.log('[4/5] Generating roofs...');
+  const roofData = generateRoofs(floorData, config, matrix);
+  console.log(`  ${roofData.roofs.length} roof slabs`);
+  recorder?.capture(5, roofData);
+
+  // Stage 5: Walls
+  console.log('[5/5] Generating walls...');
+  const wallData = generateWalls(roofData, config, rng, matrix);
   console.log(`  ${wallData.walls.length} wall segments`);
+  recorder?.capture(6, wallData);
 
-  // Stage 5: Connectivity
-  console.log('[5/7] Connecting levels...');
-  const connData = generateConnectivity(wallData, config, rng);
-  const c = connData.connections;
-  console.log(`  ${c.ladders.length} ladders, ${c.walkways.length} walkways`);
-
-  // Stage 6: Cover
-  console.log('[6/7] Placing cover...');
-  const coverData = generateCover(connData, config, rng);
-  console.log(`  ${coverData.cover.length} cover pieces`);
-
-  // Build geometry primitives (shared handover)
-  console.log('[7/8] Building geometry...');
-  const geometry = buildGeometry(coverData, config);
+  const geometry = buildGeometry(wallData, config);
 
   // Export
   await mkdir(config.outputDir, { recursive: true });
+
+  if (recorder) {
+    await writeFile(`${config.outputDir}/debug_frames.json`, recorder.serialize());
+    console.log(`  Visualizer frames written to ${config.outputDir}/debug_frames.json`);
+  }
   const { dir, baseName } = getObjOutputPath(config);
 
-  // Write handover file
+  // Write handover file — embed collision matrix for viewer grid toggle
+  const geometryWithMatrix = { ...geometry, collisionMatrix: matrix.toDebugJSON() };
   const geometryPath = path.join(dir, `${baseName}_geometry.json`);
-  await writeFile(geometryPath, JSON.stringify(geometry));
+  await writeFile(geometryPath, JSON.stringify(geometryWithMatrix));
 
-  // Build 3D scene from primitives
-  console.log('[8/8] Building scene and exporting...');
+  console.log('Building scene and exporting...');
   const scene = buildScene(geometry, config);
 
   // Always export both GLB and OBJ with texture atlas
@@ -97,7 +119,7 @@ async function main() {
   if (config.preview) {
     console.log('\nStarting preview server...');
     const { startPreview } = await import('./preview/server.js');
-    startPreview(outputPath);
+    startPreview(outputPath, 3010, config.visualize ? 'visualize' : 'preview');
   }
 }
 

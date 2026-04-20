@@ -2,8 +2,6 @@
  * Stage 5: Connectivity — ensures all elevated floor sections are reachable.
  */
 import { DELETIONS } from '../../config.js';
-import { detectGapsAndConnect } from '../gap-detection/index.js';
-import { generateBranches } from './branching.js';
 import { generatePillars } from './pillars.js';
 import { generateWalkways } from './generate-walkways.js';
 import { proximityCullWalkways } from './proximity-cull-walkways.js';
@@ -51,12 +49,6 @@ export function generateConnectivity(data, config, rng) {
       carveLadderDoorway(ladder, state);
     }
   }
-
-  const gapWalkways = detectGapsAndConnect(data, finalWalkways, [], config, rng);
-  finalWalkways.push(...gapWalkways);
-
-  const { branches } = generateBranches(data, finalWalkways, config);
-  finalWalkways.push(...branches);
 
   const { bridges, remainingWalkways } = upgradeToBridges(finalWalkways, tierHeight, rng);
 

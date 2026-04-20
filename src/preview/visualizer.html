@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mordheim Map Visualizer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #12121f; font-family: monospace; color: #ccc; }
+    canvas { display: block; }
+
+    #controls {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: rgba(10, 10, 20, 0.92);
+      border-top: 1px solid #333;
+      padding: 10px 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #transport, #grid-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    #transport button, #grid-row button {
+      background: #2a2a44;
+      border: 1px solid #555;
+      color: #ddd;
+      padding: 4px 12px;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 13px;
+      border-radius: 3px;
+    }
+    #transport button:hover, #grid-row button:hover { background: #3a3a60; }
+    #btn-grid.active     { background: #1a3a5a; border-color: #7af; color: #7af; }
+    #btn-show-all.active { background: #1a3a2a; border-color: #7fa; color: #7fa; }
+
+    #grid-panel {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+    #grid-panel label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      padding: 2px 6px;
+      border: 1px solid #444;
+      border-radius: 3px;
+      color: #ccc;
+    }
+    #grid-panel label:hover { border-color: #666; }
+    #grid-panel label.disabled { opacity: 0.4; }
+
+    #speed-group { display: flex; gap: 4px; }
+    #speed-group button { padding: 4px 8px; font-size: 12px; }
+    #speed-group button.active { background: #554488; border-color: #aa88cc; }
+
+    #scrubber {
+      width: 100%;
+      accent-color: #aa44cc;
+      cursor: pointer;
+    }
+
+    #label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+    }
+
+    #frame-label { color: #eee; }
+    #frame-count { color: #888; }
+
+    #legend {
+      display: flex;
+      gap: 14px;
+      font-size: 12px;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 3px;
+      border: 1px solid transparent;
+    }
+    .legend-item:hover { border-color: #555; }
+    .legend-item.active-stage { border-color: #888; background: #1e1e34; }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <div id="label-row">
+      <span id="frame-label">Loading...</span>
+      <span id="frame-count"></span>
+    </div>
+    <input id="scrubber" type="range" min="0" value="0">
+    <div id="transport">
+      <button id="btn-prev">&#9664; Prev</button>
+      <button id="btn-play">&#9654; Play</button>
+      <button id="btn-next">Next &#9654;</button>
+      <div id="speed-group">
+        <button data-speed="0.5">0.5×</button>
+        <button data-speed="1" class="active">1×</button>
+        <button data-speed="2">2×</button>
+        <button data-speed="4">4×</button>
+      </div>
+    </div>
+    <div id="grid-row">
+      <button id="btn-grid">Grid [G]</button>
+      <button id="btn-show-all">All Layers [A]</button>
+      <div id="grid-panel" style="display:none">
+        <label><input type="checkbox" id="group-shell"  checked> <span style="color:#ff4422">Shell</span></label>
+        <label><input type="checkbox" id="group-floors" checked> <span style="color:#2288ff">Floors</span></label>
+        <label><input type="checkbox" id="group-roofs"  checked> <span style="color:#88aaff">Roofs</span></label>
+        <label><input type="checkbox" id="group-walls"  checked> <span style="color:#4488ff">Walls</span></label>
+        <label><input type="checkbox" id="group-ground">  <span style="color:#886644">Ground</span></label>
+        <label><input type="checkbox" id="group-ifloors"> <span style="color:#aa7744">IFloors</span></label>
+        <label><input type="checkbox" id="group-iwalls">  <span style="color:#885533">IWalls</span></label>
+      </div>
+    </div>
+    <div id="legend"></div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // --- Scene setup ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x12121f);
+
+    const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 1000);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+    sun.position.set(1, 2, 1);
+    scene.add(sun);
+
+    const DIM_OPACITY = 0.4;
+    const GRID_OPACITY = 0.12; // opacity for current-stage geometry when grid is visible
+    const SPEED_MS = { 0.5: 1000, 1: 500, 2: 250, 4: 125 };
+    const STAGE_PAUSE_MS = 1500;
+
+    const STAGE_META = [
+      { stage: 1, name: 'Foundation',   color: '#5588cc' },
+      { stage: 2, name: 'Streets',      color: '#2244aa' },
+      { stage: 3, name: 'Buildings',    color: '#44bb88' },
+      { stage: 4, name: 'Floors',       color: '#ccaa33' },
+      { stage: 5, name: 'Roofs',        color: '#88aaff' },
+      { stage: 6, name: 'Walls',        color: '#cc5533' },
+      { stage: 7, name: 'Connectivity', color: '#aa44cc' },
+      { stage: 8, name: 'Cover',        color: '#33bbcc' },
+    ];
+
+    // --- State ---
+    let stages = [];
+    let frameMap = [];      // frameMap[i] = { stageIdx, elementIdx }
+    let totalFrames = 0;
+    let currentIndex = 0;
+    let playing = false;
+    let playTimeout = null;
+    let speed = 1;
+    let currentGroup = null;
+
+    // --- Load data ---
+    let data;
+    try {
+      const res = await fetch('/debug_frames.json');
+      data = await res.json();
+    } catch (e) {
+      document.getElementById('frame-label').textContent = `Failed to load debug_frames.json: ${e.message}`;
+      throw e;
+    }
+    if (!data.stages) {
+      document.getElementById('frame-label').textContent = 'debug_frames.json has no stages — re-run npm run visualize';
+      throw new Error('missing stages');
+    }
+    stages = data.stages;
+
+    // Build the flat frame index → (stageIdx, elementIdx) map
+    for (let s = 0; s < stages.length; s++) {
+      for (let e = 0; e < stages[s].elements.length; e++) {
+        frameMap.push({ stageIdx: s, elementIdx: e });
+      }
+    }
+    totalFrames = frameMap.length;
+
+    const { mapWidth, mapDepth, tiers, tierHeight } = data.config;
+    const cx = mapWidth / 2;
+    const cz = mapDepth / 2;
+
+    // Grid helper
+    const gridHelper = new THREE.GridHelper(
+      Math.max(mapWidth, mapDepth),
+      Math.max(mapWidth, mapDepth),
+      0x333344, 0x222233
+    );
+    gridHelper.position.set(cx, -0.06, cz);
+    scene.add(gridHelper);
+
+    // Camera
+    camera.position.set(cx + mapWidth * 0.8, mapWidth * 0.7, cz + mapWidth * 0.8);
+    controls.target.set(cx, tiers * tierHeight * 0.3, cz);
+    controls.update();
+
+    // --- N/S/E/W compass labels ---
+    function makeTextSprite(text, color) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128; canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = color;
+      ctx.font = 'bold 52px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 64, 32);
+      const tex = new THREE.CanvasTexture(canvas);
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(5, 2.5, 1);
+      return sprite;
+    }
+    const labelOffset = 4;
+    const compassLabels = [
+      { text: 'N', color: '#4488ff', pos: [cx, 2, -labelOffset] },
+      { text: 'S', color: '#ff6622', pos: [cx, 2, mapDepth + labelOffset] },
+      { text: 'E', color: '#22cc66', pos: [mapWidth + labelOffset, 2, cz] },
+      { text: 'W', color: '#cc44aa', pos: [-labelOffset, 2, cz] },
+    ];
+    for (const { text, color, pos } of compassLabels) {
+      const sprite = makeTextSprite(text, color);
+      sprite.position.set(...pos);
+      scene.add(sprite);
+    }
+
+    // Scrubber
+    const scrubber = document.getElementById('scrubber');
+    scrubber.max = totalFrames - 1;
+
+    // Legend
+    const legendEl = document.getElementById('legend');
+    const legendItems = {};
+    for (const m of STAGE_META) {
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      item.innerHTML = `<div class="legend-dot" style="background:${m.color}"></div>${m.name}`;
+      item.addEventListener('click', () => {
+        const idx = frameMap.findIndex(f => stages[f.stageIdx].stage === m.stage);
+        if (idx >= 0) setFrame(idx);
+      });
+      legendEl.appendChild(item);
+      legendItems[m.stage] = item;
+    }
+
+    // --- Rendering ---
+    // Builds a mesh from a flat list of rects.
+    function buildMeshGroup(rects) {
+      const group = new THREE.Group();
+      for (const r of rects) {
+        if (r.w <= 0 || r.h <= 0 || r.d <= 0) continue;
+        const geo = new THREE.BoxGeometry(r.w, r.h, r.d);
+        const mat = new THREE.MeshLambertMaterial({
+          color: new THREE.Color(r.color),
+          transparent: r.opacity < 1,
+          opacity: r.opacity,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(r.x + r.w / 2, r.y + r.h / 2, r.z + r.d / 2);
+        group.add(mesh);
+        // Wall ID debug labels — re-enable wallLabel in debug-recorder.js to activate
+        // if (r.wallLabel) {
+        //   const sprite = makeTextSprite(r.wallLabel, '#ffffff');
+        //   sprite.scale.set(0.6, 0.3, 1);
+        //   sprite.position.set(r.x + r.w / 2, r.y + r.h / 2 + 0.5, r.z + r.d / 2);
+        //   group.add(sprite);
+        // }
+      }
+      return group;
+    }
+
+    function disposeGroup(group) {
+      group.traverse(obj => {
+        if (obj.isMesh) {
+          obj.geometry.dispose();
+          obj.material.dispose();
+        }
+      });
+    }
+
+    // Assembles rects for a given frame from the compact stage data.
+    // Prior stages are dimmed; current stage accumulated up to elementIdx.
+    // When grid is visible, current-stage rects are rendered at GRID_OPACITY.
+    function assembleRects(stageIdx, elementIdx) {
+      if (showAll) {
+        const rects = [];
+        for (const stage of stages) {
+          for (const el of stage.elements) {
+            for (const r of el.rects) {
+              if (r.type === 'building') continue;
+              rects.push({ ...r, opacity: 1, transparent: false });
+            }
+          }
+        }
+        return rects;
+      }
+
+      const rects = [];
+
+      // Foundations (stage 0) and streets (stage 1) are hidden once buildings are placed
+      // so ground-level placeholder geometry doesn't obscure floor slab generation.
+      const pastBuildings = stageIdx > 2;
+
+      for (let s = 0; s < stageIdx; s++) {
+        if (pastBuildings && s < 2) continue;
+        for (const el of stages[s].elements) {
+          for (const r of el.rects) {
+            rects.push({ ...r, opacity: DIM_OPACITY, transparent: true });
+          }
+        }
+      }
+
+      const current = stages[stageIdx];
+      const curOpacity = gridVisible ? GRID_OPACITY : 1;
+      for (let e = 0; e <= elementIdx; e++) {
+        for (const r of current.elements[e].rects) {
+          rects.push({ ...r, opacity: r.opacity !== undefined ? r.opacity * curOpacity : curOpacity, transparent: gridVisible });
+        }
+      }
+
+      return rects;
+    }
+
+    function setFrame(idx) {
+      currentIndex = Math.max(0, Math.min(totalFrames - 1, idx));
+      const { stageIdx, elementIdx } = frameMap[currentIndex];
+
+      const rects = assembleRects(stageIdx, elementIdx);
+
+      if (currentGroup) {
+        disposeGroup(currentGroup);
+        scene.remove(currentGroup);
+      }
+      currentGroup = buildMeshGroup(rects);
+      scene.add(currentGroup);
+
+      const stage = stages[stageIdx];
+      const el = stage.elements[elementIdx];
+      scrubber.value = currentIndex;
+      document.getElementById('frame-label').textContent = el.label;
+      document.getElementById('frame-count').textContent =
+        `${currentIndex + 1} / ${totalFrames}`;
+
+      // Highlight active stage in legend
+      for (const [stageNum, item] of Object.entries(legendItems)) {
+        item.classList.toggle('active-stage', String(stage.stage) === stageNum);
+      }
+    }
+
+    // --- Playback ---
+    function scheduleNext() {
+      const next = currentIndex + 1;
+      if (next >= totalFrames) { stopPlay(); return; }
+      const crossesBoundary = frameMap[currentIndex].stageIdx !== frameMap[next].stageIdx;
+      const delay = crossesBoundary ? STAGE_PAUSE_MS : SPEED_MS[speed];
+      playTimeout = setTimeout(() => {
+        if (!playing) return;
+        setFrame(next);
+        scheduleNext();
+      }, delay);
+    }
+
+    function startPlay() {
+      playing = true;
+      document.getElementById('btn-play').textContent = '⏸ Pause';
+      scheduleNext();
+    }
+
+    function stopPlay() {
+      playing = false;
+      clearTimeout(playTimeout);
+      document.getElementById('btn-play').textContent = '▶ Play';
+    }
+
+    // --- Controls ---
+    document.getElementById('btn-prev').addEventListener('click', () => { stopPlay(); setFrame(currentIndex - 1); });
+    document.getElementById('btn-next').addEventListener('click', () => { stopPlay(); setFrame(currentIndex + 1); });
+    document.getElementById('btn-play').addEventListener('click', () => {
+      if (playing) { stopPlay(); } else { startPlay(); }
+    });
+
+    scrubber.addEventListener('input', () => { stopPlay(); setFrame(parseInt(scrubber.value)); });
+
+    for (const btn of document.querySelectorAll('#speed-group button')) {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#speed-group button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        speed = parseFloat(btn.dataset.speed);
+        if (playing) { stopPlay(); startPlay(); }
+      });
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowLeft')        { stopPlay(); setFrame(currentIndex - 1); }
+      if (e.key === 'ArrowRight')       { stopPlay(); setFrame(currentIndex + 1); }
+      if (e.key === ' ')                { e.preventDefault(); playing ? stopPlay() : startPlay(); }
+      if (e.key === 'g' || e.key === 'G') toggleGrid();
+      if (e.key === 'a' || e.key === 'A') toggleShowAll();
+    });
+
+    // --- Collision grid toggle ---
+    // Cell type values must match CELL constants in matrix.js
+    const CELL_TYPES = [
+      { value: 0,  label: 'Shell',    color: 0xff4422, id: 'grid-shell' },
+      { value: 1,  label: 'Floor',    color: 0x2288ff, id: 'grid-floor' },
+      { value: 10, label: 'Floor N',  color: 0x44ccff, id: 'grid-floor-n' },
+      { value: 11, label: 'Floor S',  color: 0xff8800, id: 'grid-floor-s' },
+      { value: 12, label: 'Floor E',  color: 0x44ff88, id: 'grid-floor-e' },
+      { value: 13, label: 'Floor W',  color: 0xff44cc, id: 'grid-floor-w' },
+      { value: 14, label: 'Floor NE', color: 0xaaffcc, id: 'grid-floor-ne' },
+      { value: 15, label: 'Floor NW', color: 0xccaaff, id: 'grid-floor-nw' },
+      { value: 16, label: 'Floor SE', color: 0xffccaa, id: 'grid-floor-se' },
+      { value: 17, label: 'Floor SW', color: 0xffaacc, id: 'grid-floor-sw' },
+      { value: 20, label: 'Wall N',      color: 0x4488ff, id: 'grid-wall-n' },
+      { value: 21, label: 'Wall S',      color: 0xff6622, id: 'grid-wall-s' },
+      { value: 22, label: 'Wall E',      color: 0x22cc66, id: 'grid-wall-e' },
+      { value: 23, label: 'Wall W',      color: 0xcc44aa, id: 'grid-wall-w' },
+      { value: 30, label: 'End N',       color: 0xffff00, id: 'grid-end-n' },
+      { value: 31, label: 'End S',       color: 0xffcc00, id: 'grid-end-s' },
+      { value: 32, label: 'End E',       color: 0xccff00, id: 'grid-end-e' },
+      { value: 33, label: 'End W',       color: 0xff00cc, id: 'grid-end-w' },
+      { value: 34, label: 'Island',      color: 0xffffff, id: 'grid-island' },
+      { value: 40, label: 'Roof',               color: 0x88aaff, id: 'grid-roof' },
+      { value: 41, label: 'Roof N',              color: 0xaabbff, id: 'grid-roof-n' },
+      { value: 42, label: 'Roof S',              color: 0xbbaaff, id: 'grid-roof-s' },
+      { value: 43, label: 'Roof E',              color: 0xaaffbb, id: 'grid-roof-e' },
+      { value: 44, label: 'Roof W',              color: 0xffaabb, id: 'grid-roof-w' },
+      { value: 50, label: 'Foundation',     color: 0xaa8855, id: 'grid-foundation' },
+      { value: 51, label: 'Street',         color: 0x776655, id: 'grid-street' },
+      { value: 60, label: 'IFloor N',       color: 0x996633, id: 'grid-ifloor-n' },
+      { value: 61, label: 'IFloor S',       color: 0x996633, id: 'grid-ifloor-s' },
+      { value: 62, label: 'IFloor E',       color: 0x996633, id: 'grid-ifloor-e' },
+      { value: 63, label: 'IFloor W',       color: 0x996633, id: 'grid-ifloor-w' },
+      { value: 64, label: 'IFloor NE',      color: 0xaa7744, id: 'grid-ifloor-ne' },
+      { value: 65, label: 'IFloor NW',      color: 0xaa7744, id: 'grid-ifloor-nw' },
+      { value: 66, label: 'IFloor SE',      color: 0xaa7744, id: 'grid-ifloor-se' },
+      { value: 67, label: 'IFloor SW',      color: 0xaa7744, id: 'grid-ifloor-sw' },
+      { value: 70, label: 'IFloor End N',   color: 0xbb8855, id: 'grid-ifloor-end-n' },
+      { value: 71, label: 'IFloor End S',   color: 0xbb8855, id: 'grid-ifloor-end-s' },
+      { value: 72, label: 'IFloor End E',   color: 0xbb8855, id: 'grid-ifloor-end-e' },
+      { value: 73, label: 'IFloor End W',   color: 0xbb8855, id: 'grid-ifloor-end-w' },
+      { value: 74, label: 'IFloor Island',  color: 0xcc9966, id: 'grid-ifloor-island' },
+      { value: 80, label: 'IWall N',        color: 0x885533, id: 'grid-iwall-n' },
+      { value: 81, label: 'IWall S',        color: 0x885533, id: 'grid-iwall-s' },
+      { value: 82, label: 'IWall E',        color: 0x885533, id: 'grid-iwall-e' },
+      { value: 83, label: 'IWall W',        color: 0x885533, id: 'grid-iwall-w' },
+    ];
+
+    const CELL_GROUPS = [
+      { id: 'group-shell',  values: new Set([0]) },
+      { id: 'group-floors', values: new Set([1, 10,11,12,13,14,15,16,17,30,31,32,33,34]) },
+      { id: 'group-roofs',  values: new Set([40,41,42,43,44]) },
+      { id: 'group-walls',  values: new Set([2,20,21,22,23]) },
+      { id: 'group-ground',    values: new Set([50,51]) },
+      { id: 'group-ifloors',   values: new Set([60,61,62,63,64,65,66,67,70,71,72,73,74]) },
+      { id: 'group-iwalls',    values: new Set([80,81,82,83]) },
+    ];
+    const CUBE_EDGES = [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
+
+    let cageLines = null;
+    let typeLines = {};   // value → THREE.LineSegments
+    let gridLoaded = false;
+    let gridVisible = false;
+    let showAll = false;
+
+    async function loadCollisionGrid() {
+      if (gridLoaded) return;
+      gridLoaded = true;
+      try {
+        const res = await fetch('/geometry.json');
+        if (!res.ok) return;
+        const json = await res.json();
+        const cm = json.collisionMatrix;
+        if (!cm) return;
+
+        const { W, D, maxY, belowGround = 0, ox, oz, cellSize, cells } = cm;
+        const totalY = maxY + belowGround;
+        const EMPTY = 255;
+
+        // Wireframe cage — spans from -belowGround to maxY in world Y
+        const yMin = -belowGround * cellSize;
+        const yMax =  maxY * cellSize;
+        const cagePos = [];
+        for (let cy = 0; cy <= totalY; cy++) {
+          const y = yMin + cy * cellSize;
+          for (let cz = 0; cz <= D; cz++) {
+            const z = oz + cz * cellSize;
+            cagePos.push(ox, y, z, ox + W * cellSize, y, z);
+          }
+          for (let cx = 0; cx <= W; cx++) {
+            const x = ox + cx * cellSize;
+            cagePos.push(x, y, oz, x, y, oz + D * cellSize);
+          }
+        }
+        for (let cz = 0; cz <= D; cz++) {
+          for (let cx = 0; cx <= W; cx++) {
+            const x = ox + cx * cellSize, z = oz + cz * cellSize;
+            cagePos.push(x, yMin, z, x, yMax, z);
+          }
+        }
+        const cageGeo = new THREE.BufferGeometry();
+        cageGeo.setAttribute('position', new THREE.Float32BufferAttribute(cagePos, 3));
+        cageLines = new THREE.LineSegments(cageGeo,
+          new THREE.LineBasicMaterial({ color: 0x334455, transparent: true, opacity: 0.15 }));
+        cageLines.visible = false;
+        scene.add(cageLines);
+
+        // Per-type cell wireframes
+        const posByType = {};
+        for (const t of CELL_TYPES) posByType[t.value] = [];
+
+        // cy_arr is the raw array index; world y = (cy_arr - belowGround) * cellSize
+        for (let cy_arr = 0; cy_arr < totalY; cy_arr++) {
+          for (let cz = 0; cz < D; cz++) {
+            for (let cx = 0; cx < W; cx++) {
+              const v = cells[cx + cz * W + cy_arr * W * D];
+              if (v === EMPTY || !posByType[v]) continue;
+              const x = ox + cx * cellSize, y = (cy_arr - belowGround) * cellSize, z = oz + cz * cellSize, s = cellSize;
+              const c = [
+                [x,   y,   z  ], [x+s, y,   z  ], [x,   y,   z+s], [x+s, y,   z+s],
+                [x,   y+s, z  ], [x+s, y+s, z  ], [x,   y+s, z+s], [x+s, y+s, z+s],
+              ];
+              for (const [a, b] of CUBE_EDGES) posByType[v].push(...c[a], ...c[b]);
+            }
+          }
+        }
+
+        for (const t of CELL_TYPES) {
+          if (!posByType[t.value].length) continue;
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.Float32BufferAttribute(posByType[t.value], 3));
+          const lines = new THREE.LineSegments(geo,
+            new THREE.LineBasicMaterial({ color: t.color, transparent: true, opacity: 0.8 }));
+          lines.visible = false;
+          scene.add(lines);
+          typeLines[t.value] = lines;
+        }
+      } catch (e) {
+        console.warn('Could not load collision grid:', e);
+      }
+    }
+
+    function applyGridVisibility() {
+      if (cageLines) cageLines.visible = gridVisible;
+      for (const g of CELL_GROUPS) {
+        const checked = document.getElementById(g.id)?.checked ?? true;
+        for (const v of g.values) {
+          if (typeLines[v]) typeLines[v].visible = gridVisible && checked;
+        }
+      }
+    }
+
+    async function toggleGrid() {
+      await loadCollisionGrid();
+      gridVisible = !gridVisible;
+      applyGridVisibility();
+      document.getElementById('btn-grid').classList.toggle('active', gridVisible);
+      document.getElementById('grid-panel').style.display = gridVisible ? 'flex' : 'none';
+      setFrame(currentIndex); // re-render scene with updated opacities
+    }
+
+    function toggleShowAll() {
+      showAll = !showAll;
+      document.getElementById('btn-show-all').classList.toggle('active', showAll);
+      setFrame(currentIndex);
+    }
+
+    document.getElementById('btn-grid').addEventListener('click', toggleGrid);
+    document.getElementById('btn-show-all').addEventListener('click', toggleShowAll);
+    for (const g of CELL_GROUPS) {
+      document.getElementById(g.id)?.addEventListener('change', applyGridVisibility);
+    }
+
+    // --- Resize ---
+    const controlsEl = document.getElementById('controls');
+    function resize() {
+      const h = window.innerHeight - controlsEl.offsetHeight;
+      renderer.setSize(window.innerWidth, h);
+      camera.aspect = window.innerWidth / h;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // --- Render loop ---
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    setFrame(0);
+  </script>
+</body>
+</html>
