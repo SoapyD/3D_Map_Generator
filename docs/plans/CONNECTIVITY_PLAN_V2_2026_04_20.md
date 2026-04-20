@@ -112,16 +112,64 @@ Including `IFLOOR_*` allows walkways to span *internal* gaps within a single bui
 
 ---
 
-## Step 5 — Pairing anchors into walkways
+## Phase 2 — Anchor pair discovery
 
-*(Still to be specified in detail — next design discussion.)*
+Phase 1 (Steps 1–4) produced a set of anchors per tier. Phase 2 turns those anchors into candidate connections. Overlaps and redundancy are **not** resolved here — this phase only asks *"which anchors can see each other?"*. Pruning happens later.
 
-Candidate strategy: for each anchor, cast a ray along its facing direction until it either:
-- Hits a matching opposite-facing anchor → candidate walkway between them
-- Hits any non-empty cell (wall, floor, OOB) → rejected
-- Exceeds `maxConnectionLength` → rejected
+### Step 5a — Anchor record
 
-Pairing order and conflict resolution (what if two anchors both want to bond with the same third anchor?) — **open question**.
+Each anchor must carry enough metadata for Phase 2 and beyond:
+
+```js
+{
+  direction: 'N' | 'S' | 'W' | 'E',
+  buildingId: 'b12',            // the shell the anchor attaches to
+  cells: [{ cx, cz }, { cx, cz }], // the 2 empty cells the anchor occupies
+  tier: 1,
+}
+```
+
+### Step 5b — Projection
+
+For each anchor, cast a ray outward along its `direction` cell-by-cell. The ray terminates on one of:
+
+| Termination | Outcome |
+|---|---|
+| Distance reaches `maxConnectionLength` | Anchor dies — no connection registered |
+| Hits another anchor facing the **opposite** direction (N↔S, W↔E) | Candidate pair found → proceed to 5c |
+| (Anchors only sit in empty cells, so the ray travels through empty space until it either meets another anchor or expires) | — |
+
+Same-facing or perpendicular-facing anchors are **not** valid partners. An N-facing anchor can only pair with an S-facing anchor; a W-facing with an E-facing.
+
+### Step 5c — Duplicate check and registration
+
+Before registering a candidate pair `(A, B)`:
+
+1. Check the current tier's connection registry for an existing entry where `{from, to} == {A, B}` or `{B, A}`.
+2. If already present → skip (both anchors fire rays, so every pair is discovered twice).
+3. Otherwise → append a new connection record:
+
+```js
+{
+  from: anchorA,
+  to: anchorB,
+  length: distanceInCells,  // also the length in inches (1 cell = 1")
+  axis: 'NS' | 'WE',
+}
+```
+
+### Step 5d — Per-tier scope
+
+Every tier runs its own Phase 2 pass and writes into its own registry array. No cross-tier pairing happens here — vertical movement is for the ladder sub-stage.
+
+### What this phase explicitly does **not** do
+
+- It does **not** prune overlapping walkways (perpendicular crossings are allowed through for now)
+- It does **not** prune redundant routes (multiple walkways between the same pair of buildings are allowed if distinct anchors pair)
+- It does **not** check for walls along the span (Step 6 does that, as a `blocked` flag)
+- It does **not** sort or prioritise — every valid pair is kept
+
+Pruning, prioritisation, and conflict resolution are deferred to a later phase (TBD).
 
 ---
 
@@ -158,21 +206,22 @@ Writes accepted walkways to `data.connections.walkways` **and** back into the co
 
 ```js
 data.connections = {
-  walkways: [
+  tier1: [
     {
-      tier: 1,
+      from: anchor,           // { direction, buildingId, cells, tier }
+      to: anchor,
+      length: 7,              // in cells / inches
       axis: 'NS' | 'WE',
-      rect: { x, z, w, d },
-      y: number,
-      blocked: false,
-      fromAnchor: { cx, cz, facing },
-      toAnchor:   { cx, cz, facing },
-    }
+      blocked: false,         // set by Step 6 if walls intersect
+    },
+    ...
   ],
+  tier2: [ ... ],
+  tier3: [ ... ],
 }
 ```
 
-Ladders, pillars, and platforms are added by subsequent sub-stages (not covered here).
+One array per tier. Ladders, pillars, and platforms are added by subsequent sub-stages (not covered here).
 
 ---
 
@@ -216,17 +265,16 @@ Ladders, pillars, and platforms are added by subsequent sub-stages (not covered 
 
 ## Open questions
 
-1. **Anchor pairing strategy (Step 5)** — ray cast? nearest-neighbour? greedy by distance?
-2. **Conflict resolution** — if anchor A can pair with both B and C, which wins?
-3. **Walkway cell value** — introduce `CELL.WALKWAY` or reuse an existing label?
-4. **P tuning** — is `P=4` (= 4" in Mordheim scale) the right cadence? Should it scale with `walkwayWidth`?
-5. **Orphan anchors** — anchors that fail to pair. Drop silently, or pass to the ladder sub-stage as candidates?
-6. **Interior-only walkways** — `IFLOOR_*` anchors can pair with each other within one building. Is that desirable, or should those be filtered?
+1. **Pruning / conflict resolution** — Phase 2 allows overlaps and redundancy. A later phase (TBD) must decide which connections survive. Strategy not yet defined.
+2. **Walkway cell value** — introduce `CELL.WALKWAY` or reuse an existing label?
+3. **P tuning** — is `P=4` (= 4" in Mordheim scale) the right cadence? Should it scale with `walkwayWidth`?
+4. **Orphan anchors** — anchors that fail to pair. Drop silently, or pass to the ladder sub-stage as candidates?
+5. **Interior-only walkways** — `IFLOOR_*` anchors can pair with each other within one building. Is that desirable, or should those be filtered?
 
 ---
 
 ## Next steps
 
-- Resolve Step 5 pairing strategy
-- Prototype the scan + anchor emission pass against an existing seed and visualise anchors in the preview tool before implementing pairing
+- Prototype Phase 1 (anchor emission) + Phase 2 (pair discovery) against an existing seed and visualise in the preview tool
+- Define the pruning phase (overlap resolution, redundancy culling)
 - Revisit `anchorPeriod` default after visual inspection
