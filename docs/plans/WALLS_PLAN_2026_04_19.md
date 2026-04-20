@@ -111,6 +111,132 @@ Walls are **never placed above roof slabs** — the wall stage only reads `data.
 
 ---
 
+# Phase 1 Correction — Internal Wall Detection
+
+**Status:** ⬜ Not started  
+**Priority:** Must be done before Phase 2 — affects what gets damaged
+
+---
+
+## Problem
+
+The current wall generation emits an exterior wall for every labelled floor edge cell (FLOOR_N/S/E/W etc.) regardless of what occupies the cell on the other side of that exposed face. This is wrong: a floor slab damaged by quadrant removal leaves exposed edges that face **into** the building shell volume, not outside it. Generating walls there would wall off an open interior void.
+
+**Rule:** A labelled floor edge cell whose exposed face neighbour is `CELL.SHELL` is an *internal wall face* — the edge is inside the building. Its neighbour being `CELL.EMPTY` (or out-of-bounds) means the edge faces outside — an *exterior wall face*.
+
+---
+
+## New collision cell constants
+
+Add to `CELL` in `src/generators/collision/matrix.js`:
+
+**Internal floor edge labels** — written by the labelling pass in place of the exterior variants when the exposed face neighbour is `CELL.SHELL`:
+
+| Value | Constant | Meaning |
+|---|---|---|
+| `60` | `CELL.IFLOOR_N`  | Interior-facing floor edge, north exposed |
+| `61` | `CELL.IFLOOR_S`  | Interior-facing floor edge, south exposed |
+| `62` | `CELL.IFLOOR_E`  | Interior-facing floor edge, east exposed |
+| `63` | `CELL.IFLOOR_W`  | Interior-facing floor edge, west exposed |
+| `64` | `CELL.IFLOOR_NE` | Interior corner, north+east exposed |
+| `65` | `CELL.IFLOOR_NW` | Interior corner, north+west exposed |
+| `66` | `CELL.IFLOOR_SE` | Interior corner, south+east exposed |
+| `67` | `CELL.IFLOOR_SW` | Interior corner, south+west exposed |
+| `70` | `CELL.IFLOOR_END_N` | Interior end cell, south+east+west exposed |
+| `71` | `CELL.IFLOOR_END_S` | Interior end cell, north+east+west exposed |
+| `72` | `CELL.IFLOOR_END_E` | Interior end cell, north+south+west exposed |
+| `73` | `CELL.IFLOOR_END_W` | Interior end cell, north+south+east exposed |
+| `74` | `CELL.IFLOOR_ISLAND` | Interior island, all four edges exposed |
+
+**Internal wall markers** — written by wall generation at the wall's world position (not the floor cell):
+
+| Value | Constant | Meaning |
+|---|---|---|
+| `80` | `CELL.INTERNAL_WALL_N` | Internal wall face, north-facing — logged, no geometry |
+| `81` | `CELL.INTERNAL_WALL_S` | Internal wall face, south-facing |
+| `82` | `CELL.INTERNAL_WALL_E` | Internal wall face, east-facing |
+| `83` | `CELL.INTERNAL_WALL_W` | Internal wall face, west-facing |
+
+---
+
+## Mixed-face cells
+
+A floor cell at the exact intersection of a damage edge and the building perimeter may have some exposed faces pointing to `CELL.EMPTY` (exterior) and some pointing to `CELL.SHELL` (interior). Since each matrix cell stores a single byte, these cannot be fully encoded in one label.
+
+**Convention:** a cell with mixed exposures keeps its **exterior** label (existing FLOOR_N/NE/etc.), because exterior wall generation takes precedence. The wall generator performs a per-face neighbour check on all labelled cells, so internal faces on externally-labelled cells are still caught and routed to `internalWalls`. Future stages that need internal floor edges on mixed cells must also do the per-face check rather than relying on the IFLOOR labels alone.
+
+In practice mixed cells are rare — they occur only where a damaged quadrant corner aligns with the building perimeter.
+
+---
+
+## Changes required
+
+### 1 — `src/generators/floors/label-floor-cells.js`
+
+The label assigned to each exposed-edge floor cell must now depend on what occupies the neighbour in each exposed direction, not just whether the neighbour is a floor cell.
+
+**For single-direction cells (currently FLOOR_N/S/E/W):**
+- Check the neighbour in the exposed direction at slab level (same Y, ±1 in X or Z).
+- Neighbour is `CELL.SHELL` → assign `CELL.IFLOOR_N/S/E/W`.
+- Neighbour is `CELL.EMPTY` or out-of-bounds → assign existing `CELL.FLOOR_N/S/E/W`.
+
+**For corner cells (FLOOR_NE/NW/SE/SW):**
+- Check both exposed neighbours.
+- Both SHELL → assign `CELL.IFLOOR_NE/NW/SE/SW`.
+- Both EMPTY/OOB → assign `CELL.FLOOR_NE/NW/SE/SW`.
+- Mixed → keep exterior label `CELL.FLOOR_NE/NW/SE/SW` (see mixed-face convention above).
+
+**For end cells (FLOOR_END_*) and FLOOR_ISLAND:**
+- Check all exposed neighbours (3 or 4).
+- All SHELL → assign the matching `CELL.IFLOOR_END_*` / `CELL.IFLOOR_ISLAND`.
+- Any EMPTY/OOB → keep exterior label.
+
+### 2 — `src/generators/walls/extract-wall-segments.js`
+
+- The direction scan sets and END/ISLAND pass must **exclude all IFLOOR labels** — they are not sources for exterior wall generation.
+- Add a parallel scan over `IFLOOR` label sets (same grouping/run logic as the exterior pass) that pushes candidates to `internalWalls` and writes `CELL.INTERNAL_WALL_*` to the matrix. No geometry is emitted.
+- Mixed-face cells carry exterior labels, so the exterior pass will pick them up. For each candidate in the exterior pass, additionally check the per-face neighbour: if `CELL.SHELL` → route that face to `internalWalls` instead of `walls`. This catches the rare mixed case.
+
+### 3 — `src/generators/walls/index.js`
+
+Return `internalWalls` alongside `walls`:
+
+```js
+export function generateWalls(data, config, rng, matrix) {
+  const { walls, internalWalls } = extractWallSegments(data, config, matrix);
+  return { ...data, walls, internalWalls };
+}
+```
+
+### 4 — Output contract (updated)
+
+```js
+{
+  walls: [
+    { direction, floorY, x, y, z, w, h, d }  // exterior only — geometry generated
+  ],
+  internalWalls: [
+    { direction, floorY, x, y, z, w, h, d }  // interior facing — logged, no geometry yet
+  ]
+}
+```
+
+### 5 — `src/preview/debug-recorder.js`
+
+`wallElements` renders only `data.walls`. No change needed for now — `internalWalls` is ignored by the recorder until geometry is planned. Add a TODO comment.
+
+---
+
+## Execution order
+
+1. Add `CELL.IFLOOR_*` and `CELL.INTERNAL_WALL_*` constants to `matrix.js`
+2. Update `label-floor-cells.js` to assign internal labels where neighbour is SHELL
+3. Update `extractWallSegments` to exclude IFLOOR labels from exterior pass, add internal pass
+4. Update `walls/index.js` to return both arrays
+5. Update `docs/architecture/collision_matrix.md`
+
+---
+
 # Phase 2 — Wall Damage & Interior Walls
 
 **Status:** ⬜ Not started

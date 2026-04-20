@@ -130,7 +130,9 @@
         <label><input type="checkbox" id="group-floors" checked> <span style="color:#2288ff">Floors</span></label>
         <label><input type="checkbox" id="group-roofs"  checked> <span style="color:#88aaff">Roofs</span></label>
         <label><input type="checkbox" id="group-walls"  checked> <span style="color:#4488ff">Walls</span></label>
-        <label><input type="checkbox" id="group-ground"> <span style="color:#886644">Ground</span></label>
+        <label><input type="checkbox" id="group-ground">  <span style="color:#886644">Ground</span></label>
+        <label><input type="checkbox" id="group-ifloors"> <span style="color:#aa7744">IFloors</span></label>
+        <label><input type="checkbox" id="group-iwalls">  <span style="color:#885533">IWalls</span></label>
       </div>
     </div>
     <div id="legend"></div>
@@ -456,8 +458,25 @@
       { value: 42, label: 'Roof S',              color: 0xbbaaff, id: 'grid-roof-s' },
       { value: 43, label: 'Roof E',              color: 0xaaffbb, id: 'grid-roof-e' },
       { value: 44, label: 'Roof W',              color: 0xffaabb, id: 'grid-roof-w' },
-      { value: 50, label: 'Foundation',          color: 0xaa8855, id: 'grid-foundation' },
-      { value: 51, label: 'Street',              color: 0x776655, id: 'grid-street' },
+      { value: 50, label: 'Foundation',     color: 0xaa8855, id: 'grid-foundation' },
+      { value: 51, label: 'Street',         color: 0x776655, id: 'grid-street' },
+      { value: 60, label: 'IFloor N',       color: 0x996633, id: 'grid-ifloor-n' },
+      { value: 61, label: 'IFloor S',       color: 0x996633, id: 'grid-ifloor-s' },
+      { value: 62, label: 'IFloor E',       color: 0x996633, id: 'grid-ifloor-e' },
+      { value: 63, label: 'IFloor W',       color: 0x996633, id: 'grid-ifloor-w' },
+      { value: 64, label: 'IFloor NE',      color: 0xaa7744, id: 'grid-ifloor-ne' },
+      { value: 65, label: 'IFloor NW',      color: 0xaa7744, id: 'grid-ifloor-nw' },
+      { value: 66, label: 'IFloor SE',      color: 0xaa7744, id: 'grid-ifloor-se' },
+      { value: 67, label: 'IFloor SW',      color: 0xaa7744, id: 'grid-ifloor-sw' },
+      { value: 70, label: 'IFloor End N',   color: 0xbb8855, id: 'grid-ifloor-end-n' },
+      { value: 71, label: 'IFloor End S',   color: 0xbb8855, id: 'grid-ifloor-end-s' },
+      { value: 72, label: 'IFloor End E',   color: 0xbb8855, id: 'grid-ifloor-end-e' },
+      { value: 73, label: 'IFloor End W',   color: 0xbb8855, id: 'grid-ifloor-end-w' },
+      { value: 74, label: 'IFloor Island',  color: 0xcc9966, id: 'grid-ifloor-island' },
+      { value: 80, label: 'IWall N',        color: 0x885533, id: 'grid-iwall-n' },
+      { value: 81, label: 'IWall S',        color: 0x885533, id: 'grid-iwall-s' },
+      { value: 82, label: 'IWall E',        color: 0x885533, id: 'grid-iwall-e' },
+      { value: 83, label: 'IWall W',        color: 0x885533, id: 'grid-iwall-w' },
     ];
 
     const CELL_GROUPS = [
@@ -465,7 +484,9 @@
       { id: 'group-floors', values: new Set([1, 10,11,12,13,14,15,16,17,30,31,32,33,34]) },
       { id: 'group-roofs',  values: new Set([40,41,42,43,44]) },
       { id: 'group-walls',  values: new Set([2,20,21,22,23]) },
-      { id: 'group-ground', values: new Set([50,51]) },
+      { id: 'group-ground',    values: new Set([50,51]) },
+      { id: 'group-ifloors',   values: new Set([60,61,62,63,64,65,66,67,70,71,72,73,74]) },
+      { id: 'group-iwalls',    values: new Set([80,81,82,83]) },
     ];
     const CUBE_EDGES = [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
 

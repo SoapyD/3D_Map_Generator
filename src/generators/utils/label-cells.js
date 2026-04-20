@@ -16,12 +16,17 @@ export function labelCells(yLevels, matrix, isTyped, resolve) {
       for (let cx = 0; cx < matrix.W; cx++) {
         if (!isTyped(matrix.getCell(cx, cy, cz))) continue;
 
-        const expN = !isTyped(matrix.getCell(cx,     cy, cz - 1));
-        const expS = !isTyped(matrix.getCell(cx,     cy, cz + 1));
-        const expE = !isTyped(matrix.getCell(cx + 1, cy, cz));
-        const expW = !isTyped(matrix.getCell(cx - 1, cy, cz));
+        const nN = matrix.getCell(cx,     cy, cz - 1);
+        const nS = matrix.getCell(cx,     cy, cz + 1);
+        const nE = matrix.getCell(cx + 1, cy, cz);
+        const nW = matrix.getCell(cx - 1, cy, cz);
 
-        const label = resolve(cx, cy, cz, expN, expS, expE, expW);
+        const expN = !isTyped(nN);
+        const expS = !isTyped(nS);
+        const expE = !isTyped(nE);
+        const expW = !isTyped(nW);
+
+        const label = resolve(cx, cy, cz, expN, expS, expE, expW, nN, nS, nE, nW);
         if (label !== null) matrix.setCellType(cx, cy, cz, label);
       }
     }

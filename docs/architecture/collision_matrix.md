@@ -49,35 +49,59 @@ The collision matrix is a flat `Uint8Array` covering the full map volume at 1-in
 | `42` | `CELL.ROOF_S` | Roofs stage — label pass | Roof cell with exposed **south** edge |
 | `43` | `CELL.ROOF_E` | Roofs stage — label pass | Roof cell with exposed **east** edge |
 | `44` | `CELL.ROOF_W` | Roofs stage — label pass | Roof cell with exposed **west** edge |
+| `50` | `CELL.FOUNDATION_PLACEHOLDER` | Foundations stage | Foundation block ground-slab placeholder — replaced by real geometry in a later stage |
+| `51` | `CELL.STREET_PLACEHOLDER` | Foundations stage | Street ground-slab placeholder — may become river/waterway |
+| `60` | `CELL.IFLOOR_N`  | Floors stage — label pass | Interior-facing floor edge, north exposed (neighbour is SHELL) |
+| `61` | `CELL.IFLOOR_S`  | Floors stage — label pass | Interior-facing floor edge, south exposed |
+| `62` | `CELL.IFLOOR_E`  | Floors stage — label pass | Interior-facing floor edge, east exposed |
+| `63` | `CELL.IFLOOR_W`  | Floors stage — label pass | Interior-facing floor edge, west exposed |
+| `64` | `CELL.IFLOOR_NE` | Floors stage — label pass | Interior corner, north+east exposed |
+| `65` | `CELL.IFLOOR_NW` | Floors stage — label pass | Interior corner, north+west exposed |
+| `66` | `CELL.IFLOOR_SE` | Floors stage — label pass | Interior corner, south+east exposed |
+| `67` | `CELL.IFLOOR_SW` | Floors stage — label pass | Interior corner, south+west exposed |
+| `70` | `CELL.IFLOOR_END_N` | Floors stage — label pass | Interior end cell, south+east+west exposed |
+| `71` | `CELL.IFLOOR_END_S` | Floors stage — label pass | Interior end cell, north+east+west exposed |
+| `72` | `CELL.IFLOOR_END_E` | Floors stage — label pass | Interior end cell, north+south+west exposed |
+| `73` | `CELL.IFLOOR_END_W` | Floors stage — label pass | Interior end cell, north+south+east exposed |
+| `74` | `CELL.IFLOOR_ISLAND` | Floors stage — label pass | Interior island, all four edges exposed |
+| `80` | `CELL.INTERNAL_WALL_N` | Walls stage — Phase 1 correction | Internal wall face, north-facing — logged at wall position, no geometry |
+| `81` | `CELL.INTERNAL_WALL_S` | Walls stage — Phase 1 correction | Internal wall face, south-facing |
+| `82` | `CELL.INTERNAL_WALL_E` | Walls stage — Phase 1 correction | Internal wall face, east-facing |
+| `83` | `CELL.INTERNAL_WALL_W` | Walls stage — Phase 1 correction | Internal wall face, west-facing |
 
 ---
 
 ## Useful range checks
 
 ```js
-const isFloor    = v => v === CELL.FLOOR || (v >= 10 && v <= 17) || (v >= 30 && v <= 34);
-const isWall     = v => v === CELL.WALL  || (v >= 20 && v <= 23);
-const isOccupied = v => v !== CELL.EMPTY;
-const direction  = v => ({ 10:'N', 11:'S', 12:'E', 13:'W', 20:'N', 21:'S', 22:'E', 23:'W' })[v] ?? null;
+const isExteriorFloor = v => v === CELL.FLOOR || (v >= 10 && v <= 17) || (v >= 30 && v <= 34);
+const isInteriorFloor = v => (v >= 60 && v <= 67) || (v >= 70 && v <= 74);
+const isAnyFloor      = v => isExteriorFloor(v) || isInteriorFloor(v);
+const isExteriorWall  = v => v === CELL.WALL || (v >= 20 && v <= 23);
+const isInternalWall  = v => v >= 80 && v <= 83;
+const isOccupied      = v => v !== CELL.EMPTY;
 ```
 
 ---
 
 ## Vertical layout (per floor level)
 
-Room height = 3", slab thickness = 1", so each floor level occupies 4" of Y space.
+Room height = 3", slab thickness = 1", so each floor level occupies 4" of Y space.  
+The matrix reserves 12 cells below Y=0 for future below-ground geometry (rivers, sewers, tunnels).
 
 | Y cell range | Contents |
 |---|---|
-| `0 – 2` | Ground-level room (SHELL cells inside building footprint) |
-| `3` | First floor slab (FLOOR / FLOOR_N/S/E/W cells) |
+| `< 0` | Below-ground reserve (12 cells; FOUNDATION_PLACEHOLDER / STREET_PLACEHOLDER at Y=-1) |
+| `-1` | Ground floor slab (FLOOR / FLOOR_N/S/E/W cells) |
+| `0 – 2` | Ground-level room (SHELL cells inside building footprint; walls from Y=0) |
+| `3` | First upper floor slab |
 | `4 – 6` | First-floor room |
-| `7` | Second floor slab |
+| `7` | Second upper floor slab |
 | `8 – 10` | Second-floor room |
-| … | Pattern repeats: slab at `i * 4 + 3` for floor index `i` |
+| … | Pattern repeats: slab at `i * 4 - 1` for floor index `i ≥ 0` |
 
-Formula: `slabY(floorIndex) = floorIndex * (tierHeight + slabThickness) + tierHeight`  
-With defaults: `slabY(i) = i * 4 + 3`
+Formula: `slabY(floorIndex) = floorIndex * (tierHeight + slabThickness) - slabThickness`  
+With defaults: `slabY(i) = i * 4 - 1`
 
 ---
 

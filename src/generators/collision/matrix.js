@@ -23,6 +23,13 @@ export const CELL = {
   // Ground-level placeholders (replaced by real geometry in later stages)
   FOUNDATION_PLACEHOLDER: 50,
   STREET_PLACEHOLDER:     51,
+  // Interior-facing floor edge labels (exposed face neighbour is CELL.SHELL)
+  IFLOOR_N: 60, IFLOOR_S: 61, IFLOOR_E: 62, IFLOOR_W: 63,
+  IFLOOR_NE: 64, IFLOOR_NW: 65, IFLOOR_SE: 66, IFLOOR_SW: 67,
+  IFLOOR_END_N: 70, IFLOOR_END_S: 71, IFLOOR_END_E: 72, IFLOOR_END_W: 73,
+  IFLOOR_ISLAND: 74,
+  // Internal wall markers (logged at wall position, no geometry generated)
+  INTERNAL_WALL_N: 80, INTERNAL_WALL_S: 81, INTERNAL_WALL_E: 82, INTERNAL_WALL_W: 83,
 };
 
 // Number of cells reserved below world Y=0 (for rivers, sewers, tunnels).
