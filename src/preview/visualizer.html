@@ -40,6 +40,7 @@
     #btn-grid.active          { background: #1a3a5a; border-color: #7af; color: #7af; }
     #btn-show-all.active      { background: #1a3a2a; border-color: #7fa; color: #7fa; }
     #btn-debug-markers.active { background: #3a2a1a; border-color: #fa7; color: #fa7; }
+    #btn-prior.active         { background: #2a1a3a; border-color: #a7f; color: #a7f; }
 
     #grid-panel {
       display: flex;
@@ -126,6 +127,7 @@
     <div id="grid-row">
       <button id="btn-grid">Grid [G]</button>
       <button id="btn-show-all">All Layers [A]</button>
+      <button id="btn-prior" class="active">Prior Steps [P]</button>
       <button id="btn-debug-markers">Debug Markers [D]</button>
       <div id="grid-panel" style="display:none">
         <label><input type="checkbox" id="group-shell"  checked> <span style="color:#ff4422">Shell</span></label>
@@ -332,6 +334,10 @@
       });
     }
 
+    const DEBUG_TYPES = new Set(['trigger', 'anchor', 'connection', 'door']);
+
+    function isDebugRect(r) { return DEBUG_TYPES.has(r.type); }
+
     // Assembles rects for a given frame from the compact stage data.
     // Prior stages are dimmed; current stage accumulated up to elementIdx.
     // When grid is visible, current-stage rects are rendered at GRID_OPACITY.
@@ -342,7 +348,7 @@
           for (const el of stage.elements) {
             for (const r of el.rects) {
               if (r.type === 'building') continue;
-              if (!showDebugMarkers && (r.type === 'trigger' || r.type === 'anchor' || r.type === 'connection' || r.type === 'door')) continue;
+              if (!showDebugMarkers && isDebugRect(r)) continue;
               rects.push({ ...r, opacity: 1, transparent: false });
             }
           }
@@ -352,15 +358,18 @@
 
       const rects = [];
 
-      // Foundations (stage 0) and streets (stage 1) are hidden once buildings are placed
-      // so ground-level placeholder geometry doesn't obscure floor slab generation.
-      const pastBuildings = stageIdx > 2;
+      if (showPrior) {
+        // Foundations (stage 0) and streets (stage 1) are hidden once buildings are placed
+        // so ground-level placeholder geometry doesn't obscure floor slab generation.
+        const pastBuildings = stageIdx > 2;
 
-      for (let s = 0; s < stageIdx; s++) {
-        if (pastBuildings && s < 2) continue;
-        for (const el of stages[s].elements) {
-          for (const r of el.rects) {
-            rects.push({ ...r, opacity: DIM_OPACITY, transparent: true });
+        for (let s = 0; s < stageIdx; s++) {
+          if (pastBuildings && s < 2) continue;
+          for (const el of stages[s].elements) {
+            for (const r of el.rects) {
+              if (!showDebugMarkers && isDebugRect(r)) continue;
+              rects.push({ ...r, opacity: DIM_OPACITY, transparent: true });
+            }
           }
         }
       }
@@ -369,7 +378,7 @@
       const curOpacity = gridVisible ? GRID_OPACITY : 1;
       for (let e = 0; e <= elementIdx; e++) {
         for (const r of current.elements[e].rects) {
-          if (!showDebugMarkers && (r.type === 'trigger' || r.type === 'anchor' || r.type === 'connection' || r.type === 'door')) continue;
+          if (!showDebugMarkers && isDebugRect(r)) continue;
           rects.push({ ...r, opacity: r.opacity !== undefined ? r.opacity * curOpacity : curOpacity, transparent: gridVisible });
         }
       }
@@ -452,6 +461,7 @@
       if (e.key === ' ')                { e.preventDefault(); playing ? stopPlay() : startPlay(); }
       if (e.key === 'g' || e.key === 'G') toggleGrid();
       if (e.key === 'a' || e.key === 'A') toggleShowAll();
+      if (e.key === 'p' || e.key === 'P') togglePrior();
       if (e.key === 'd' || e.key === 'D') toggleDebugMarkers();
     });
 
@@ -521,6 +531,7 @@
     let gridLoaded = false;
     let gridVisible = false;
     let showAll = false;
+    let showPrior = true;
     let showDebugMarkers = false;
 
     async function loadCollisionGrid() {
@@ -565,35 +576,53 @@
         cageLines.visible = false;
         scene.add(cageLines);
 
-        // Per-type cell wireframes
-        const posByType = {};
-        for (const t of CELL_TYPES) posByType[t.value] = [];
+        // Per-type cell wireframes + solid fills
+        const edgesByType = {};
+        const facesByType = {};
+        for (const t of CELL_TYPES) { edgesByType[t.value] = []; facesByType[t.value] = []; }
 
         // cy_arr is the raw array index; world y = (cy_arr - belowGround) * cellSize
         for (let cy_arr = 0; cy_arr < totalY; cy_arr++) {
           for (let cz = 0; cz < D; cz++) {
             for (let cx = 0; cx < W; cx++) {
               const v = cells[cx + cz * W + cy_arr * W * D];
-              if (v === EMPTY || !posByType[v]) continue;
+              if (v === EMPTY || !edgesByType[v]) continue;
               const x = ox + cx * cellSize, y = (cy_arr - belowGround) * cellSize, z = oz + cz * cellSize, s = cellSize;
+              // Wireframe edges
               const c = [
                 [x,   y,   z  ], [x+s, y,   z  ], [x,   y,   z+s], [x+s, y,   z+s],
                 [x,   y+s, z  ], [x+s, y+s, z  ], [x,   y+s, z+s], [x+s, y+s, z+s],
               ];
-              for (const [a, b] of CUBE_EDGES) posByType[v].push(...c[a], ...c[b]);
+              for (const [a, b] of CUBE_EDGES) edgesByType[v].push(...c[a], ...c[b]);
+              // Solid faces (6 faces × 2 triangles)
+              const f = facesByType[v];
+              f.push(x,y,z,   x+s,y,z,   x+s,y,z+s,  x,y,z,   x+s,y,z+s,  x,y,z+s);   // bottom
+              f.push(x,y+s,z, x+s,y+s,z+s,x+s,y+s,z, x,y+s,z, x,y+s,z+s,  x+s,y+s,z+s); // top
+              f.push(x,y,z,   x+s,y,z,   x+s,y+s,z,  x,y,z,   x+s,y+s,z,  x,y+s,z);    // front
+              f.push(x,y,z+s, x+s,y+s,z+s,x+s,y,z+s, x,y,z+s, x,y+s,z+s,  x+s,y+s,z+s); // back
+              f.push(x,y,z,   x,y+s,z,   x,y+s,z+s,  x,y,z,   x,y+s,z+s,  x,y,z+s);    // left
+              f.push(x+s,y,z, x+s,y+s,z+s,x+s,y+s,z, x+s,y,z, x+s,y,z+s,  x+s,y+s,z+s); // right
             }
           }
         }
 
         for (const t of CELL_TYPES) {
-          if (!posByType[t.value].length) continue;
-          const geo = new THREE.BufferGeometry();
-          geo.setAttribute('position', new THREE.Float32BufferAttribute(posByType[t.value], 3));
-          const lines = new THREE.LineSegments(geo,
+          if (!edgesByType[t.value].length) continue;
+          const edgeGeo = new THREE.BufferGeometry();
+          edgeGeo.setAttribute('position', new THREE.Float32BufferAttribute(edgesByType[t.value], 3));
+          const lines = new THREE.LineSegments(edgeGeo,
             new THREE.LineBasicMaterial({ color: t.color, transparent: true, opacity: 0.8 }));
           lines.visible = false;
           scene.add(lines);
-          typeLines[t.value] = lines;
+
+          const faceGeo = new THREE.BufferGeometry();
+          faceGeo.setAttribute('position', new THREE.Float32BufferAttribute(facesByType[t.value], 3));
+          const mesh = new THREE.Mesh(faceGeo,
+            new THREE.MeshBasicMaterial({ color: t.color, transparent: true, opacity: 0.15, depthWrite: false, side: THREE.DoubleSide }));
+          mesh.visible = false;
+          scene.add(mesh);
+
+          typeLines[t.value] = { lines, mesh };
         }
       } catch (e) {
         console.warn('Could not load collision grid:', e);
@@ -605,7 +634,11 @@
       for (const g of CELL_GROUPS) {
         const checked = document.getElementById(g.id)?.checked ?? true;
         for (const v of g.values) {
-          if (typeLines[v]) typeLines[v].visible = gridVisible && checked;
+          if (typeLines[v]) {
+            const on = gridVisible && checked;
+            typeLines[v].lines.visible = on;
+            typeLines[v].mesh.visible  = on;
+          }
         }
       }
     }
@@ -617,6 +650,12 @@
       document.getElementById('btn-grid').classList.toggle('active', gridVisible);
       document.getElementById('grid-panel').style.display = gridVisible ? 'flex' : 'none';
       setFrame(currentIndex); // re-render scene with updated opacities
+    }
+
+    function togglePrior() {
+      showPrior = !showPrior;
+      document.getElementById('btn-prior').classList.toggle('active', showPrior);
+      setFrame(currentIndex);
     }
 
     function toggleShowAll() {
@@ -633,6 +672,7 @@
 
     document.getElementById('btn-grid').addEventListener('click', toggleGrid);
     document.getElementById('btn-show-all').addEventListener('click', toggleShowAll);
+    document.getElementById('btn-prior').addEventListener('click', togglePrior);
     document.getElementById('btn-debug-markers').addEventListener('click', toggleDebugMarkers);
     for (const g of CELL_GROUPS) {
       document.getElementById(g.id)?.addEventListener('change', applyGridVisibility);
