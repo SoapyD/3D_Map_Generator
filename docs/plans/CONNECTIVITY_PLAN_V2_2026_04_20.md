@@ -444,7 +444,7 @@ The 0.25" depth is intentionally shallow so end tiles consume minimal matrix spa
 | Step 7a — Trigger cells on anchors | `emit-anchors.js` | ⏳ Pending |
 | Step 7b-i — Door cell stamping + debug draw | Connectivity output pass | ⏳ Pending |
 | Step 7b-ii — Wall pipeline doorway carving | `generateWalls` | ⏳ Pending |
-| Step 7c — Walkway rasterisation | Post-wall pass | ⏳ Pending |
+| Step 7c — Walkway rasterisation | Post-wall pass | ✅ Complete |
 
 ## Next steps
 

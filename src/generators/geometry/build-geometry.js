@@ -37,9 +37,10 @@ export function buildGeometry(data, config) {
   const buildings = data.buildings || [];
   const floorData = data.floors || [];
   const walls = data.walls || [];
-  const walkways = data.connections ? data.connections.walkways : [];
-  const bridges = data.connections ? data.connections.bridges || [] : [];
-  const pillars = data.connections ? data.connections.pillars || [] : [];
+  const allWalkways = data.connections ? data.connections.walkways || [] : [];
+  const walkways = allWalkways.filter(w => w.connectionType === 'walkway');
+  const bridges  = allWalkways.filter(w => w.connectionType?.startsWith('bridge_'));
+  const pillars  = data.connections ? data.connections.pillars || [] : [];
 
   if (floorData.length > 0) {
     primitives.push(...buildFloorPrimitives(floorData, buildings, config));

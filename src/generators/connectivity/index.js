@@ -2,6 +2,7 @@ import { writeFileSync } from 'fs';
 import { emitAnchors } from './emit-anchors.js';
 import { pairAnchors } from './pair-anchors.js';
 import { filterCandidates } from './filter-candidates.js';
+import { rasteriseConnections } from './rasterise-connections.js';
 import { CELL, STAGE } from '../collision/matrix.js';
 
 // Step 7b-i — vectors pointing FROM anchor cell BACK TO its trigger (floor-edge) cell
@@ -153,6 +154,12 @@ export function generateConnectivity(data, config, rng, matrix) {
 
   const doors = stampDoors(survivors, matrix);
 
+  const dataWithSurvivors = {
+    ...data,
+    connections: { anchors, triggerCells, candidates: survivors, doors },
+  };
+  const { walkways, crossings } = rasteriseConnections(dataWithSurvivors, matrix, rng);
+
   return {
     ...data,
     connections: {
@@ -160,7 +167,8 @@ export function generateConnectivity(data, config, rng, matrix) {
       triggerCells,
       candidates: survivors,
       doors,
-      walkways: [],
+      walkways,
+      crossings,
     },
   };
 }

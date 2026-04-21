@@ -1,73 +1,82 @@
-/**
- * Build geometry primitives for bridges (slab, walls, battlements).
- */
-
-// import { CONNECTIVITY } from '../../config.js'; // _old_system — inlined defaults below
-import { emitWallSegments } from './emit-wall-segments.js';
+import { CONNECTIVITY } from '../../config.js';
 import { emitBattlements } from './emit-battlements.js';
 
-/**
- * @param {object[]} bridges     Bridge descriptors
- * @param {object[]} walkways    Walkway descriptors (for branch gap detection)
- * @param {object[]} allBranches Combined branch items
- * @returns {object[]}           Primitives for all bridges
- */
-export function buildBridgePrimitives(bridges, walkways, allBranches) {
+export function buildBridgePrimitives(bridges) {
   const primitives = [];
-  const bridgeThickness = 0.5;
-  const wallH = 0.75;
-  const wallT = 0.25;
+  const {
+    bridgeThickness,
+    bridgeWallHeight:       wallH,
+    bridgeWallThickness:    wallT,
+    bridgeBattlementHeight: battH,
+    bridgeBattlementSpacing: spacing,
+    bridgeBattlementGap:    gap,
+  } = CONNECTIVITY;
+
+  const pillarW = spacing - gap;
 
   for (let i = 0; i < bridges.length; i++) {
     const b = bridges[i];
+    const texKey = `wall:landmark:${i}`;
+    const isBattlement = b.connectionType === 'bridge_battlement';
+    // NS: travels along Z, 2 cells wide in X — side walls on X edges, run along Z
+    // WE: travels along X, 2 cells wide in Z — side walls on Z edges, run along X
+    const isNS = b.axis === 'NS';
 
-    // Bridge texture — branches use parent's texture via textureId
-    const bridgeTexIdx = (b.textureId !== undefined)
-      ? bridges.findIndex(br => br.textureId === b.textureId && !br.branch)
-      : i;
-    const texKey = `wall:landmark:${bridgeTexIdx >= 0 ? bridgeTexIdx : i}`;
+    for (const seg of b.segments) {
+      const r = seg.worldRect;
 
-    // Bridge slab
-    primitives.push({
-      type: 'slab', name: `bridge_${i}`,
-      x: b.x, y: b.y, z: b.z, w: b.w, h: bridgeThickness, d: b.d,
-      textureKey: texKey,
-      emitTop: true, emitBottom: true, simpleBottom: false,
-      rotateUV: b.w > b.d,
-      shared: true,
-    });
-    primitives.push({
-      type: 'edges', name: `bridge_${i}`,
-      x: b.x, y: b.y, z: b.z, w: b.w, h: bridgeThickness, d: b.d,
-      textureKey: texKey,
-    });
+      // Slab — always emitted
+      primitives.push({
+        type: 'slab', name: `bridge_${i}`,
+        x: r.x, y: r.y, z: r.z, w: r.w, h: bridgeThickness, d: r.d,
+        textureKey: texKey,
+        emitTop: true, emitBottom: true, simpleBottom: false,
+        rotateUV: r.w > r.d,
+        shared: true,
+      });
+      primitives.push({
+        type: 'edges', name: `bridge_${i}`,
+        x: r.x, y: r.y, z: r.z, w: r.w, h: bridgeThickness, d: r.d,
+        textureKey: texKey,
+      });
 
-    // Side walls with gap detection
-    const wallY = b.y + bridgeThickness;
+      if (seg.isCrossing) continue;
 
-    let segmentsL, segmentsR;
-    if (b.axis === 'x') {
-      segmentsL = emitWallSegments(primitives, b, i, 'L', 'x', b.x, b.x + b.w, b.z + wallT / 2, true, wallY, wallH, wallT, texKey, allBranches);
-      segmentsR = emitWallSegments(primitives, b, i, 'R', 'x', b.x, b.x + b.w, b.z + b.d - wallT / 2, true, wallY, wallH, wallT, texKey, allBranches);
-    } else {
-      segmentsL = emitWallSegments(primitives, b, i, 'L', 'z', b.z, b.z + b.d, b.x + wallT / 2, false, wallY, wallH, wallT, texKey, allBranches);
-      segmentsR = emitWallSegments(primitives, b, i, 'R', 'z', b.z, b.z + b.d, b.x + b.w - wallT / 2, false, wallY, wallH, wallT, texKey, allBranches);
-    }
+      // Side walls
+      const wallY = r.y + bridgeThickness;
 
-    // Battlements — only within surviving wall segments
-    if (b.variant === 'battlement') {
-      const battH = 1.5 - wallH;
-      const spacing = 2.25;
-      const gap = 1.5;
-      const pillarW = spacing - gap;
-      const battY = wallY + wallH;
-
-      if (b.axis === 'x') {
-        emitBattlements(primitives, segmentsL, b.z + wallT / 2, true, 'L', i, battY, battH, wallT, spacing, pillarW, texKey);
-        emitBattlements(primitives, segmentsR, b.z + b.d - wallT / 2, true, 'R', i, battY, battH, wallT, spacing, pillarW, texKey);
+      let wallL, wallR;
+      if (isNS) {
+        // walls run along Z (depth axis), sit on west and east X edges
+        wallL = { x: r.x,             y: wallY, z: r.z, w: wallT, h: wallH, d: r.d };
+        wallR = { x: r.x + r.w - wallT, y: wallY, z: r.z, w: wallT, h: wallH, d: r.d };
       } else {
-        emitBattlements(primitives, segmentsL, b.x + wallT / 2, false, 'L', i, battY, battH, wallT, spacing, pillarW, texKey);
-        emitBattlements(primitives, segmentsR, b.x + b.w - wallT / 2, false, 'R', i, battY, battH, wallT, spacing, pillarW, texKey);
+        // walls run along X (width axis), sit on north and south Z edges
+        wallL = { x: r.x, y: wallY, z: r.z,             w: r.w, h: wallH, d: wallT };
+        wallR = { x: r.x, y: wallY, z: r.z + r.d - wallT, w: r.w, h: wallH, d: wallT };
+      }
+
+      for (const [side, wall] of [['L', wallL], ['R', wallR]]) {
+        primitives.push({
+          type: 'slab', name: `bridge_${i}_wall${side}`,
+          ...wall,
+          textureKey: texKey,
+          emitTop: false, emitBottom: false, simpleBottom: false, rotateUV: false,
+          shared: false,
+          thinAxis: isNS ? 'x' : 'z',
+        });
+
+        if (isBattlement) {
+          const battY = wallY + wallH;
+          // emitBattlements expects segments as [{ start, end }] along the travel axis
+          const segArr = isNS
+            ? [{ start: r.z, end: r.z + r.d }]
+            : [{ start: r.x, end: r.x + r.w }];
+          const fixedPos = isNS
+            ? (side === 'L' ? r.x + wallT / 2 : r.x + r.w - wallT / 2)
+            : (side === 'L' ? r.z + wallT / 2 : r.z + r.d - wallT / 2);
+          emitBattlements(primitives, segArr, fixedPos, !isNS, side, i, battY, battH, wallT, spacing, pillarW, texKey);
+        }
       }
     }
   }

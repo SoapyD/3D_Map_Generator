@@ -232,12 +232,12 @@ export const CONNECTIVITY = {
 
 | Step | Status |
 |---|---|
-| New CELL constants + STAGE enum | ⏳ Pending |
-| Config additions | ⏳ Pending |
-| `rasterise-connections.js` — type assignment | ⏳ Pending |
-| `rasterise-connections.js` — cell enumeration | ⏳ Pending |
-| `rasterise-connections.js` — crossing detection | ⏳ Pending |
-| `rasterise-connections.js` — two-pass matrix writes | ⏳ Pending |
-| `connectivity/index.js` wiring | ⏳ Pending |
-| `build-walkway-primitives.js` segment support | ⏳ Pending |
-| `build-bridge-primitives.js` segment support | ⏳ Pending |
+| New CELL constants + STAGE enum | ✅ Complete |
+| Config additions | ✅ Complete |
+| `rasterise-connections.js` — type assignment | ✅ Complete |
+| `rasterise-connections.js` — cell enumeration | ✅ Complete |
+| `rasterise-connections.js` — crossing detection | ✅ Complete |
+| `rasterise-connections.js` — two-pass matrix writes | ✅ Complete |
+| `connectivity/index.js` wiring | ✅ Complete |
+| `build-walkway-primitives.js` segment support | ✅ Complete |
+| `build-bridge-primitives.js` segment support | ✅ Complete |

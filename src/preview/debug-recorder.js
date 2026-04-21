@@ -213,14 +213,20 @@ function connectivityElements(data, color, config) {
     });
   }
 
-  const walkways = [...(c.walkways || []), ...(c.bridges || [])];
+  const walkways = c.walkways || [];
   const totalW = walkways.length;
   for (let i = 0; i < walkways.length; i++) {
     const w = walkways[i];
-    const isBridge = w.type === 'bridge' || w.bridgeWalls;
+    const isBridge = w.connectionType?.startsWith('bridge_');
+    const segRects = w.segments.map(seg => {
+      const r = seg.worldRect;
+      const h = isBridge ? 0.5 : 0.3;
+      const baseColor = seg.isCrossing ? '#ffffff' : (isBridge ? '#7733aa' : color);
+      return box(isBridge ? 'bridge' : 'walkway', r.x, r.y, r.z, r.w, h, r.d, baseColor, seg.isCrossing ? 0.5 : 0.8);
+    });
     elements.push({
-      label: `Connectivity — ${isBridge ? 'bridge' : 'walkway'} ${i + 1}/${totalW}`,
-      rects: [box(isBridge ? 'bridge' : 'walkway', w.x, w.y, w.z, w.w, isBridge ? 0.5 : 0.3, w.d, isBridge ? '#7733aa' : color)],
+      label: `Connectivity — ${isBridge ? w.connectionType : 'walkway'} ${i + 1}/${totalW} ${w.fromBuildingId}→${w.toBuildingId}${w.hasCrossing ? ' [CROSSING]' : ''}`,
+      rects: segRects,
     });
   }
 

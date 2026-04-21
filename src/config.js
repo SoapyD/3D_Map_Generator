@@ -39,15 +39,16 @@ export const WALL = {
   wallThickness: 0.25,
   applySegmentCull: true,   // cull walls to at most 2 sides per building per floor
   applyWindows: true,        // cut window openings in wall segments
-  applyBlobDamage: true,     // apply random blob damage to wall segments              // outer face flush with cell edge, body extends inward
+  applyBlobDamage: true,     // apply random blob damage to wall segments
+  applyDoorCuts: true,       // skip cells marked CELL.DOOR during wall matrix writes              // outer face flush with cell edge, body extends inward
   quadSize: 1.5,                    // inches per damage column (Phase 2)
-  externalRow2RemovalRatio: 0.5,    // Phase 2: max fraction of row 2 (top) removed on exterior walls
+  externalRow2RemovalRatio: 0.4,    // Phase 2: max fraction of row 2 (top) removed on exterior walls
   externalRow2RemovalMin: 0.2,      // Phase 2: min fraction of row 2 removed on exterior walls
   externalRow1RemovalRatio: 0.3,    // Phase 2: max fraction of row 1 (mid) removed — cascades from row 2
   externalRow1RemovalMin: 0.1,      // Phase 2: min fraction of row 1 removed
-  externalRow0RemovalRatio: 0.2,    // Phase 2: max fraction of row 0 (base) removed — cascades from row 1
+  externalRow0RemovalRatio: 0.15,   // Phase 2: max fraction of row 0 (base) removed — cascades from row 1
   externalRow0RemovalMin: 0.0,      // Phase 2: min fraction of row 0 removed
-  internalRow2RemovalRatio: 0.6,    // Phase 2: interior wall ratios
+  internalRow2RemovalRatio: 0.4,    // Phase 2: interior wall ratios
   internalRow1RemovalRatio: 0.3,
   internalRow0RemovalRatio: 0.15,
   interiorWallChance: { medium: 0.75, largeA: 1.0, largeB: 1.0 }, // Phase 2
@@ -63,8 +64,20 @@ export const FLOOR = {
   tier3EscalateChance: 0.5,  // chance to remove third adjacent quadrant
 };
 
-// --- Connectivity --- (_old_system only)
-// export const CONNECTIVITY = { ... };  // see _old_system/config.js
+// --- Connectivity ---
+export const CONNECTIVITY = {
+  bridgeChance:    0.4,   // chance a tier 2+ connection becomes a bridge
+  bridgeVariants: {
+    low:        { weight: 0.5 },  // slab + low continuous side walls
+    battlement: { weight: 0.5 },  // slab + low walls + spaced tall sections
+  },
+  bridgeThickness:        0.5,
+  bridgeWallHeight:       0.75,
+  bridgeWallThickness:    0.25,
+  bridgeBattlementHeight: 1.5,
+  bridgeBattlementSpacing: 2.25,
+  bridgeBattlementGap:    1.5,
+};
 
 // --- Cover --- (_old_system only)
 // export const COVER = { ... };  // see _old_system/config.js

@@ -1,6 +1,9 @@
 import { CELL, STAGE } from '../collision/matrix.js';
 import { WALL } from '../../config.js';
 
+const skipDoor = (matrix, cx, cy, cz) =>
+  WALL.applyDoorCuts && matrix.getCell(cx, cy + 1, cz) === CELL.DOOR;
+
 // Each direction collects its own label set (exterior + interior variants) plus
 // both corner labels that include it. The outward neighbour check at emit time
 // splits each cell into an exterior wall or an internal wall record.
@@ -65,9 +68,10 @@ const END_FACES = {
 
 function isSlabCell(v) {
   return v === CELL.FLOOR
-    || (v >= 10 && v <= 34)   // FLOOR_N … FLOOR_ISLAND
-    || (v >= 40 && v <= 44)   // ROOF … ROOF_W
-    || (v >= 60 && v <= 74);  // IFLOOR variants
+    || (v >= 10 && v <= 34)    // FLOOR_N … FLOOR_ISLAND
+    || (v >= 40 && v <= 48)    // ROOF … ROOF_SW (incl. corner labels)
+    || (v >= 60 && v <= 74)    // IFLOOR variants
+    || (v >= 91 && v <= 104);  // IROOF variants
 }
 
 const FACE_OFFSET = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] };
@@ -132,7 +136,7 @@ export function extractWallSegments(data, config, matrix) {
         for (let cx = 0; cx < matrix.W; cx++) {
           if (!labels.has(matrix.getCell(cx, cy, cz))) continue;
           if (!isSlabCell(matrix.getCell(cx, cy + levelHeight, cz))) continue;
-          if (matrix.getCell(cx, cy + 1, cz) === CELL.DOOR) continue;
+          if (skipDoor(matrix, cx, cy, cz)) continue;
           const neighbour = matrix.getCell(cx + dcx, cy, cz + dcz);
           if (neighbour === CELL.SHELL) {
             intCells.push({ cx, cz });

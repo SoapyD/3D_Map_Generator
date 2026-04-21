@@ -73,6 +73,8 @@ The collision matrix is a flat `Uint8Array` covering the full map volume at 1-in
 | `82` | `CELL.INTERNAL_WALL_E` | Walls stage — Phase 1 correction | Internal wall face, east-facing |
 | `83` | `CELL.INTERNAL_WALL_W` | Walls stage — Phase 1 correction | Internal wall face, west-facing |
 | `90` | `CELL.DOOR` | Connectivity stage — Step 7b-i | Doorway opening — stamped into the building shell (2 cells wide × 3 cells tall) at each surviving anchor's trigger-cell position, before wall generation runs. Wall generator reads these to carve openings. |
+| `105` | `CELL.WALKWAY` | Connectivity stage — Step 7c | Walkway or bridge span cell. Stamped along the full span of each surviving connection (2 cells wide). |
+| `106` | `CELL.WALKWAY_CROSSING` | Connectivity stage — Step 7c | Cell where two connections cross at the same tier. Only a floor slab is emitted at crossing cells — no side walls or battlements. |
 | `91` | `CELL.IROOF_N` | Roofs stage — label pass | Interior-facing roof edge, north exposed (neighbour is SHELL) |
 | `92` | `CELL.IROOF_S` | Roofs stage — label pass | Interior-facing roof edge, south exposed |
 | `93` | `CELL.IROOF_E` | Roofs stage — label pass | Interior-facing roof edge, east exposed |
@@ -150,7 +152,8 @@ Each pipeline stage stores its output objects in arrays on the shared data objec
 | `2` | Floors — label pass | `data.floors[]` | Same as above — nearest building, no per-cell object |
 | `3` | Roofs | `data.roofs[]` | `{ buildingId, buildingIndex, yCollisionLevel, rects[], removedQuadrants }` |
 | `4` | Roofs — label pass | `data.roofs[]` | Same as above — nearest building, no per-cell object. Covers ROOF_N/S/E/W, ROOF_NE/NW/SE/SW, and all IROOF_* labels |
-| `5` | Connectivity | `data.connections.doors[]` | `{ anchorId, direction, x, y, z, w, h, d }` |
+| `5` | Connectivity — door stamps | `data.connections.doors[]` | `{ anchorId, direction, x, y, z, w, h, d }` |
+| `9` | Connectivity — walkway rasterisation | `data.connections.walkways[]` | `{ id, connectionType, axis, fromBuildingId, toBuildingId, tier, hasCrossing, segments[] }` |
 | `6` | Walls — Pass 1 (floor labels) | `data.floors[]` | Nearest building — label pass has no per-cell object |
 | `7` | Walls — Pass 2 (segments) | `data.walls[]` | `{ x, y, z, w, h, d, direction, floorY }` |
 | `8` | Walls — internal | `data.internalWalls[]` | Same shape as `walls[]` |
