@@ -21,6 +21,8 @@ export const DEFAULTS = {
   streetWidth: GLOBAL_GRID.streetWidth, // derived from GLOBAL_GRID — do not change independently
   damageLevel: 0.5,   // ruin level 0–1, controls floor quadrant removal escalation
   // maxSightline: 24,     // _old_system: max unbroken line of sight (inches)
+  filterStrategy: 'longestAndShortest', // one of: longestAndShortest, longest, shortest, random
+  filterN: 2,             // max connections kept per building per tier (each end for longestAndShortest)
   textureSet: 'base',
   preview: false,
   visualize: false,

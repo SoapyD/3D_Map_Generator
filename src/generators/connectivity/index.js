@@ -1,6 +1,7 @@
 import { writeFileSync } from 'fs';
 import { emitAnchors } from './emit-anchors.js';
 import { pairAnchors } from './pair-anchors.js';
+import { filterCandidates } from './filter-candidates.js';
 
 export function generateConnectivity(data, config, rng, matrix) {
   const { anchors, triggerCells } = emitAnchors(data, matrix, config);
@@ -75,6 +76,16 @@ export function generateConnectivity(data, config, rng, matrix) {
 
   const activeCandidates = candidates.filter(c => !c.stackCulled);
 
+  // Steps 6b–6e — per-tier filter pass
+  const { survivors, culled: filterCulled } = filterCandidates(activeCandidates, config, rng);
+
+  // Mark anchors whose every remaining connection was filter-culled
+  const survivorAnchorIds = new Set(survivors.flatMap(c => [c.from.id, c.to.id]));
+  for (const c of filterCulled) {
+    if (!survivorAnchorIds.has(c.from.id)) c.from.filterCulled = true;
+    if (!survivorAnchorIds.has(c.to.id))   c.to.filterCulled   = true;
+  }
+
   if (config.debugConnectivity) {
     const dump = {
       anchors: anchors.map(a => ({
@@ -96,7 +107,7 @@ export function generateConnectivity(data, config, rng, matrix) {
     connections: {
       anchors,
       triggerCells,
-      candidates: activeCandidates,
+      candidates: survivors,
       walkways: [],
     },
   };
