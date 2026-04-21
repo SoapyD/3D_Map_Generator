@@ -187,7 +187,7 @@ function connectivityElements(data, color, config) {
     const anchorColor = a.filterCulled ? '#226633' : a.stackCulled ? '#882244' : '#ff44aa';
     elements.push({
       label: `Connectivity — anchor ${a.id} ${a.direction} (${a.cells[0].cx},${a.cells[0].cz})${a.stackCulled ? ' [CULLED]' : ''}`,
-      rects: [box('anchor', a.x, a.y, a.z, a.w, 0.1, a.d, anchorColor)],
+      rects: [box('anchor', a.x, a.y + 0.25, a.z, a.w, 0.25, a.d, anchorColor)],
     });
   }
 

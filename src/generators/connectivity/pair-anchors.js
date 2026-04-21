@@ -18,11 +18,11 @@ function makeDebugRect(from, to, axis) {
   if (axis === 'NS') {
     const zMin = Math.min(from.z, to.z);
     const zMax = Math.max(from.z, to.z) + from.d;
-    return { x: from.x, y, z: zMin, w: from.w, h: 0.06, d: zMax - zMin };
+    return { x: from.x, y, z: zMin, w: from.w, h: 0.25, d: zMax - zMin };
   } else {
     const xMin = Math.min(from.x, to.x);
     const xMax = Math.max(from.x, to.x) + from.w;
-    return { x: xMin, y, z: from.z, w: xMax - xMin, h: 0.06, d: from.d };
+    return { x: xMin, y, z: from.z, w: xMax - xMin, h: 0.25, d: from.d };
   }
 }
 
