@@ -132,6 +132,7 @@ export function extractWallSegments(data, config, matrix) {
         for (let cx = 0; cx < matrix.W; cx++) {
           if (!labels.has(matrix.getCell(cx, cy, cz))) continue;
           if (!isSlabCell(matrix.getCell(cx, cy + levelHeight, cz))) continue;
+          if (matrix.getCell(cx, cy + 1, cz) === CELL.DOOR) continue;
           const neighbour = matrix.getCell(cx + dcx, cy, cz + dcz);
           if (neighbour === CELL.SHELL) {
             intCells.push({ cx, cz });
@@ -210,6 +211,7 @@ export function extractWallSegments(data, config, matrix) {
         const faces = END_FACES[v];
         if (!faces) continue;
         if (!isSlabCell(matrix.getCell(cx, cy + levelHeight, cz))) continue;
+        if (matrix.getCell(cx, cy + 1, cz) === CELL.DOOR) continue;
 
         const hasE = faces.includes('E') && matrix.getCell(cx + 1, cy, cz) !== CELL.SHELL;
         const hasW = faces.includes('W') && matrix.getCell(cx - 1, cy, cz) !== CELL.SHELL;

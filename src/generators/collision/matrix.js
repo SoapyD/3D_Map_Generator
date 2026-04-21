@@ -99,6 +99,18 @@ export function createCollisionMatrix(activeArea, maxTiers, tierHeight, slabThic
           for (let cx = c0.cx; cx < cxEnd; cx++)
             if (inBounds(cx, cy, cz)) data[idx(cx, cy, cz)] = value;
     },
+    // Like fillBox but skips any cell whose current value matches skipValue.
+    fillBoxUnless(x, y, z, w, h, d, value, skipValue) {
+      const c0 = worldToCell(x, y, z);
+      const cxEnd = Math.ceil((x + w - ox) / cellSize);
+      const cyEnd = Math.ceil((y + h) / cellSize);
+      const czEnd = Math.ceil((z + d - oz) / cellSize);
+      for (let cy = c0.cy; cy < cyEnd; cy++)
+        for (let cz = c0.cz; cz < czEnd; cz++)
+          for (let cx = c0.cx; cx < cxEnd; cx++)
+            if (inBounds(cx, cy, cz) && data[idx(cx, cy, cz)] !== skipValue)
+              data[idx(cx, cy, cz)] = value;
+    },
     toDebugJSON() {
       return { W, D, maxY, belowGround: BELOW_GROUND, ox, oz, cellSize, cells: Array.from(data) };
     },

@@ -73,7 +73,7 @@ export function generateWalls(data, config, rng, matrix) {
 
     for (const seg of mergeWallCells(grid, wall)) {
       walls.push(seg);
-      matrix.fillBox(seg.x, seg.y, seg.z, seg.w, seg.h, seg.d, WALL_CELL[wall.direction]);
+      matrix.fillBoxUnless(seg.x, seg.y, seg.z, seg.w, seg.h, seg.d, WALL_CELL[wall.direction], CELL.DOOR);
     }
   }
 

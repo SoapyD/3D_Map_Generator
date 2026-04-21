@@ -134,6 +134,7 @@
         <label><input type="checkbox" id="group-ground">  <span style="color:#886644">Ground</span></label>
         <label><input type="checkbox" id="group-ifloors"> <span style="color:#aa7744">IFloors</span></label>
         <label><input type="checkbox" id="group-iwalls">  <span style="color:#885533">IWalls</span></label>
+        <label><input type="checkbox" id="group-doors" checked>  <span style="color:#888888">Doors</span></label>
       </div>
     </div>
     <div id="legend"></div>
@@ -340,7 +341,7 @@
           for (const el of stage.elements) {
             for (const r of el.rects) {
               if (r.type === 'building') continue;
-              if (!showDebugMarkers && (r.type === 'trigger' || r.type === 'anchor' || r.type === 'connection')) continue;
+              if (!showDebugMarkers && (r.type === 'trigger' || r.type === 'anchor' || r.type === 'connection' || r.type === 'door')) continue;
               rects.push({ ...r, opacity: 1, transparent: false });
             }
           }
@@ -367,7 +368,7 @@
       const curOpacity = gridVisible ? GRID_OPACITY : 1;
       for (let e = 0; e <= elementIdx; e++) {
         for (const r of current.elements[e].rects) {
-          if (!showDebugMarkers && (r.type === 'trigger' || r.type === 'anchor' || r.type === 'connection')) continue;
+          if (!showDebugMarkers && (r.type === 'trigger' || r.type === 'anchor' || r.type === 'connection' || r.type === 'door')) continue;
           rects.push({ ...r, opacity: r.opacity !== undefined ? r.opacity * curOpacity : curOpacity, transparent: gridVisible });
         }
       }
@@ -499,6 +500,7 @@
       { value: 81, label: 'IWall S',        color: 0x885533, id: 'grid-iwall-s' },
       { value: 82, label: 'IWall E',        color: 0x885533, id: 'grid-iwall-e' },
       { value: 83, label: 'IWall W',        color: 0x885533, id: 'grid-iwall-w' },
+      { value: 90, label: 'Door',           color: 0x888888, id: 'grid-door' },
     ];
 
     const CELL_GROUPS = [
@@ -509,6 +511,7 @@
       { id: 'group-ground',    values: new Set([50,51]) },
       { id: 'group-ifloors',   values: new Set([60,61,62,63,64,65,66,67,70,71,72,73,74]) },
       { id: 'group-iwalls',    values: new Set([80,81,82,83]) },
+      { id: 'group-doors',     values: new Set([90]) },
     ];
     const CUBE_EDGES = [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
 
