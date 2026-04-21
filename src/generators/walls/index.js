@@ -27,24 +27,31 @@ function ruinsMediumKeep(dirs, size, rng) {
   return new Set([long, short].filter(Boolean));
 }
 
-// For each building+floor, randomly keep at most 2 wall directions and discard the rest.
-function cullToTwoSides(walls, buildings, rng) {
-  const kept = new Map(); // key → Set of 2 directions to keep
+// For each building+floor, keep at most N wall directions: 2 for ruins, 3 for everything else.
+function cullToMaxSides(walls, buildings, rng) {
+  const kept = new Map();
   for (const wall of walls) {
     const key = `${findBuildingIndex(wall, buildings)}:${wall.floorY}`;
     if (!kept.has(key)) kept.set(key, new Set());
     kept.get(key).add(wall.direction);
   }
   for (const [key, dirs] of kept) {
-    if (dirs.size <= 2) continue;
     const bi = parseInt(key.split(':')[0]);
     const size = buildings[bi].size;
+    const isRuins = size.startsWith('ruins');
+    const max = isRuins ? 2 : 3;
+    if (dirs.size <= max) continue;
     if (size === 'ruins-medium-h' || size === 'ruins-medium-v') {
       kept.set(key, ruinsMediumKeep(dirs, size, rng));
-    } else {
+    } else if (isRuins) {
       const first  = rng.pick([...dirs]);
       const second = rng.pick([...dirs].filter(d => d !== first));
       kept.set(key, new Set([first, second]));
+    } else {
+      const first  = rng.pick([...dirs]);
+      const second = rng.pick([...dirs].filter(d => d !== first));
+      const third  = rng.pick([...dirs].filter(d => d !== first && d !== second));
+      kept.set(key, new Set([first, second, third]));
     }
   }
   return walls.filter(wall => {
@@ -56,7 +63,7 @@ function cullToTwoSides(walls, buildings, rng) {
 export function generateWalls(data, config, rng, matrix) {
   const { walls: rawWalls, internalWalls } = extractWallSegments(data, config, matrix);
 
-  const culledWalls = WALL.applySegmentCull ? cullToTwoSides(rawWalls, data.buildings, rng) : rawWalls;
+  const culledWalls = WALL.applySegmentCull ? cullToMaxSides(rawWalls, data.buildings, rng) : rawWalls;
   const windowPlans = buildWindowPlans(data.buildings, rng);
 
   const walls = [];

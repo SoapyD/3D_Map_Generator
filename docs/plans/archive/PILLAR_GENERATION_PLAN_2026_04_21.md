@@ -100,9 +100,18 @@ Emit a `slab` primitive per pillar (existing structure is fine, just fix tex key
 
 ## Status
 
-- [ ] Step 1 — Add `CELL.PILLAR`
-- [ ] Step 2 — Config values
-- [ ] Step 3 — `generate-pillars.js`
-- [ ] Step 4 — Wire into index
-- [ ] Step 5 — Fix `build-pillar-primitives.js`
-- [ ] Step 6 — Update `collision_matrix.md`
+- [x] Step 1 — Add `CELL.PILLAR`
+- [x] Step 2 — Config values
+- [x] Step 3 — `generate-pillars.js`
+- [x] Step 4 — Wire into index
+- [x] Step 5 — Fix `build-pillar-primitives.js`
+- [x] Step 6 — Update `collision_matrix.md`
+
+---
+
+## Deviations from plan
+
+- `pillarWidth` set to `0.25"` (not `1"` / full cell). Pillars are centred within their cell using `inset = (cellSize - pillarWidth) / 2 = 0.375`.
+- `topY` is fractional: `cy + 1 - connSlabThickness` (underside of the connection slab) rather than `cy` (cell floor). Accounts for walkway (0.25") and bridge (0.5") slab thickness so the pillar meets the underside of the slab, not the cell floor.
+- Added abort condition: if the downward scan hits `CELL.WALKWAY` or `CELL.WALKWAY_CROSSING`, the pillar is suppressed — no pillar beneath a connection that already has one above it.
+- `STAGE.PILLARS = 10` added to the stage enum alongside `CELL.PILLAR = 107`.

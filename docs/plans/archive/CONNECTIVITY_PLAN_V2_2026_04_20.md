@@ -441,18 +441,12 @@ The 0.25" depth is intentionally shallow so end tiles consume minimal matrix spa
 | Phase 2 — Pair discovery | Steps 5a–5d | ✅ Complete |
 | Phase 3 — Filter pass | Steps 6a–6e | ✅ Complete |
 | Pipeline reorder — walls after connectivity | `src/index.js` | ✅ Complete |
-| Step 7a — Trigger cells on anchors | `emit-anchors.js` | ⏳ Pending |
-| Step 7b-i — Door cell stamping + debug draw | Connectivity output pass | ⏳ Pending |
-| Step 7b-ii — Wall pipeline doorway carving | `generateWalls` | ⏳ Pending |
-| Step 7c — Walkway rasterisation | Post-wall pass | ✅ Complete |
-
-## Next steps
-
-1. ~~Move `generateWalls` to after `generateConnectivity` in `src/index.js`~~ ✅ Done
-2. Re-add `triggerCells` to anchors in `emit-anchors.js` (`makeAnchor`)
-3. Register `CELL.DOOR = 90` in `src/generators/collision/matrix.js`; document in `docs/architecture/collision_matrix.md`
-4. After `generateConnectivity` returns surviving connections, iterate each connection's `from`/`to` anchors, stamp `CELL.DOOR` (2×3 per anchor), emit grey debug rects
-5. Pass surviving anchors into `generateWalls`; implement carve-opening logic in the wall pipeline (Step 7b-ii)
+| Step 7a — Trigger cells on anchors | `emit-anchors.js` | ✅ Complete |
+| Step 7b-i — Door cell stamping + debug draw | `connectivity/index.js` | ✅ Complete |
+| Step 7b-ii — Wall pipeline doorway carving | `generateWalls` — reads `CELL.DOOR` | ✅ Complete |
+| Step 7c — Walkway rasterisation | `rasterise-connections.js` | ✅ Complete |
+| Pillar generation | `generate-pillars.js` | ✅ Complete — see PILLAR_GENERATION_PLAN |
+| Crossing connection handling | `rasterise-connections.js` | ✅ Complete — see CONNECTION_RASTERISATION_PLAN |
 6. Stamp walkway rects into the collision matrix (`CELL.WALKWAY`) (Step 7c)
 7. Tune `filterStrategy` and `filterN` after visual inspection
 8. Design Phase 4 (final connection culling — perpendicular crossings, density limits)

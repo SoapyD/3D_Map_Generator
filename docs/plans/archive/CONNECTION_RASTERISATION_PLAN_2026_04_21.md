@@ -241,3 +241,15 @@ export const CONNECTIVITY = {
 | `connectivity/index.js` wiring | ✅ Complete |
 | `build-walkway-primitives.js` segment support | ✅ Complete |
 | `build-bridge-primitives.js` segment support | ✅ Complete |
+
+---
+
+## Post-plan changes (2026-04-21)
+
+**Bug fix — crossing detection:** `cellOwners` was storing `conn.id` (always `undefined` — connections have no id field) instead of connection object references. The `connById` lookup therefore always returned the last connection in the survivors array, so `hasCrossing` was never correctly set on crossing pairs. Fixed by storing connection objects directly and marking `conn.hasCrossing = true` without a map lookup.
+
+**Edges suppressed for crossing bridge segments:** The plan specified "slab only" for `isCrossing` segments but `build-bridge-primitives.js` was still emitting `type: 'edges'` unconditionally. Fixed to guard edges behind `if (!seg.isCrossing)`, matching the walkway builder.
+
+**Shared texture index and type for crossing groups:** After crossing detection, a union-find pass groups all crossing connections. All connections in the same group receive the same `texIndex` (the root's array index) and the same `connectionType` (the root's type). Geometry builders use `texIndex` instead of their loop counter so crossing connections resolve to the same texture pool entry and are visually consistent.
+
+**Connection type system redesigned:** The original two-layer system (`bridgeChance` gate + variant percentages) was replaced with a single direct-percentage roll per length band. `bridgeChance` and `bridgeLongChance` removed from config. `bridgeVariants` and `bridgeVariantsLong` now include a `walkway` entry so the roll is a single pass with final probabilities summing to 100%.
