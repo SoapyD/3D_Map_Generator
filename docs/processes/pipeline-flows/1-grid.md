@@ -1,73 +1,62 @@
 # Stage 1: Grid Partitioning
 
-> Last verified: 2026-04-18
+> Last verified: 2026-04-21
 
 ## Overview
 
-Divides the play area into a 2D grid of city blocks separated by streets. Uses Binary Space Partitioning (BSP) to produce irregular block sizes that avoid a regular checkerboard appearance. The output is the foundation every subsequent stage builds on.
+Divides the map into city blocks separated by streets. The active area is first snapped to the BBD grid (any remainder becomes a symmetric skirt). A strategy — `centerFirst` or `bspTopLeft`, chosen 50/50 — then recursively splits the active area using BSP. Street rectangles are derived from the gaps between blocks. The collision matrix is then initialised and ground-slab placeholders are written.
 
 ## Input Contract
 
 ```js
-{
-  seed: number,           // RNG seed (passed through from CLI)
-  mapWidth: number,       // Map width in inches (default 48)
-  mapDepth: number,       // Map depth in inches (default 48)
-  streetWidth: number,    // Minimum street width in inches (default 3.5)
-  rng: RNG,              // Seeded RNG instance
+config: {
+  mapWidth: number,       // map width in inches
+  mapDepth: number,       // map depth in inches
+  streetWidth: number,    // gap between blocks (inches)
 }
+rng: RNG
 ```
 
 ## Algorithm
 
-1. Initialise a seeded RNG from the seed value
-2. Start with a single rectangle covering the full map area
-3. Recursively split the rectangle using BSP:
-   - Choose a split axis (alternating horizontal/vertical, or choose by longest dimension)
-   - Choose a split position within the rectangle, biased toward the centre (not a pure random position — prevents extremely thin blocks)
-   - Recurse on both halves until blocks reach a minimum size threshold
-4. After BSP, carve streets between all adjacent blocks:
-   - Streets are carved from the shared edge inward by `streetWidth / 2` on each side
-   - This produces street corridors of at least `streetWidth` width
-5. Tag some blocks as open plazas (no buildings): blocks below a size threshold or selected randomly (~15% of blocks)
-6. Return the final list of block rectangles and the street network
+1. Snap active area: `activeW = floor(mapWidth / bbd) * bbd`, same for depth. Remainder split equally as `skirtX` / `skirtZ`.
+2. Pick a BSP strategy at random (50/50):
+   - `centerFirst` — biases splits toward the centre of each region
+   - `bspTopLeft` — biases splits toward the top-left
+3. Recursively split the active area via `bspSplit`:
+   - A region can be split on X if `w > minBlockSize * 2 + streetWidth`, same rule for Z.
+   - Split axis and position chosen by the active strategy.
+   - Split position is snapped to BBD and clamped inside the valid range.
+   - Recursion terminates when no further split is possible — leaf nodes become blocks.
+4. Derive street rectangles from block gaps via `deriveStreetRects`.
+5. Create the collision matrix from `activeArea`, `config.tiers`, `config.tierHeight`, `config.slabThickness`.
+6. Write ground-slab placeholders into the matrix at `Y = -slabThickness`:
+   - `CELL.FOUNDATION_PLACEHOLDER` for each block rect
+   - `CELL.STREET_PLACEHOLDER` for each street rect
 
 ## Output Contract
 
 ```js
 {
-  blocks: [
-    {
-      x: number, z: number,        // block origin (inches)
-      width: number, depth: number, // block dimensions (inches)
-      isPlaza: boolean,            // true = open area, no buildings placed
-    }
-  ],
-  streets: [
-    {
-      x: number, z: number,
-      width: number, depth: number, // street corridor rectangle
-    }
-  ],
-  rng: RNG,   // same RNG instance, advanced past this stage's calls
+  blocks: [{ x, z, w, d }],          // one per BSP leaf
+  streetBounds: [{ x, z, w, d }],    // derived from block gaps
+  activeArea: { x, z, w, d },        // BBD-snapped usable area
+  skirt: { x, z },                   // per-side remainder (equal on both sides)
 }
+// plus matrix (created and partially written here, passed to all subsequent stages)
 ```
 
 ## Key Files
 
-- `src/generators/grid.js` — BSP split logic and street carving
-- `src/generators/bsp-split.js` — recursive BSP implementation
-- `src/generators/extract-streets.js` — derives street rectangles from block adjacency
-- `src/core/rng.js` — seeded RNG utility
+- [src/generators/foundations/grid.js](../../../../src/generators/foundations/grid.js) — entry point; snaps active area, picks strategy, calls bspSplit, derives streets
+- [src/generators/foundations/bsp-split.js](../../../../src/generators/foundations/bsp-split.js) — recursive BSP implementation
+- [src/generators/foundations/strategies/center-first.js](../../../../src/generators/foundations/strategies/center-first.js) — centerFirst strategy
+- [src/generators/foundations/strategies/bsp-top-left.js](../../../../src/generators/foundations/strategies/bsp-top-left.js) — bspTopLeft strategy
+- [src/generators/streets/derive-street-rects.js](../../../../src/generators/streets/derive-street-rects.js) — derives street rects from block gaps
+- [src/generators/collision/matrix.js](../../../../src/generators/collision/matrix.js) — collision matrix; created after grid is known
 
 ## Edge Cases & Constraints
 
-- Minimum block size is enforced to prevent blocks too small for any building
-- Street carving must not reduce a block to zero width — the minimum block size implicitly prevents this
-- On very small maps (< 24" square), BSP depth is reduced to avoid over-partitioning
-
-## Testing Notes
-
-- Tests verify block coverage: total block area + street area ≈ map area (±small rounding)
-- Tests verify no block overlaps with any other block
-- Seed 42 is the regression anchor — block count and approximate dimensions are snapshot-tested
+- Minimum block size (`GRID.minBlockSize`) prevents blocks too small for any building.
+- BSP snap to BBD means split positions are always on the same grid as building foundations.
+- Skirt is purely geometric — no buildings or streets are placed in the skirt.

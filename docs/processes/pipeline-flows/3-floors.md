@@ -1,80 +1,92 @@
 # Stage 3: Floor Plate Generation
 
-> Last verified: 2026-04-18
+> Last verified: 2026-04-21
 
 ## Overview
 
-Generates the horizontal slab geometry for every tier. Tier 0 covers the entire map (base/street level). Upper tiers cover only the footprints of buildings tall enough to reach them. Damage cutouts are applied — random rectangular chunks removed from floor edges to create the ruined aesthetic.
+Generates interior floor slabs for every building at every tier. Quadrant-based damage escalates upward — higher floors lose more area, biased by `damageLevel`. The topmost slab per building is withheld from the matrix write and passed to the Roofs stage as `roofSlabs`. After all slabs are written, a label pass stamps directional values (`FLOOR_N/S/E/W` and variants) onto exposed-edge cells.
 
 ## Input Contract
 
 ```js
-{
-  buildings: Building[],    // from Stage 2
-  blocks: Block[],
-  streets: Street[],
-  tiers: number,
-  tierHeight: number,       // vertical spacing between tiers (inches, default 6)
-  slabThickness: number,    // floor slab thickness (inches, default 0.5)
-  rng: RNG,
+data: {
+  buildings: Building[],   // from Stage 2
+  // all prior fields carried forward
 }
+config: {
+  tierHeight: number,
+  slabThickness: number,
+  damageLevel: number,     // 0–1; influences quadrant removal probability
+}
+rng: RNG
+matrix: CollisionMatrix
 ```
 
 ## Algorithm
 
-**For each tier (0 to config.tiers):**
+**Per building (`processBuildingFloors`):**
 
-**Tier 0 (base):**
-1. Create a single rectangle covering the full map
-2. No damage cutouts — the base is always intact
-3. Extrude to `slabThickness`, place at Y = 0
+Each building has `maxTier` levels (index 0 = ground, index `maxTier-1` = roof). A `removed` set tracks which quadrants (0–3, NW/NE/SW/SE) have been removed.
 
-**Tier 1+:**
-1. Collect all buildings with `maxTier >= currentTier`
-2. For each qualifying building, start with its `shape` rectangles
-3. Apply damage cutouts:
-   a. Sample a cutout count from the RNG, biased by `building.damage` and tier index (higher tiers = more cutouts)
-   b. For each cutout, pick a random edge (N/S/E/W), a random inset depth, and a random width along that edge
-   c. Subtract the cutout rectangle from the floor shape using axis-aligned boolean subtraction
-   d. After all cutouts, check minimum walkable area: any remaining section must have at least one 2"×2" contiguous area; if not, restore the last cutout
-4. Record the resulting polygon as a list of axis-aligned rect segments (the subtracted shape)
-5. Extrude to `slabThickness`, place at Y = `currentTier * config.tierHeight`
+For each tier level `i`:
+1. If the building is **not** ruins:
+   - If no quadrants removed: occasionally escalate by removing one quadrant (`maxIntactFloors` cap + `tier1EscalateChance`).
+   - If 1 quadrant removed: roll `tier2EscalateChance` to remove an adjacent quadrant.
+   - If 2 quadrants removed: roll `tier3EscalateChance` to remove an adjacent quadrant.
+2. Compute `present` quadrants = `{0,1,2,3}` minus `removed`.
+3. Decompose the building footprint into rects given the present quadrants:
+   - `ruins-small`: single-quadrant decomposition via `ruinsToSections`.
+   - Other ruins: full building rect (no quadrant damage).
+   - Normal buildings: `quadrantsToSections` maps present quadrants → rect list.
+4. Compute `yCollisionLevel = i * (tierHeight + slabThickness) - slabThickness`.
+5. Push a floor record. If this is the **last** tier (`floorIndex === maxTier - 1`), push to `roofSlabs` instead of `floors`.
+
+**Writing to matrix:**
+- Interior floors only: `matrix.setWriteContext(STAGE.FLOORS, floors.length)` then `matrix.fillBox(rect.x, yCollisionLevel, rect.z, rect.w, slabThickness, rect.d, CELL.FLOOR)`.
+- Roof slabs are **not** written here.
+
+**Label pass (`labelFloorCells`):**
+- Scans all floor-level Y values in the matrix.
+- Overwrites `CELL.FLOOR` cells that have an exposed edge (neighbour is `CELL.EMPTY` or `CELL.SHELL`) with the appropriate directional constant:
+  - Cardinal: `FLOOR_N/S/E/W` (10–13)
+  - Corner: `FLOOR_NE/NW/SE/SW` (14–17)
+  - End: `FLOOR_END_N/S/E/W` (30–33)
+  - Island: `FLOOR_ISLAND` (34)
+  - Interior variants (`IFLOOR_*` 60–74) — used when the neighbour is `CELL.SHELL` (edge faces into a damaged quadrant).
 
 ## Output Contract
 
 ```js
 {
-  // all prior output fields carried forward, plus:
+  // all prior fields carried forward, plus:
   floors: [
     {
-      tier: number,                // 0-indexed tier
-      buildingId: string | null,   // null for tier 0 (base)
-      y: number,                   // Y position of top face
-      rects: Rect[],               // axis-aligned rect decomposition of the floor shape
-      cutouts: Rect[],             // the damage cutouts that were applied
-      materialKey: string,         // e.g. "stone_floor", "wood_plank"
+      buildingId: string,       // e.g. 'b3'
+      buildingIndex: number,
+      floorIndex: number,       // 0 = ground, maxTier-2 = highest interior
+      yCollisionLevel: number,  // Y position of slab in collision matrix
+      rects: [{ x, z, w, d }], // present quadrant decomposition
+      removedQuadrants: number[],
+      materialKey: 'stone_floor',
     }
+  ],
+  roofSlabs: [                  // same shape as floors[], index = maxTier-1 per building
+    { buildingId, buildingIndex, floorIndex, yCollisionLevel, rects, removedQuadrants }
   ],
 }
 ```
 
 ## Key Files
 
-- `src/generators/floors/index.js` — public entry, iterates tiers and buildings
-- `src/generators/floors/generate-floor-plates.js` — main per-building floor generation
-- `src/generators/floors/apply-damage.js` — cutout sampling and subtraction logic
-- `src/generators/floor-texture-key.js` — maps floor type to material key
-- `src/generators/geometry-rects.js` — shared rect arithmetic (subtract, intersect, union)
+- [src/generators/floors/index.js](../../../../src/generators/floors/index.js) — entry; iterates buildings, separates floors from roofSlabs, calls label pass
+- [src/generators/floors/process-building-floors.js](../../../../src/generators/floors/process-building-floors.js) — per-building damage escalation and rect decomposition
+- [src/generators/floors/quadrants-to-sections.js](../../../../src/generators/floors/quadrants-to-sections.js) — maps present quadrant set → rect list
+- [src/generators/floors/ruins-small-to-sections.js](../../../../src/generators/floors/ruins-small-to-sections.js) — ruins-small subdivision
+- [src/generators/floors/label-floor-cells.js](../../../../src/generators/floors/label-floor-cells.js) — directional label pass
 
 ## Edge Cases & Constraints
 
-- Minimum walkable area (2"×2") is enforced per floor section — a section removed entirely is preferable to leaving an unreachable sliver
-- Tier 0 receives no cutouts regardless of damage factor
-- Very high damage values (> 0.9) may reduce a building to only a narrow ledge — this is intentional for the ruined aesthetic, as long as the 2"×2" minimum is met
-- Cutouts are axis-aligned only — no diagonal or curved cuts
-
-## Testing Notes
-
-- Tests verify all rects in `floors` are within the building's bounding footprint
-- Tests verify cutouts do not consume > 80% of any floor plate
-- Tests verify Y positions match `tier * tierHeight` exactly
+- Damage escalation is stochastic but always upward — lower tiers can never have more damage than higher tiers.
+- `ruins-small` and `ruins-medium-*` buildings skip the quadrant escalation logic; ruins-small gets a fixed sub-footprint decomposition.
+- The label pass must run after all buildings' floors are written, so cross-building adjacency is resolved correctly.
+- `roofSlabs` uses the same damage state as the highest interior floor — no separate damage roll for the roof tier.
