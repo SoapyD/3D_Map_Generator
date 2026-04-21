@@ -66,20 +66,21 @@ export const FLOOR = {
 
 // --- Connectivity ---
 export const CONNECTIVITY = {
-  bridgeMinLength:   8,    // min connection length (cells) eligible to become a bridge
-  bridgeChance:      0.4,  // chance an elevated connection (8–15 units) becomes a bridge
-  bridgeLongThreshold: 16, // connections this length or longer always become a bridge
-  bridgeLongChance:  1.0,  // chance used instead of bridgeChance for long connections (0% walkway)
+  bridgeMinLength:     6,  // min connection length (cells) eligible to become a bridge
+  bridgeLongThreshold: 12, // connections this length or longer use long-bridge chances
   pillarMinLength:   8,    // min connection length (cells) to receive support pillars
   pillarSpacing:     6,    // cells between pillar pairs along travel axis
   pillarEdgeInset:   1,    // cells inset from each end before placing first pair
   pillarWidth:       0.25, // pillar footprint in inches
+  // Direct percentage chances — must sum to 100
   bridgeVariants: {
-    low:        100,  // short bridges (8–15 units): 100% low, 0% battlement
+    walkway:     60,
+    low:         40,
     battlement:   0,
   },
   bridgeVariantsLong: {
-    low:         40,  // long bridges (≥16 units): 40% low, 60% battlement
+    walkway:     10,
+    low:         30,
     battlement:  60,
   },
   bridgeThickness:         0.5,   // slab thickness; top face flush with cell top

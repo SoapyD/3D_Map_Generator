@@ -6,7 +6,7 @@ export function buildWalkwayPrimitives(walkways) {
 
   for (let i = 0; i < walkways.length; i++) {
     const w = walkways[i];
-    const texKey = `walkway:${i}`;
+    const texKey = `walkway:${w.texIndex ?? i}`;
 
     for (const seg of w.segments) {
       const r = seg.worldRect;

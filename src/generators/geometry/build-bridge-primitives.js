@@ -12,7 +12,7 @@ export function buildBridgePrimitives(bridges) {
 
   for (let i = 0; i < bridges.length; i++) {
     const b = bridges[i];
-    const texKey = `wall:landmark:${i}`;
+    const texKey = `wall:landmark:${b.texIndex ?? i}`;
     const isBattlement = b.connectionType === 'bridge_battlement';
     // NS: travels along Z — side walls sit on X edges, run along Z
     // WE: travels along X — side walls sit on Z edges, run along X

@@ -4,19 +4,17 @@ import { CONNECTIVITY } from '../../config.js';
 // ─── Type assignment ──────────────────────────────────────────────────────────
 
 function assignType(conn, rng) {
-  // cy > 0 means the slab is above ground (ground slab sits at cy = -slabThickness = -1)
   const elevated = conn.from.cells[0].cy > 0;
   if (!elevated || conn.length < CONNECTIVITY.bridgeMinLength) return 'walkway';
-  const isLong = conn.length >= CONNECTIVITY.bridgeLongThreshold;
-  const chance = isLong ? CONNECTIVITY.bridgeLongChance : CONNECTIVITY.bridgeChance;
-  if (!rng.chance(chance)) return 'walkway';
 
+  const isLong = conn.length >= CONNECTIVITY.bridgeLongThreshold;
   const variants = isLong ? CONNECTIVITY.bridgeVariantsLong : CONNECTIVITY.bridgeVariants;
+
   const roll = rng.random() * 100;
   let cum = 0;
   for (const [name, pct] of Object.entries(variants)) {
     cum += pct;
-    if (roll < cum) return `bridge_${name}`;
+    if (roll < cum) return name === 'walkway' ? 'walkway' : `bridge_${name}`;
   }
   return 'walkway';
 }
@@ -136,6 +134,7 @@ function buildEntry(conn) {
     toBuildingId:   conn.toBuildingId,
     tier:           conn.from.cells[0].cy,
     hasCrossing:    !!conn.hasCrossing,
+    texIndex:       conn.texIndex,
     segments:       conn.segments,
   };
 }
@@ -179,6 +178,21 @@ export function rasteriseConnections(data, matrix, rng) {
 
   if (crossings.length > 0) {
     console.log(`  Crossings detected: ${crossings.length} cells`);
+  }
+
+  // Assign texture indices — crossing connections share an index via union-find.
+  const connIdx = new Map(survivors.map((c, i) => [c, i]));
+  const ufParent = survivors.map((_, i) => i);
+  const ufFind = i => { while (ufParent[i] !== i) { ufParent[i] = ufParent[ufParent[i]]; i = ufParent[i]; } return i; };
+  for (const owners of cellOwners.values()) {
+    if (owners.length >= 2) {
+      const root = ufFind(connIdx.get(owners[0]));
+      for (let j = 1; j < owners.length; j++) ufParent[ufFind(connIdx.get(owners[j]))] = root;
+    }
+  }
+  for (let i = 0; i < survivors.length; i++) {
+    survivors[i].texIndex = ufFind(i);
+    survivors[i].connectionType = survivors[ufFind(i)].connectionType;
   }
 
   // 4. Build segments
