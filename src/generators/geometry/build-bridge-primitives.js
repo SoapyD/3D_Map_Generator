@@ -1,34 +1,34 @@
 import { CONNECTIVITY } from '../../config.js';
-import { emitBattlements } from './emit-battlements.js';
 
 export function buildBridgePrimitives(bridges) {
   const primitives = [];
   const {
     bridgeThickness,
-    bridgeWallHeight:       wallH,
-    bridgeWallThickness:    wallT,
-    bridgeBattlementHeight: battH,
-    bridgeBattlementSpacing: spacing,
-    bridgeBattlementGap:    gap,
+    bridgeWallHeight:    wallH,
+    bridgeWallThickness: wallT,
+    bridgeBattlementPeriod:  period,
+    bridgeBattlementTallH:   tallH,
   } = CONNECTIVITY;
-
-  const pillarW = spacing - gap;
 
   for (let i = 0; i < bridges.length; i++) {
     const b = bridges[i];
     const texKey = `wall:landmark:${i}`;
     const isBattlement = b.connectionType === 'bridge_battlement';
-    // NS: travels along Z, 2 cells wide in X — side walls on X edges, run along Z
-    // WE: travels along X, 2 cells wide in Z — side walls on Z edges, run along X
+    // NS: travels along Z — side walls sit on X edges, run along Z
+    // WE: travels along X — side walls sit on Z edges, run along X
     const isNS = b.axis === 'NS';
 
     for (const seg of b.segments) {
       const r = seg.worldRect;
 
-      // Slab — always emitted
+      // Slab: 0.5" thick, top face flush with cell top.
+      // r.y is anchor.y = wp.y + 0.75 (= cell floor + 0.75).
+      // Cell top = wp.y + 1 = r.y + 0.25, so slabY = r.y + 0.25 - bridgeThickness = r.y - 0.25.
+      const slabY = r.y - 0.25;
+
       primitives.push({
         type: 'slab', name: `bridge_${i}`,
-        x: r.x, y: r.y, z: r.z, w: r.w, h: bridgeThickness, d: r.d,
+        x: r.x, y: slabY, z: r.z, w: r.w, h: bridgeThickness, d: r.d,
         textureKey: texKey,
         emitTop: true, emitBottom: true, simpleBottom: false,
         rotateUV: r.w > r.d,
@@ -36,46 +36,72 @@ export function buildBridgePrimitives(bridges) {
       });
       primitives.push({
         type: 'edges', name: `bridge_${i}`,
-        x: r.x, y: r.y, z: r.z, w: r.w, h: bridgeThickness, d: r.d,
+        x: r.x, y: slabY, z: r.z, w: r.w, h: bridgeThickness, d: r.d,
         textureKey: texKey,
       });
 
       if (seg.isCrossing) continue;
 
-      // Side walls
-      const wallY = r.y + bridgeThickness;
+      // Wall base sits at cell top.
+      const wallY = slabY + bridgeThickness; // = r.y - 0.25 + 0.5 = r.y + 0.25
 
-      let wallL, wallR;
-      if (isNS) {
-        // walls run along Z (depth axis), sit on west and east X edges
-        wallL = { x: r.x,             y: wallY, z: r.z, w: wallT, h: wallH, d: r.d };
-        wallR = { x: r.x + r.w - wallT, y: wallY, z: r.z, w: wallT, h: wallH, d: r.d };
+      if (!isBattlement) {
+        // bridge_low: one continuous slab per side, 1" tall.
+        const walls = isNS
+          ? [
+              { x: r.x,             y: wallY, z: r.z, w: wallT, h: wallH, d: r.d, side: 'L' },
+              { x: r.x + r.w - wallT, y: wallY, z: r.z, w: wallT, h: wallH, d: r.d, side: 'R' },
+            ]
+          : [
+              { x: r.x, y: wallY, z: r.z,             w: r.w, h: wallH, d: wallT, side: 'L' },
+              { x: r.x, y: wallY, z: r.z + r.d - wallT, w: r.w, h: wallH, d: wallT, side: 'R' },
+            ];
+
+        for (const wall of walls) {
+          primitives.push({
+            type: 'slab', name: `bridge_${i}_wall${wall.side}`,
+            x: wall.x, y: wall.y, z: wall.z, w: wall.w, h: wall.h, d: wall.d,
+            textureKey: texKey,
+            emitTop: true, emitBottom: false, simpleBottom: false, rotateUV: false,
+            shared: false,
+            thinAxis: isNS ? 'x' : 'z',
+          });
+        }
       } else {
-        // walls run along X (width axis), sit on north and south Z edges
-        wallL = { x: r.x, y: wallY, z: r.z,             w: r.w, h: wallH, d: wallT };
-        wallR = { x: r.x, y: wallY, z: r.z + r.d - wallT, w: r.w, h: wallH, d: wallT };
-      }
+        // bridge_battlement: per-cell sections, height alternates by position.
+        // Travel axis is Z (NS) or X (WE). Each cell is 1".
+        const travelLength = isNS ? r.d : r.w;
+        const cellCount = Math.round(travelLength); // should be integer
 
-      for (const [side, wall] of [['L', wallL], ['R', wallR]]) {
-        primitives.push({
-          type: 'slab', name: `bridge_${i}_wall${side}`,
-          ...wall,
-          textureKey: texKey,
-          emitTop: false, emitBottom: false, simpleBottom: false, rotateUV: false,
-          shared: false,
-          thinAxis: isNS ? 'x' : 'z',
-        });
+        for (let ci = 0; ci < cellCount; ci++) {
+          const h = ci % period === (period - 1) ? tallH : wallH;
+          const travelOffset = ci; // 1" per cell
 
-        if (isBattlement) {
-          const battY = wallY + wallH;
-          // emitBattlements expects segments as [{ start, end }] along the travel axis
-          const segArr = isNS
-            ? [{ start: r.z, end: r.z + r.d }]
-            : [{ start: r.x, end: r.x + r.w }];
-          const fixedPos = isNS
-            ? (side === 'L' ? r.x + wallT / 2 : r.x + r.w - wallT / 2)
-            : (side === 'L' ? r.z + wallT / 2 : r.z + r.d - wallT / 2);
-          emitBattlements(primitives, segArr, fixedPos, !isNS, side, i, battY, battH, wallT, spacing, pillarW, texKey);
+          for (const side of ['L', 'R']) {
+            let wx, wy, wz, ww, wd;
+            if (isNS) {
+              wx = side === 'L' ? r.x : r.x + r.w - wallT;
+              wy = wallY;
+              wz = r.z + travelOffset;
+              ww = wallT;
+              wd = 1;
+            } else {
+              wx = r.x + travelOffset;
+              wy = wallY;
+              wz = side === 'L' ? r.z : r.z + r.d - wallT;
+              ww = 1;
+              wd = wallT;
+            }
+
+            primitives.push({
+              type: 'slab', name: `bridge_${i}_batt${ci}_${side}`,
+              x: wx, y: wy, z: wz, w: ww, h, d: wd,
+              textureKey: texKey,
+              emitTop: true, emitBottom: false, simpleBottom: false, rotateUV: false,
+              shared: false,
+              thinAxis: isNS ? 'x' : 'z',
+            });
+          }
         }
       }
     }

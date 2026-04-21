@@ -66,17 +66,18 @@ export const FLOOR = {
 
 // --- Connectivity ---
 export const CONNECTIVITY = {
-  bridgeChance:    0.4,   // chance a tier 2+ connection becomes a bridge
+  bridgeChance:      0.4,  // chance a tier 2+ connection (≥5 units) becomes a bridge
+  bridgeLongThreshold: 15, // connections this length or longer use the higher chance
+  bridgeLongChance:  0.75, // chance used instead of bridgeChance for long connections
   bridgeVariants: {
-    low:        { weight: 0.5 },  // slab + low continuous side walls
-    battlement: { weight: 0.5 },  // slab + low walls + spaced tall sections
+    low:        { weight: 0.5 },  // slab + continuous 1" side walls
+    battlement: { weight: 0.5 },  // slab + 1" walls with 2" posts every 3 units
   },
-  bridgeThickness:        0.5,
-  bridgeWallHeight:       0.75,
-  bridgeWallThickness:    0.25,
-  bridgeBattlementHeight: 1.5,
-  bridgeBattlementSpacing: 2.25,
-  bridgeBattlementGap:    1.5,
+  bridgeThickness:         0.5,   // slab thickness; top face flush with cell top
+  bridgeWallHeight:        1,     // base wall height (inches, = 1 cell)
+  bridgeWallThickness:     0.25,
+  bridgeBattlementPeriod:  3,     // every N units a tall post appears
+  bridgeBattlementTallH:   2,     // height of tall post (inches)
 };
 
 // --- Cover --- (_old_system only)

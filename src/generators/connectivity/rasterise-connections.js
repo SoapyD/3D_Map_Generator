@@ -6,7 +6,11 @@ import { CONNECTIVITY } from '../../config.js';
 function assignType(conn, rng) {
   // cy > 0 means the slab is above ground (ground slab sits at cy = -slabThickness = -1)
   const elevated = conn.from.cells[0].cy > 0;
-  if (!elevated || !rng.chance(CONNECTIVITY.bridgeChance)) return 'walkway';
+  if (!elevated || conn.length < 5) return 'walkway';
+  const chance = conn.length >= CONNECTIVITY.bridgeLongThreshold
+    ? CONNECTIVITY.bridgeLongChance
+    : CONNECTIVITY.bridgeChance;
+  if (!rng.chance(chance)) return 'walkway';
 
   const entries = Object.entries(CONNECTIVITY.bridgeVariants);
   const total = entries.reduce((s, [, v]) => s + v.weight, 0);
