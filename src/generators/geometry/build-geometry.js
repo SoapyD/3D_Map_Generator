@@ -52,7 +52,7 @@ export function buildGeometry(data, config) {
 
   const allBranches = [...walkways.filter(w => w.branch), ...bridges.filter(b => b.branch)];
   primitives.push(...buildBridgePrimitives(bridges, walkways, allBranches));
-  primitives.push(...buildPillarPrimitives(pillars, bridges, walkways));
+  primitives.push(...buildPillarPrimitives(pillars));
 
   const objTexKey = (i) => `object:${i}`;
   primitives.push(...buildBoxSlabPrimitives(data.cover || [], 'cover', objTexKey));

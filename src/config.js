@@ -66,12 +66,21 @@ export const FLOOR = {
 
 // --- Connectivity ---
 export const CONNECTIVITY = {
-  bridgeChance:      0.4,  // chance a tier 2+ connection (≥5 units) becomes a bridge
-  bridgeLongThreshold: 15, // connections this length or longer use the higher chance
-  bridgeLongChance:  0.75, // chance used instead of bridgeChance for long connections
+  bridgeMinLength:   8,    // min connection length (cells) eligible to become a bridge
+  bridgeChance:      0.4,  // chance an elevated connection (8–15 units) becomes a bridge
+  bridgeLongThreshold: 16, // connections this length or longer always become a bridge
+  bridgeLongChance:  1.0,  // chance used instead of bridgeChance for long connections (0% walkway)
+  pillarMinLength:   8,    // min connection length (cells) to receive support pillars
+  pillarSpacing:     6,    // cells between pillar pairs along travel axis
+  pillarEdgeInset:   1,    // cells inset from each end before placing first pair
+  pillarWidth:       0.25, // pillar footprint in inches
   bridgeVariants: {
-    low:        { weight: 0.5 },  // slab + continuous 1" side walls
-    battlement: { weight: 0.5 },  // slab + 1" walls with 2" posts every 3 units
+    low:        100,  // short bridges (8–15 units): 100% low, 0% battlement
+    battlement:   0,
+  },
+  bridgeVariantsLong: {
+    low:         40,  // long bridges (≥16 units): 40% low, 60% battlement
+    battlement:  60,
   },
   bridgeThickness:         0.5,   // slab thickness; top face flush with cell top
   bridgeWallHeight:        1,     // base wall height (inches, = 1 cell)
@@ -111,7 +120,7 @@ export const GEOMETRY = {
   // Platform
   platformSize: 2,           // ladder platform width/depth (inches)
   platformThickness: 0.2,    // ladder platform thickness (inches)
-  walkwayThickness: 0.3,     // walkway slab thickness (inches)
+  walkwayThickness: 0.25,    // walkway slab thickness (inches)
 };
 
 // --- Ladder Display ---

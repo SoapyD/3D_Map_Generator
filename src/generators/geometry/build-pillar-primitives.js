@@ -1,20 +1,15 @@
-export function buildPillarPrimitives(pillars, bridges, walkways) {
+export function buildPillarPrimitives(pillars) {
   const primitives = [];
 
   for (let i = 0; i < pillars.length; i++) {
     const p = pillars[i];
-    let texKey;
-    if (p.isBridge) {
-      const parentIdx = bridges.findIndex(b => b.textureId === p.textureId && !b.branch);
-      texKey = `wall:landmark:${parentIdx >= 0 ? parentIdx : i}`;
-    } else {
-      const parentIdx = walkways.findIndex(w => w.textureId === p.textureId && !w.branch);
-      texKey = `walkway:${parentIdx >= 0 ? parentIdx : i}`;
-    }
+    const texKey = p.connectionType?.startsWith('bridge_')
+      ? `wall:landmark:${i}`
+      : `walkway:${i}`;
 
     primitives.push({
       type: 'slab', name: `pillar_${i}`,
-      x: p.x, y: p.y, z: p.z, w: p.w, h: p.height, d: p.d,
+      x: p.x, y: p.y, z: p.z, w: p.w, h: p.h, d: p.d,
       textureKey: texKey,
       emitTop: false, emitBottom: false, simpleBottom: false, rotateUV: false,
       shared: false,

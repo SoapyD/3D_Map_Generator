@@ -3,6 +3,7 @@ import { emitAnchors } from './emit-anchors.js';
 import { pairAnchors } from './pair-anchors.js';
 import { filterCandidates } from './filter-candidates.js';
 import { rasteriseConnections } from './rasterise-connections.js';
+import { generatePillars } from './generate-pillars.js';
 import { CELL, STAGE } from '../collision/matrix.js';
 
 // Step 7b-i — vectors pointing FROM anchor cell BACK TO its trigger (floor-edge) cell
@@ -159,6 +160,10 @@ export function generateConnectivity(data, config, rng, matrix) {
     connections: { anchors, triggerCells, candidates: survivors, doors },
   };
   const { walkways, crossings } = rasteriseConnections(dataWithSurvivors, matrix, rng);
+  const typeCounts = {};
+  for (const w of walkways) typeCounts[w.connectionType] = (typeCounts[w.connectionType] || 0) + 1;
+  for (const [type, n] of Object.entries(typeCounts)) console.log(`    ${n}x ${type}`);
+  const pillars = generatePillars(survivors, matrix, config);
 
   return {
     ...data,
@@ -169,6 +174,7 @@ export function generateConnectivity(data, config, rng, matrix) {
       doors,
       walkways,
       crossings,
+      pillars,
     },
   };
 }

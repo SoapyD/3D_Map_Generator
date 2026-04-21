@@ -6,18 +6,16 @@ import { CONNECTIVITY } from '../../config.js';
 function assignType(conn, rng) {
   // cy > 0 means the slab is above ground (ground slab sits at cy = -slabThickness = -1)
   const elevated = conn.from.cells[0].cy > 0;
-  if (!elevated || conn.length < 5) return 'walkway';
-  const chance = conn.length >= CONNECTIVITY.bridgeLongThreshold
-    ? CONNECTIVITY.bridgeLongChance
-    : CONNECTIVITY.bridgeChance;
+  if (!elevated || conn.length < CONNECTIVITY.bridgeMinLength) return 'walkway';
+  const isLong = conn.length >= CONNECTIVITY.bridgeLongThreshold;
+  const chance = isLong ? CONNECTIVITY.bridgeLongChance : CONNECTIVITY.bridgeChance;
   if (!rng.chance(chance)) return 'walkway';
 
-  const entries = Object.entries(CONNECTIVITY.bridgeVariants);
-  const total = entries.reduce((s, [, v]) => s + v.weight, 0);
-  const roll = rng.random() * total;
+  const variants = isLong ? CONNECTIVITY.bridgeVariantsLong : CONNECTIVITY.bridgeVariants;
+  const roll = rng.random() * 100;
   let cum = 0;
-  for (const [name, v] of entries) {
-    cum += v.weight;
+  for (const [name, pct] of Object.entries(variants)) {
+    cum += pct;
     if (roll < cum) return `bridge_${name}`;
   }
   return 'walkway';
@@ -163,21 +161,24 @@ export function rasteriseConnections(data, matrix, rng) {
     for (const cell of conn.spanCells) {
       const key = `${cell.cx},${cell.cy},${cell.cz}`;
       if (!cellOwners.has(key)) cellOwners.set(key, []);
-      cellOwners.get(key).push(conn.id);
+      cellOwners.get(key).push(conn);
     }
   }
 
   const crossingKeys = new Set();
   const crossings = [];
-  const connById = new Map(survivors.map(c => [c.id, c]));
 
   for (const [key, owners] of cellOwners) {
     if (owners.length >= 2) {
       crossingKeys.add(key);
       const [cx, cy, cz] = key.split(',').map(Number);
-      crossings.push({ cx, cy, cz, connectionIds: owners });
-      for (const id of owners) connById.get(id).hasCrossing = true;
+      crossings.push({ cx, cy, cz, connectionIds: owners.map(c => c.id) });
+      for (const conn of owners) conn.hasCrossing = true;
     }
+  }
+
+  if (crossings.length > 0) {
+    console.log(`  Crossings detected: ${crossings.length} cells`);
   }
 
   // 4. Build segments

@@ -246,6 +246,18 @@ function connectivityElements(data, color, config) {
       rects: [box('ladder', l.x, y0, l.z, l.w, y1 - y0, l.d, '#ffdd44')],
     });
   }
+
+  const allPillars = c.pillars || [];
+  const totalP = allPillars.length;
+  for (let i = 0; i < allPillars.length; i++) {
+    const p = allPillars[i];
+    const isBridge = p.connectionType?.startsWith('bridge_');
+    elements.push({
+      label: `Connectivity — pillar ${i + 1}/${totalP} (${p.connectionType})`,
+      rects: [box('pillar', p.x, p.y, p.z, p.w, p.h, p.d, isBridge ? '#cc7733' : '#88bbdd')],
+    });
+  }
+
   return elements;
 }
 

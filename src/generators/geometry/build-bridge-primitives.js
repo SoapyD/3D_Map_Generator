@@ -34,11 +34,13 @@ export function buildBridgePrimitives(bridges) {
         rotateUV: r.w > r.d,
         shared: true,
       });
-      primitives.push({
-        type: 'edges', name: `bridge_${i}`,
-        x: r.x, y: slabY, z: r.z, w: r.w, h: bridgeThickness, d: r.d,
-        textureKey: texKey,
-      });
+      if (!seg.isCrossing) {
+        primitives.push({
+          type: 'edges', name: `bridge_${i}`,
+          x: r.x, y: slabY, z: r.z, w: r.w, h: bridgeThickness, d: r.d,
+          textureKey: texKey,
+        });
+      }
 
       if (seg.isCrossing) continue;
 

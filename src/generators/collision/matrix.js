@@ -42,6 +42,8 @@ export const CELL = {
   // Walkway / bridge span cells — stamped by connectivity Step 7c
   WALKWAY:          105,
   WALKWAY_CROSSING: 106,
+  // Pillar support columns — stamped by connectivity after walkway rasterisation
+  PILLAR:           107,
 };
 
 // Stage enum used in write-history records.
@@ -56,12 +58,13 @@ export const STAGE = {
   WALLS:        7,
   WALLS_INT:    8,
   WALKWAYS:     9,
+  PILLARS:      10,
   UNKNOWN:      255,
 };
 
 const STAGE_NAMES = {
   0: 'buildings', 1: 'floors', 2: 'floors-label', 3: 'roofs', 4: 'roofs-label',
-  5: 'connectivity', 6: 'walls-label', 7: 'walls', 8: 'walls-internal', 9: 'walkways', 255: 'unknown',
+  5: 'connectivity', 6: 'walls-label', 7: 'walls', 8: 'walls-internal', 9: 'walkways', 10: 'pillars', 255: 'unknown',
 };
 
 // Number of cells reserved below world Y=0 (for rivers, sewers, tunnels).
