@@ -2,6 +2,54 @@ import { writeFileSync } from 'fs';
 import { emitAnchors } from './emit-anchors.js';
 import { pairAnchors } from './pair-anchors.js';
 import { filterCandidates } from './filter-candidates.js';
+import { CELL } from '../collision/matrix.js';
+
+// Step 7b-i — vectors pointing FROM anchor cell BACK TO its trigger (floor-edge) cell
+const TO_TRIGGER = { N: [0, 1], S: [0, -1], E: [-1, 0], W: [1, 0] };
+const DOOR_HEIGHT = 3; // cells = full room height
+
+function stampDoors(survivors, matrix) {
+  const cs = matrix.cellSize;
+  const doors = [];
+  const seen = new Set();
+
+  for (const conn of survivors) {
+    for (const anchor of [conn.from, conn.to]) {
+      const [dx, dz] = TO_TRIGGER[anchor.direction];
+      const cy = anchor.cells[0].cy;
+
+      const tc0 = { cx: anchor.cells[0].cx + dx, cz: anchor.cells[0].cz + dz };
+      const tc1 = { cx: anchor.cells[1].cx + dx, cz: anchor.cells[1].cz + dz };
+
+      // Deduplicate — two connections from the same anchor produce the same door
+      const key = `${tc0.cx},${cy},${tc0.cz}|${tc1.cx},${cy},${tc1.cz}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      for (const tc of [tc0, tc1]) {
+        for (let dy = 1; dy <= DOOR_HEIGHT; dy++) {
+          matrix.setCell(tc.cx, cy + dy, tc.cz, CELL.DOOR);
+        }
+      }
+
+      // World-space rect for debug rendering (2 wide × 3 tall)
+      const minCx = Math.min(tc0.cx, tc1.cx);
+      const minCz = Math.min(tc0.cz, tc1.cz);
+      const maxCx = Math.max(tc0.cx, tc1.cx) + 1;
+      const maxCz = Math.max(tc0.cz, tc1.cz) + 1;
+      const wp = matrix.cellToWorld(minCx, cy + 1, minCz);
+      doors.push({
+        anchorId: anchor.id,
+        direction: anchor.direction,
+        x: wp.x, y: wp.y, z: wp.z,
+        w: (maxCx - minCx) * cs,
+        h: DOOR_HEIGHT * cs,
+        d: (maxCz - minCz) * cs,
+      });
+    }
+  }
+  return doors;
+}
 
 export function generateConnectivity(data, config, rng, matrix) {
   const { anchors, triggerCells } = emitAnchors(data, matrix, config);
@@ -102,12 +150,15 @@ export function generateConnectivity(data, config, rng, matrix) {
     writeFileSync('debug_connectivity.json', JSON.stringify(dump, null, 2));
   }
 
+  const doors = stampDoors(survivors, matrix);
+
   return {
     ...data,
     connections: {
       anchors,
       triggerCells,
       candidates: survivors,
+      doors,
       walkways: [],
     },
   };

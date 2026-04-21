@@ -250,7 +250,33 @@ triggerCells: [{ cx, cy, cz }, { cx, cy, cz }]  // the 2 floor-edge cells the an
 
 This was implemented then reverted during earlier work — must be re-added to `emit-anchors.js` (`makeAnchor`) when Step 7 is built.
 
-### Step 7b — Wall generator carves doorways
+### Step 7b — Door cell stamping and wall carving
+
+#### Step 7b-i — Derive orientation and stamp `CELL.DOOR` into collision matrix
+
+Each surviving connection carries `axis: 'NS' | 'WE'` (set during Phase 2 pairing). This directly encodes the door orientation — no recalculation needed.
+
+For each surviving connection, stamp a door volume at **both** ends (`conn.from` and `conn.to` anchors):
+
+**Door geometry:**
+- **Width:** 2 cells — the two trigger cells sit side-by-side along the axis perpendicular to the anchor's facing direction.
+  - N/S-facing anchor → trigger cells are adjacent along the W-E axis
+  - E/W-facing anchor → trigger cells are adjacent along the N-S axis
+- **Height:** 3 cells — full room height, starting at `triggerCell.cy + 1` (first cell above the floor slab) up to `triggerCell.cy + 3` inclusive
+
+**Stamping:**
+```js
+// For each of the 2 trigger cells in the anchor:
+matrix.fillBox(triggerCell.cx, triggerCell.cy + 1, triggerCell.cz, 1, 3, 1, CELL.DOOR);
+// (repeat for both trigger cells to get the full 2-wide opening)
+```
+
+`CELL.DOOR` must be registered as a new constant in `src/generators/collision/matrix.js` and documented in `docs/architecture/collision_matrix.md`. Suggested value: **90**, written by the Connectivity stage.
+
+**Debug visualisation:**
+After all door cells are stamped, emit a grey debug rectangle for each door volume. Each rect covers the 2×3 column of cells (XZ footprint = 2×1, height = 3 cells). Use the same debug recorder pattern as other stages — colour: grey (e.g. `0x888888`).
+
+#### Step 7b-ii — Wall generator carves doorways
 
 Wall generation receives the surviving anchor list. For each anchor's trigger cells, it:
 
@@ -414,14 +440,19 @@ The 0.25" depth is intentionally shallow so end tiles consume minimal matrix spa
 | Phase 1 — Anchor emission | Steps 1–4 | ✅ Complete |
 | Phase 2 — Pair discovery | Steps 5a–5d | ✅ Complete |
 | Phase 3 — Filter pass | Steps 6a–6e | ✅ Complete |
-| Step 7 — Doorway carving + walkway rasterisation | 7a–7c | ⏳ Pending |
+| Pipeline reorder — walls after connectivity | `src/index.js` | ✅ Complete |
+| Step 7a — Trigger cells on anchors | `emit-anchors.js` | ⏳ Pending |
+| Step 7b-i — Door cell stamping + debug draw | Connectivity output pass | ⏳ Pending |
+| Step 7b-ii — Wall pipeline doorway carving | `generateWalls` | ⏳ Pending |
+| Step 7c — Walkway rasterisation | Post-wall pass | ⏳ Pending |
 
 ## Next steps
 
-1. Move `generateWalls` to after `generateConnectivity` in `src/index.js`
+1. ~~Move `generateWalls` to after `generateConnectivity` in `src/index.js`~~ ✅ Done
 2. Re-add `triggerCells` to anchors in `emit-anchors.js` (`makeAnchor`)
-3. Pass surviving anchors into `generateWalls`; implement carve-opening logic in the wall pipeline
-4. Stamp walkway rects into the collision matrix (`CELL.WALKWAY`)
-
-6. Tune `filterStrategy` and `filterN` after visual inspection
-7. Design Phase 4 (final connection culling — perpendicular crossings, density limits)
+3. Register `CELL.DOOR = 90` in `src/generators/collision/matrix.js`; document in `docs/architecture/collision_matrix.md`
+4. After `generateConnectivity` returns surviving connections, iterate each connection's `from`/`to` anchors, stamp `CELL.DOOR` (2×3 per anchor), emit grey debug rects
+5. Pass surviving anchors into `generateWalls`; implement carve-opening logic in the wall pipeline (Step 7b-ii)
+6. Stamp walkway rects into the collision matrix (`CELL.WALKWAY`) (Step 7c)
+7. Tune `filterStrategy` and `filterN` after visual inspection
+8. Design Phase 4 (final connection culling — perpendicular crossings, density limits)

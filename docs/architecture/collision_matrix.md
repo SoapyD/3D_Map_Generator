@@ -68,6 +68,7 @@ The collision matrix is a flat `Uint8Array` covering the full map volume at 1-in
 | `81` | `CELL.INTERNAL_WALL_S` | Walls stage — Phase 1 correction | Internal wall face, south-facing |
 | `82` | `CELL.INTERNAL_WALL_E` | Walls stage — Phase 1 correction | Internal wall face, east-facing |
 | `83` | `CELL.INTERNAL_WALL_W` | Walls stage — Phase 1 correction | Internal wall face, west-facing |
+| `90` | `CELL.DOOR` | Connectivity stage — Step 7b-i | Doorway opening — stamped into the building shell (2 cells wide × 3 cells tall) at each surviving anchor's trigger-cell position, before wall generation runs. Wall generator reads these to carve openings. |
 
 ---
 
@@ -110,10 +111,11 @@ With defaults: `slabY(i) = i * 4 - 1`
 1. **Buildings** — `fillBox` entire building volume with `CELL.SHELL`
 2. **Floors** — `fillBox` each interior floor slab (index 0 to maxTier−2) with `CELL.FLOOR`
 3. **Roofs** — `fillBox` top slab (index maxTier−1) with `CELL.ROOF`; label pass marks exposed edges as `CELL.ROOF_N/S/E/W`
-4. **Walls Pass 1** — overwrite each exposed-edge FLOOR cell with `CELL.FLOOR_N/S/E/W` (and END/ISLAND variants)
-5. **Walls Pass 2** — `fillBox` each wall segment with `CELL.WALL_N/S/E/W` (never above roof level)
+4. **Connectivity** — stamps `CELL.DOOR` (value 90) into the shell volume at each surviving anchor's trigger-cell position (2 wide × 3 tall), marking where the wall generator must carve doorway openings
+5. **Walls Pass 1** — overwrite each exposed-edge FLOOR cell with `CELL.FLOOR_N/S/E/W` (and END/ISLAND variants)
+6. **Walls Pass 2** — `fillBox` each wall segment with `CELL.WALL_N/S/E/W`, skipping cells already marked `CELL.DOOR` (never above roof level)
 
-Later stages (connectivity, cover) will add further types as the pipeline is extended.
+Later stages (cover, ladders) will add further types as the pipeline is extended.
 
 ---
 

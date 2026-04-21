@@ -77,19 +77,19 @@ async function main() {
   console.log(`  ${roofData.roofs.length} roof slabs`);
   recorder?.capture(5, roofData);
 
-  // Stage 5: Walls
-  console.log('[5/5] Generating walls...');
-  const wallData = generateWalls(roofData, config, rng, matrix);
-  console.log(`  ${wallData.walls.length} wall segments`);
-  recorder?.capture(6, wallData);
-
-  // Stage 6: Connectivity
-  console.log('[6/6] Generating connectivity...');
-  const connectivityData = generateConnectivity(wallData, config, rng, matrix);
+  // Stage 5: Connectivity
+  console.log('[5/6] Generating connectivity...');
+  const connectivityData = generateConnectivity(roofData, config, rng, matrix);
   console.log(`  ${connectivityData.connections.anchors.length} anchors, ${connectivityData.connections.candidates.length} candidate connections`);
   recorder?.capture(7, connectivityData);
 
-  const geometry = buildGeometry(connectivityData, config);
+  // Stage 6: Walls
+  console.log('[6/6] Generating walls...');
+  const wallData = generateWalls(connectivityData, config, rng, matrix);
+  console.log(`  ${wallData.walls.length} wall segments`);
+  recorder?.capture(6, wallData);
+
+  const geometry = buildGeometry(wallData, config);
 
   // Export
   await mkdir(config.outputDir, { recursive: true });

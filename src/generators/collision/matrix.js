@@ -30,6 +30,8 @@ export const CELL = {
   IFLOOR_ISLAND: 74,
   // Internal wall markers (logged at wall position, no geometry generated)
   INTERNAL_WALL_N: 80, INTERNAL_WALL_S: 81, INTERNAL_WALL_E: 82, INTERNAL_WALL_W: 83,
+  // Doorway openings — stamped by connectivity into the building shell before wall generation
+  DOOR: 90,
 };
 
 // Number of cells reserved below world Y=0 (for rivers, sewers, tunnels).

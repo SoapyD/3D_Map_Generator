@@ -191,6 +191,14 @@ function connectivityElements(data, color, config) {
     });
   }
 
+  const doors = c.doors || [];
+  for (const d of doors) {
+    elements.push({
+      label: `Connectivity — door ${d.anchorId} (${d.direction})`,
+      rects: [box('door', d.x, d.y, d.z, d.w, d.h, d.d, '#888888', 0.7)],
+    });
+  }
+
   const allCandidates = c.candidates || [];
   const totalC = allCandidates.length;
   for (let i = 0; i < allCandidates.length; i++) {
