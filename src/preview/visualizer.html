@@ -139,7 +139,6 @@
         <label><input type="checkbox" id="group-iwalls">  <span style="color:#885533">IWalls</span></label>
         <label><input type="checkbox" id="group-doors" checked>  <span style="color:#888888">Doors</span></label>
         <label><input type="checkbox" id="group-iroofs"> <span style="color:#886644">IRoofs</span></label>
-        <label><input type="checkbox" id="group-empty">          <span style="color:#444466">Empty</span></label>
       </div>
     </div>
     <div id="legend"></div>
@@ -531,7 +530,6 @@
       { value: 102, label: 'IRoof End E',    color: 0x997755, id: 'grid-iroof-end-e' },
       { value: 103, label: 'IRoof End W',    color: 0x997755, id: 'grid-iroof-end-w' },
       { value: 104, label: 'IRoof Island',   color: 0xaa8866, id: 'grid-iroof-island' },
-      { value: 255, label: 'Empty',          color: 0x222244, id: 'grid-empty' },
     ];
 
     const CELL_GROUPS = [
@@ -544,7 +542,6 @@
       { id: 'group-iwalls',    values: new Set([80,81,82,83]) },
       { id: 'group-doors',     values: new Set([90]) },
       { id: 'group-iroofs',    values: new Set([91,92,93,94,95,96,97,98,100,101,102,103,104]) },
-      { id: 'group-empty',     values: new Set([255]) },
     ];
     const CUBE_EDGES = [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
 
