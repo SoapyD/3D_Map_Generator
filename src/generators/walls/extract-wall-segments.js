@@ -1,4 +1,4 @@
-import { CELL } from '../collision/matrix.js';
+import { CELL, STAGE } from '../collision/matrix.js';
 import { WALL } from '../../config.js';
 
 // Each direction collects its own label set (exterior + interior variants) plus
@@ -195,6 +195,7 @@ export function extractWallSegments(data, config, matrix) {
           x = ox + fixedVal * s;            z = oz + runStart * s; w = t; d = runLength * s;
         }
 
+        matrix.setWriteContext(STAGE.WALLS_INT, internalWalls.length);
         internalWalls.push({ direction: dir, floorY: cy, x, y: wallWorldY, z, w, h: tierHeight, d });
         matrix.fillBox(x, wallWorldY, z, w, tierHeight, d, intWallCell);
       }
@@ -236,6 +237,7 @@ export function extractWallSegments(data, config, matrix) {
           }
 
           if (isInternal) {
+            matrix.setWriteContext(STAGE.WALLS_INT, internalWalls.length);
             internalWalls.push({ direction: face, floorY: cy, x, y: wallWorldY, z, w, h: tierHeight, d });
             matrix.fillBox(x, wallWorldY, z, w, tierHeight, d, FACE_INT_WALL[face]);
           } else {

@@ -2,7 +2,7 @@ import { writeFileSync } from 'fs';
 import { emitAnchors } from './emit-anchors.js';
 import { pairAnchors } from './pair-anchors.js';
 import { filterCandidates } from './filter-candidates.js';
-import { CELL } from '../collision/matrix.js';
+import { CELL, STAGE } from '../collision/matrix.js';
 
 // Step 7b-i — vectors pointing FROM anchor cell BACK TO its trigger (floor-edge) cell
 const TO_TRIGGER = { N: [0, 1], S: [0, -1], E: [-1, 0], W: [1, 0] };
@@ -26,6 +26,7 @@ function stampDoors(survivors, matrix) {
       if (seen.has(key)) continue;
       seen.add(key);
 
+      matrix.setWriteContext(STAGE.CONNECTIVITY, doors.length);
       for (const tc of [tc0, tc1]) {
         for (let dy = 1; dy <= DOOR_HEIGHT; dy++) {
           matrix.setCell(tc.cx, cy + dy, tc.cz, CELL.DOOR);

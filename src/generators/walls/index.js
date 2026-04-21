@@ -3,7 +3,7 @@ import { subdivideWall }       from './subdivide-wall.js';
 import { buildWindowPlans, applyWindowPlan } from './place-windows.js';
 import { applyBlobDamage }     from './apply-blob-damage.js';
 import { mergeWallCells }      from './merge-wall-cells.js';
-import { CELL } from '../collision/matrix.js';
+import { CELL, STAGE } from '../collision/matrix.js';
 import { WALL } from '../../config.js';
 
 const WALL_CELL = { N: CELL.WALL_N, S: CELL.WALL_S, E: CELL.WALL_E, W: CELL.WALL_W };
@@ -72,6 +72,7 @@ export function generateWalls(data, config, rng, matrix) {
     if (WALL.applyWindows) applyWindowPlan(grid, wall, plan, data.buildings[bi]);
 
     for (const seg of mergeWallCells(grid, wall)) {
+      matrix.setWriteContext(STAGE.WALLS, walls.length);
       walls.push(seg);
       matrix.fillBoxUnless(seg.x, seg.y, seg.z, seg.w, seg.h, seg.d, WALL_CELL[wall.direction], CELL.DOOR);
     }

@@ -178,8 +178,8 @@ Once Step 3 (JSON output) is implemented, load the history file in the visualise
 
 | Step | Description | Status |
 |---|---|---|
-| Step 1 | Matrix history internals | ⏳ Pending |
-| Step 2 | Propagate context through callers | ⏳ Pending |
-| Step 3 | JSON output | ⏳ Pending |
+| Step 1 | Matrix history internals | ✅ Implemented |
+| Step 2 | Propagate context through callers | ✅ Implemented |
+| Step 3 | JSON output | ✅ Implemented |
 | Step 4 | Visualiser: solid cell fills | ✅ Implemented |
 | Step 5 | Visualiser: conflict highlighting | ⏳ Pending |

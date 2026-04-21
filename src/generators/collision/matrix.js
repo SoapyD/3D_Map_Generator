@@ -41,6 +41,25 @@ export const CELL = {
   IROOF_ISLAND: 104,
 };
 
+// Stage enum used in write-history records.
+export const STAGE = {
+  BUILDINGS:    0,
+  FLOORS:       1,
+  FLOORS_LABEL: 2,
+  ROOFS:        3,
+  ROOFS_LABEL:  4,
+  CONNECTIVITY: 5,
+  WALLS_LABEL:  6,
+  WALLS:        7,
+  WALLS_INT:    8,
+  UNKNOWN:      255,
+};
+
+const STAGE_NAMES = {
+  0: 'buildings', 1: 'floors', 2: 'floors-label', 3: 'roofs', 4: 'roofs-label',
+  5: 'connectivity', 6: 'walls-label', 7: 'walls', 8: 'walls-internal', 255: 'unknown',
+};
+
 // Number of cells reserved below world Y=0 (for rivers, sewers, tunnels).
 export const BELOW_GROUND = 12;
 
@@ -57,6 +76,12 @@ export function createCollisionMatrix(activeArea, maxTiers, tierHeight, slabThic
   // cy is a world cell coordinate; negative values address below-ground cells.
   const data = new Uint8Array(W * D * totalY);
   data.fill(CELL.EMPTY);
+
+  // Write history — always-on, sparse Map of 5-byte records per cell.
+  // Record layout: [prev:Uint8, next:Uint8, stage:Uint8, sourceIndex:Uint16LE]
+  const history = new Map();
+  let writeCtxStage = STAGE.UNKNOWN;
+  let writeCtxSource = 0;
 
   function inBounds(cx, cy, cz) {
     return cx >= 0 && cx < W && cy >= -BELOW_GROUND && cy < maxY && cz >= 0 && cz < D;
@@ -78,22 +103,46 @@ export function createCollisionMatrix(activeArea, maxTiers, tierHeight, slabThic
     return { x: cx * cellSize + ox, y: cy * cellSize, z: cz * cellSize + oz };
   }
 
+  function recordWrite(cellIndex, prev, next) {
+    if (prev === next) return;
+    let buf = history.get(cellIndex);
+    const offset = buf ? buf.length : 0;
+    const next_buf = new Uint8Array(offset + 5);
+    if (buf) next_buf.set(buf);
+    next_buf[offset]     = prev;
+    next_buf[offset + 1] = next;
+    next_buf[offset + 2] = writeCtxStage;
+    next_buf[offset + 3] = writeCtxSource & 0xff;
+    next_buf[offset + 4] = (writeCtxSource >> 8) & 0xff;
+    history.set(cellIndex, next_buf);
+  }
+
   return {
     W, D, maxY, ox, oz, cellSize,
     CELL,
     worldToCell,
     cellToWorld,
+    setWriteContext(stage, sourceIndex) {
+      writeCtxStage  = stage;
+      writeCtxSource = sourceIndex;
+    },
     isOccupied(cx, cy, cz) {
       return inBounds(cx, cy, cz) && data[idx(cx, cy, cz)] !== CELL.EMPTY;
     },
     setCellType(cx, cy, cz, type) {
-      if (inBounds(cx, cy, cz)) data[idx(cx, cy, cz)] = type;
+      if (!inBounds(cx, cy, cz)) return;
+      const i = idx(cx, cy, cz);
+      recordWrite(i, data[i], type);
+      data[i] = type;
     },
     getCell(cx, cy, cz) {
       return inBounds(cx, cy, cz) ? data[idx(cx, cy, cz)] : CELL.EMPTY;
     },
     setCell(cx, cy, cz, value = CELL.FLOOR) {
-      if (inBounds(cx, cy, cz)) data[idx(cx, cy, cz)] = value;
+      if (!inBounds(cx, cy, cz)) return;
+      const i = idx(cx, cy, cz);
+      recordWrite(i, data[i], value);
+      data[i] = value;
     },
     fillBox(x, y, z, w, h, d, value = CELL.FLOOR) {
       const c0 = worldToCell(x, y, z);
@@ -104,7 +153,11 @@ export function createCollisionMatrix(activeArea, maxTiers, tierHeight, slabThic
       for (let cy = c0.cy; cy < cyEnd; cy++)
         for (let cz = c0.cz; cz < czEnd; cz++)
           for (let cx = c0.cx; cx < cxEnd; cx++)
-            if (inBounds(cx, cy, cz)) data[idx(cx, cy, cz)] = value;
+            if (inBounds(cx, cy, cz)) {
+              const i = idx(cx, cy, cz);
+              recordWrite(i, data[i], value);
+              data[i] = value;
+            }
     },
     // Like fillBox but skips any cell whose current value matches skipValue.
     fillBoxUnless(x, y, z, w, h, d, value, skipValue) {
@@ -115,8 +168,30 @@ export function createCollisionMatrix(activeArea, maxTiers, tierHeight, slabThic
       for (let cy = c0.cy; cy < cyEnd; cy++)
         for (let cz = c0.cz; cz < czEnd; cz++)
           for (let cx = c0.cx; cx < cxEnd; cx++)
-            if (inBounds(cx, cy, cz) && data[idx(cx, cy, cz)] !== skipValue)
-              data[idx(cx, cy, cz)] = value;
+            if (inBounds(cx, cy, cz) && data[idx(cx, cy, cz)] !== skipValue) {
+              const i = idx(cx, cy, cz);
+              recordWrite(i, data[i], value);
+              data[i] = value;
+            }
+    },
+    getCellHistory(cx, cy, cz) {
+      if (!inBounds(cx, cy, cz)) return undefined;
+      const buf = history.get(idx(cx, cy, cz));
+      if (!buf) return undefined;
+      const records = [];
+      for (let o = 0; o < buf.length; o += 5) {
+        records.push({
+          prev:        buf[o],
+          next:        buf[o + 1],
+          stage:       buf[o + 2],
+          stageName:   STAGE_NAMES[buf[o + 2]] ?? 'unknown',
+          sourceIndex: buf[o + 3] | (buf[o + 4] << 8),
+        });
+      }
+      return records;
+    },
+    dumpHistory() {
+      return history;
     },
     toDebugJSON() {
       return { W, D, maxY, belowGround: BELOW_GROUND, ox, oz, cellSize, cells: Array.from(data) };

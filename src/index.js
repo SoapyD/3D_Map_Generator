@@ -10,7 +10,7 @@ import { parseArgs } from './config.js';
 import { createRng } from './core/rng.js';
 import { generateGrid } from './generators/foundations/grid.js';
 import { generateBuildings } from './generators/buildings/index.js';
-import { createCollisionMatrix, CELL } from './generators/collision/matrix.js';
+import { createCollisionMatrix, CELL, STAGE, BELOW_GROUND } from './generators/collision/matrix.js';
 import { generateFloors } from './generators/floors/index.js';
 import { generateRoofs } from './generators/roofs/index.js';
 import { generateWalls } from './generators/walls/index.js';
@@ -52,6 +52,7 @@ async function main() {
   // Buildings will overwrite their footprints with SHELL; remaining cells mark
   // non-building foundation and street areas for future geometry stages.
   const slabY = -config.slabThickness;
+  matrix.setWriteContext(STAGE.BUILDINGS, 0);
   for (const block of gridData.blocks) {
     matrix.fillBox(block.x, slabY, block.z, block.w, config.slabThickness, block.d, CELL.FOUNDATION_PLACEHOLDER);
   }
@@ -93,6 +94,33 @@ async function main() {
 
   // Export
   await mkdir(config.outputDir, { recursive: true });
+
+  if (config.debugMatrix) {
+    const { dir: mDir, baseName: mBase } = getObjOutputPath(config);
+    const historyOut = [];
+    const rawHistory = matrix.dumpHistory();
+    const { cellSize: cs, W: mW, D: mD } = matrix;
+    for (const [cellIndex, buf] of rawHistory) {
+      const writes = [];
+      for (let o = 0; o < buf.length; o += 5) {
+        writes.push({
+          prev: buf[o], next: buf[o + 1],
+          stage: buf[o + 2],
+          stageName: ['buildings','floors','floors-label','roofs','roofs-label','connectivity','walls-label','walls','walls-internal'][buf[o + 2]] ?? 'unknown',
+          sourceIndex: buf[o + 3] | (buf[o + 4] << 8),
+        });
+      }
+      if (writes.length < 2) continue; // skip single-write cells by default
+      const cy_arr = Math.floor(cellIndex / (mW * mD));
+      const rem    = cellIndex % (mW * mD);
+      const cz     = Math.floor(rem / mW);
+      const cx     = rem % mW;
+      historyOut.push({ cx, cy: cy_arr - BELOW_GROUND, cz, writes });
+    }
+    const histPath = path.join(mDir, `${mBase}_matrix_history.json`);
+    await writeFile(histPath, JSON.stringify({ cells: historyOut }, null, 2));
+    console.log(`  Matrix history: ${histPath}`);
+  }
 
   if (recorder) {
     await writeFile(`${config.outputDir}/debug_frames.json`, recorder.serialize());

@@ -1,4 +1,4 @@
-import { CELL } from '../collision/matrix.js';
+import { CELL, STAGE } from '../collision/matrix.js';
 import { labelCells } from '../utils/label-cells.js';
 
 function isRoofCell(v) {
@@ -15,7 +15,13 @@ function allShell(...neighbours) {
 export function labelRoofCells(data, matrix) {
   const yLevels = new Set(data.roofs.map(r => r.yCollisionLevel));
 
+  const buildingIndexForLevel = new Map();
+  for (let i = 0; i < data.roofs.length; i++) {
+    buildingIndexForLevel.set(data.roofs[i].yCollisionLevel, data.roofs[i].buildingIndex);
+  }
+
   labelCells(yLevels, matrix, isRoofCell, (cx, cy, cz, expN, expS, expE, expW, nN, nS, nE, nW) => {
+    matrix.setWriteContext(STAGE.ROOFS_LABEL, buildingIndexForLevel.get(cy) ?? 0);
     const expCount = (expN ? 1 : 0) + (expS ? 1 : 0) + (expE ? 1 : 0) + (expW ? 1 : 0);
 
     if (expCount === 0) return null;

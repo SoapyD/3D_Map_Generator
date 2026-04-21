@@ -141,6 +141,11 @@ export function parseArgs(argv) {
       continue;
     }
 
+    if (arg === '--debug-matrix') {
+      config.debugMatrix = true;
+      continue;
+    }
+
     if (arg === '--obj') {
       config.obj = true;
       continue;
