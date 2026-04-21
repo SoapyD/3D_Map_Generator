@@ -1,7 +1,7 @@
 # Connectivity Plan v2
 
 **Created:** 2026-04-20
-**Last updated:** 2026-04-20
+**Last updated:** 2026-04-21
 **Supersedes:** `CONNECTIVITY_PLAN_2026_04_20.md` (v1 — Delaunay + MST approach)
 **Depends on:** Walls Phase 2 (complete), Floors (complete)
 **Source reference:** `src/generators/_old_system/connectivity/`
@@ -186,24 +186,26 @@ Pruning, prioritisation, and conflict resolution happen in Phase 3.
 
 Phase 2 produced every possible anchor pair. Phase 3 trims that list down to a curated set per tier. It begins by collapsing vertically-stacked duplicates across all tiers before any per-tier filtering runs.
 
-### Step 6a — Vertical stacking detection and cull
+### Step 6a — Vertical stacking detection and cull ✅ IMPLEMENTED
 
-A vertical stack occurs when two or more candidates from **different tiers** share the same XZ footprint — i.e. they occupy the same x, z, w, d on the ground plane (same axis, same start/end positions projected down). They are the same walkway path repeated at multiple heights.
+A vertical stack occurs when two or more candidates overlap in the same XZ lane — same axis, same perpendicular coordinate, and their spans along the travel axis overlap (even partially). These represent walkways that would stack on top of each other between the same pair of wall faces.
 
-1. Collect all candidates from all tiers into a single flat list
-2. For each candidate, compute a **stack key** from its `debugRect`: `"${axis}|${x}|${z}|${w}|${d}"` (y is excluded — the tier)
-3. Group candidates by stack key. Groups with only one member are not stacks
-4. Assign each stack group a unique `stackGroupId`
-5. For each group of 2+, randomly select one survivor (seeded RNG). Mark the rest with `stackCulled: true`
-6. Remove culled candidates before the per-tier passes below
+Implementation uses **union-find (path-halving)** to group overlapping candidates within each lane:
 
-### Step 6b — Group and sort
+1. Compute a lane key: `"${axis}|${perp}"` where perp is `z` for WE axis, `x` for NS axis
+2. Within each lane, union-find any pair where their travel-axis spans overlap
+3. For each connected component of 2+, pick the longest span as the survivor (seeded RNG breaks ties among equally-long candidates)
+4. Mark all others `stackCulled: true`; mark their anchors `stackCulled: true` if all their connections were culled
+
+`src/generators/connectivity/index.js` — stacking logic runs as the first pass in `generateConnectivity`.
+
+### Step 6b — Group and sort ✅ IMPLEMENTED
 
 For each tier's remaining candidate list:
 1. Group candidates by `fromBuildingId`
 2. Within each group, sort by `length` ascending
 
-### Step 6c — Per-building selection strategy
+### Step 6c — Per-building selection strategy ✅ IMPLEMENTED
 
 A config key `filterStrategy` selects one of:
 
@@ -214,7 +216,9 @@ A config key `filterStrategy` selects one of:
 | `shortest` | Keep the N shortest per building |
 | `random` | Keep N seeded-random per building |
 
-### Step 6d — Per-building filter loop
+`src/generators/connectivity/filter-candidates.js`
+
+### Step 6d — Per-building filter loop ✅ IMPLEMENTED
 
 For each building's sorted candidate list:
 
@@ -225,20 +229,40 @@ For each building's sorted candidate list:
 5. Repeat until N has been satisfied for this building, or no candidates remain
 6. Move to the next building
 
-### Step 6e — Per-tier scope
+### Step 6e — Per-tier scope ✅ IMPLEMENTED
 
 Each tier's filter runs independently and writes into its own filtered array. The same two buildings *can* be connected at multiple tiers — vertical stacking has already been resolved by Step 6a, so any multi-tier connections that survive to this point are genuinely distinct paths.
 
 ---
 
-## Step 7 — Walkway rasterisation and validation
+## Step 7 — Doorway carving and walkway rasterisation
 
-After Phase 3 has produced the filtered per-tier connection list, for each surviving connection:
+⚠️ **Pipeline order change (2026-04-21):** `generateWalls` must be called **after** `generateConnectivity` in `src/index.js`. This allows the wall generator to receive the final surviving anchor list and carve doorways as part of its own subdivide → damage → windows → **carve doorways** → merge pass, rather than connectivity reaching back into wall data.
 
-1. Stamp the walkway rect into the collision matrix with a dedicated cell value (e.g. `CELL.WALKWAY`)
-2. Scan the walkway span for wall cells (`20–23`) encountered along the way
-3. If walls intersect the span → flag walkway as `blocked = true` (carry-over from v1)
-4. No fallback routing — blocked walkways remain blocked; downstream culling or ladders handle fallback
+### Step 7a — Connectivity outputs anchor/trigger data
+
+`generateConnectivity` must attach `triggerCells` to each anchor before returning. Trigger cells carry the collision matrix cell coordinates (`cx`, `cy`, `cz`) needed by the wall generator to locate the correct wall segments:
+
+```js
+// on each anchor:
+triggerCells: [{ cx, cy, cz }, { cx, cy, cz }]  // the 2 floor-edge cells the anchor fired from
+```
+
+This was implemented then reverted during earlier work — must be re-added to `emit-anchors.js` (`makeAnchor`) when Step 7 is built.
+
+### Step 7b — Wall generator carves doorways
+
+Wall generation receives the surviving anchor list. For each anchor's trigger cells, it:
+
+1. Locates the outward wall face at that position (direction matches the anchor direction)
+2. Carves a 2-cell-wide × `tierHeight`-tall opening — re-subdivide the wall segment, kill columns overlapping `[openStart, openEnd]`, re-merge
+3. Carves both ends of each connection (both `conn.from` and `conn.to` anchors)
+
+The opening is carved **during the wall pipeline** so subdivide/merge runs naturally around doorways rather than needing to be re-applied after the fact.
+
+### Step 7c — Walkway rasterisation
+
+After doorways are carved, stamp each surviving walkway rect into the collision matrix with `CELL.WALKWAY` for downstream stages (Cover etc.) to read.
 
 ---
 
@@ -256,9 +280,18 @@ After Phase 3 has produced the filtered per-tier connection list, for each survi
 
 ## Pipeline position
 
-Runs after Walls Phase 2 and before Cover.
-Reads `FLOOR_*`, `IFLOOR_*`, and wall cells from the collision matrix.
-Writes accepted walkways to `data.connections.walkways` **and** back into the collision matrix (so Cover and later sub-stages see them as occupied).
+**Updated order (2026-04-21):**
+
+```
+generateGrid → generateBuildings → generateFloors → generateRoofs
+  → generateConnectivity        ← reads FLOOR_*/IFLOOR_* labels, outputs surviving anchors
+  → generateWalls               ← receives anchor list, carves doorways during wall pipeline
+  → Cover
+```
+
+Previously walls ran before connectivity. They must now run after so the wall generator can receive the final anchor set and carve doorways in a single coordinated pass.
+
+`src/index.js` stage order change is **pending** — not yet applied.
 
 ---
 
@@ -342,18 +375,11 @@ Phase 3 filters per-building and removes cross-tier stacks, but the surviving se
 
 Phase 4 must define the final pass that resolves these conflicts. Open question already flagged (#6). Strategy, priority rules, and config keys TBD.
 
-### Phase 5 — Trigger/anchor doorway deletion *(not yet designed)*
+### Phase 5 — Doorway carving *(approach defined, not yet implemented — see Step 7)*
 
-The trigger cell (the `FLOOR_*` / `IFLOOR_*` edge where an anchor fired from) may have a wall cell directly above it. Without removal, the walkway connects to a floor edge that is *behind* a wall — the player can reach the walkway but cannot step from the walkway onto the building.
+Superseded by the pipeline order change. Doorway carving now belongs in the wall generator rather than as a post-connectivity phase. See **Step 7** above for the revised approach.
 
-Phase 5 must define how trigger-point walls are cleared to form doorways:
-
-- Which wall cells get removed (trigger cell, anchor cell, or both sides of the gap?)
-- Doorway height and width (carry over from the old `carveLadderDoorway` logic?)
-- Interaction with partial walls (`FLOOR_NE` corner cells border two wall runs)
-- What happens when a walkway is flagged `blocked=true` by Step 7 — skip the doorway carve?
-
-Equivalent to the old system's `carve-ladder-doorway.js` but applied to walkway trigger points.
+All three files from the earlier attempt have been deleted: `carve-doorways.js`, `identify-doorway-walls.js`, `carve-opening.js`. The wall generator will need a new carve-opening implementation when Step 7 is built.
 
 ---
 
@@ -381,8 +407,21 @@ The 0.25" depth is intentionally shallow so end tiles consume minimal matrix spa
 
 ---
 
+## Implementation status
+
+| Phase | Steps | Status |
+|---|---|---|
+| Phase 1 — Anchor emission | Steps 1–4 | ✅ Complete |
+| Phase 2 — Pair discovery | Steps 5a–5d | ✅ Complete |
+| Phase 3 — Filter pass | Steps 6a–6e | ✅ Complete |
+| Step 7 — Doorway carving + walkway rasterisation | 7a–7c | ⏳ Pending |
+
 ## Next steps
 
-- Prototype Phase 1 (anchor emission) + Phase 2 (pair discovery) + Phase 3 (filter) against an existing seed and visualise each phase's output in the preview tool
-- Tune `filterStrategy` and `filterN` defaults after visual inspection
-- Revisit `anchorPeriod` default after visual inspection
+1. Move `generateWalls` to after `generateConnectivity` in `src/index.js`
+2. Re-add `triggerCells` to anchors in `emit-anchors.js` (`makeAnchor`)
+3. Pass surviving anchors into `generateWalls`; implement carve-opening logic in the wall pipeline
+4. Stamp walkway rects into the collision matrix (`CELL.WALKWAY`)
+
+6. Tune `filterStrategy` and `filterN` after visual inspection
+7. Design Phase 4 (final connection culling — perpendicular crossings, density limits)
