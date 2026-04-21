@@ -1,6 +1,7 @@
 # Collision Matrix Write History
 
 **Created:** 2026-04-21
+**Last updated:** 2026-04-21
 **Status:** Planned — not yet implemented
 
 ---
@@ -19,48 +20,80 @@ This makes it hard to diagnose bugs where a stage silently overwrites another st
 
 ## Goal
 
-Add an optional write-history layer to the collision matrix that records every write to every cell: what the previous value was, what the new value is, and what object caused the change. The history is off by default (zero cost in production) and enabled via a config flag for debugging sessions.
+Add an always-on write-history layer to the collision matrix that records every non-empty write to every cell: what the previous value was, what the new value is, which pipeline stage made the change, and a direct index into that stage's source array so the exact object can be retrieved without any bounding-box lookups.
+
+History is stored in a compact typed format — **5 bytes per write record** — making it negligible to keep alive for every generation run.
 
 ---
 
 ## Design
 
-### History record
+### Record format — 5 bytes per write
 
-Each write appends one record to a per-cell log:
+Each write appends 5 bytes to a per-cell `Uint8Array` buffer:
+
+| Byte(s) | Field | Type | Notes |
+|---|---|---|---|
+| 0 | `prev` | `Uint8` | Cell value before this write |
+| 1 | `next` | `Uint8` | Cell value after this write |
+| 2 | `stage` | `Uint8` | Stage enum — see table below |
+| 3–4 | `sourceIndex` | `Uint16LE` | Index into that stage's source array (see below) |
+
+`sourceIndex` supports up to 65,535 objects per stage — sufficient for all current and foreseeable pipeline stages.
+
+### Stage enum
+
+| Value | Stage | Source array |
+|---|---|---|
+| `0` | Buildings | `data.buildings[]` |
+| `1` | Floors | `data.floors[]` |
+| `2` | Floors — label pass | `data.floors[]` (nearest building by index) |
+| `3` | Roofs | `data.roofs[]` |
+| `4` | Roofs — label pass | `data.roofs[]` (nearest building by index) |
+| `5` | Connectivity | `data.connections.doors[]` |
+| `6` | Walls — Pass 1 (floor labels) | `data.floors[]` (nearest building by index) |
+| `7` | Walls — Pass 2 (segments) | `data.walls[]` |
+| `8` | Walls — internal | `data.internalWalls[]` |
+| `255` | Unknown / no source | — (`sourceIndex` ignored) |
+
+Label passes (floor edge labelling, roof label pass, wall pass 1) don't iterate a natural per-object array — they scan the matrix and overwrite in place. For these, `sourceIndex` points to the nearest building index in the relevant array, which is sufficient to trace which building's geometry was being labelled.
+
+### Storage — sparse Map of typed buffers
 
 ```js
-{
-  prev:   Number,   // cell value before this write
-  next:   Number,   // cell value after this write
-  stage:  String,   // pipeline stage name, e.g. 'walls', 'connectivity'
-  source: String,   // identifying string for the object that caused the write,
-                    // e.g. 'wall:N:b03', 'door:A0012', 'floor:b03:tier1'
-}
+// history: Map<cellIndex, Uint8Array>
+// Each Uint8Array grows in 5-byte increments, one per write.
+// Cells never written have no entry.
 ```
 
-Per-cell logs are stored in a sparse `Map<cellIndex, record[]>` — cells that are never written have no entry, keeping memory cost proportional to actual writes rather than matrix volume.
+A sparse `Map<cellIndex, Uint8Array>` is used — cells that are never written have no entry, keeping memory cost proportional to actual writes rather than matrix volume.
 
-### Matrix API additions
+**Memory estimate (default 48×48 map):**
+- ~20,000 written cells × 1.2 average writes × 5 bytes = **~120 KB**
+- Map entry overhead (V8): ~100 bytes per key × 20,000 entries = ~2 MB total with overhead
+- Well within always-on budget for a Node.js generation process
 
-Two new methods on the matrix object, only active when `config.debugMatrix` is true:
+### Matrix API
 
 ```js
-// Existing methods gain an optional context parameter:
-matrix.setCell(cx, cy, cz, value, context)
-matrix.fillBox(x, y, z, w, h, d, value, context)
-matrix.fillBoxUnless(x, y, z, w, h, d, value, skipValue, context)
+// Existing methods — unchanged external signatures, history recorded internally:
+matrix.setCell(cx, cy, cz, value)
+matrix.fillBox(x, y, z, w, h, d, value)
+matrix.fillBoxUnless(x, y, z, w, h, d, value, skipValue)
 
-// New read methods:
-matrix.getCellHistory(cx, cy, cz)  // → record[] | undefined
-matrix.dumpHistory()               // → Map<cellIndex, record[]> — full history
+// Set once per source object before a write batch (not once per cell):
+matrix.setWriteContext(stage, sourceIndex)
+
+// Read methods:
+matrix.getCellHistory(cx, cy, cz)
+// → Array of decoded records: [{ prev, next, stage, stageName, sourceIndex }, ...]
+// → undefined if cell was never written
+
+matrix.dumpHistory()
+// → Map<cellIndex, Uint8Array> — raw buffer map for serialisation
 ```
 
-`context` is an object `{ stage, source }`. When `config.debugMatrix` is false, the context parameter is accepted but ignored — no branching in callers, no cost.
-
-### Enabling
-
-Add `debugMatrix: true` to the config (CLI flag `--debug-matrix`). When set, the matrix constructor allocates the history map and all write methods record to it.
+`setWriteContext` is called once per source object (e.g. once per wall segment before its `fillBox`), not once per cell — keeping call overhead minimal. No change to existing call sites is needed until Step 2 wires up context.
 
 ---
 
@@ -70,29 +103,27 @@ Add `debugMatrix: true` to the config (CLI flag `--debug-matrix`). When set, the
 
 In `src/generators/collision/matrix.js`:
 
-1. Accept `debugMatrix` flag in `createCollisionMatrix(activeArea, maxTiers, tierHeight, slabThickness, debugMatrix)`
-2. Allocate `const history = debugMatrix ? new Map() : null`
-3. Add internal `recordWrite(cellIndex, prev, next, context)` helper — no-ops when `history` is null
-4. Wrap each write in `setCell`, `fillBox`, `fillBoxUnless` with a `recordWrite` call before the assignment
-5. Expose `getCellHistory(cx, cy, cz)` and `dumpHistory()`
+1. Allocate `const history = new Map()` and `let writeCtxStage = 255, writeCtxSource = 0` unconditionally on matrix creation — no flag needed
+2. Add internal `recordWrite(cellIndex, prev, next)` — appends 5 bytes to `history.get(cellIndex)`, creating the buffer if absent; skips when `prev === next` (no-op writes)
+3. Call `recordWrite` inside `setCell`, `fillBox`, `fillBoxUnless` before each assignment
+4. Expose `setWriteContext(stage, sourceIndex)`, `getCellHistory(cx, cy, cz)`, `dumpHistory()`
 
 ### Step 2 — Propagate context through callers
 
-Each pipeline stage that writes to the matrix gains a `{ stage, source }` context on its write calls. Suggested source strings per stage:
+Each pipeline stage calls `matrix.setWriteContext(stageEnum, index)` once before writing each source object's cells:
 
-| Stage | Example source string |
-|---|---|
-| Buildings | `'shell:b03'` |
-| Floors | `'floor:b03:tier1'` |
-| Roofs | `'roof:b03'` |
-| Walls | `'wall:N:b03'` |
-| Connectivity | `'door:A0012'` |
+```js
+// Example — walls stage (Pass 2):
+for (let i = 0; i < walls.length; i++) {
+  matrix.setWriteContext(7, i);  // stage 7 = Walls Pass 2, index into data.walls[]
+  const seg = walls[i];
+  matrix.fillBoxUnless(seg.x, seg.y, seg.z, seg.w, seg.h, seg.d, WALL_CELL[seg.direction], CELL.DOOR);
+}
+```
 
-This is additive — callers that don't pass context still work, they just produce records with `stage: undefined, source: undefined`.
+### Step 3 — JSON output
 
-### Step 3 — Output
-
-When `config.debugMatrix` is true, after all pipeline stages complete, write the history to a JSON file alongside the existing debug outputs:
+Write the history to JSON when `--debug-matrix` is passed. After all pipeline stages complete:
 
 ```
 {outputDir}/{baseName}_matrix_history.json
@@ -106,16 +137,16 @@ Format:
     {
       "cx": 12, "cy": 0, "cz": 7,
       "writes": [
-        { "prev": 255, "next": 0,  "stage": "buildings", "source": "shell:b03" },
-        { "prev": 0,   "next": 90, "stage": "connectivity", "source": "door:A0012" },
-        { "prev": 90,  "next": 20, "stage": "walls", "source": "wall:N:b03" }
+        { "prev": 255, "next": 0,  "stage": 0, "stageName": "buildings",    "sourceIndex": 3 },
+        { "prev": 0,   "next": 90, "stage": 5, "stageName": "connectivity", "sourceIndex": 1 },
+        { "prev": 90,  "next": 20, "stage": 7, "stageName": "walls",        "sourceIndex": 47 }
       ]
     }
   ]
 }
 ```
 
-Only cells with more than one write are included by default (single-write cells are unambiguous). A `--debug-matrix-all` flag includes all written cells.
+Only cells with more than one write are included by default. A `--debug-matrix-all` flag includes all written cells.
 
 ### Step 4 — Visualiser: solid cell fills ✅ Implemented
 
@@ -138,16 +169,8 @@ Once Step 3 (JSON output) is implemented, load the history file in the visualise
 ## What this is NOT
 
 - Not a replay system — history is a log only, not executable
-- Not always-on — zero cost when `debugMatrix` is false
 - Not a lock mechanism — writes still happen freely; history is observational only
-
----
-
-## Open questions
-
-1. **Granularity of source strings** — per-building is probably sufficient; per-wall-segment would be very verbose. Decide during Step 2.
-2. **Visualiser conflict highlighting** — worth doing immediately alongside Step 3, or defer until we have a concrete debugging need?
-3. **History file size** — large maps with many stages could produce large JSON. Consider a compact binary format or a filtered view (conflicts only) as default output.
+- **Not debug-flag gated** — history is always recorded; the JSON output file is only written when `--debug-matrix` is passed
 
 ---
 

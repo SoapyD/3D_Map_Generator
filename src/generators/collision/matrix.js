@@ -20,6 +20,8 @@ export const CELL = {
   // Roof slab — top of building shell
   ROOF:   40,
   ROOF_N: 41, ROOF_S: 42, ROOF_E: 43, ROOF_W: 44,
+  // Exterior roof corner labels — two exposed edges
+  ROOF_NE: 45, ROOF_NW: 46, ROOF_SE: 47, ROOF_SW: 48,
   // Ground-level placeholders (replaced by real geometry in later stages)
   FOUNDATION_PLACEHOLDER: 50,
   STREET_PLACEHOLDER:     51,
@@ -32,6 +34,11 @@ export const CELL = {
   INTERNAL_WALL_N: 80, INTERNAL_WALL_S: 81, INTERNAL_WALL_E: 82, INTERNAL_WALL_W: 83,
   // Doorway openings — stamped by connectivity into the building shell before wall generation
   DOOR: 90,
+  // Interior-facing roof edge labels (exposed face neighbour is CELL.SHELL)
+  IROOF_N: 91, IROOF_S: 92, IROOF_E: 93, IROOF_W: 94,
+  IROOF_NE: 95, IROOF_NW: 96, IROOF_SE: 97, IROOF_SW: 98,
+  IROOF_END_N: 100, IROOF_END_S: 101, IROOF_END_E: 102, IROOF_END_W: 103,
+  IROOF_ISLAND: 104,
 };
 
 // Number of cells reserved below world Y=0 (for rivers, sewers, tunnels).

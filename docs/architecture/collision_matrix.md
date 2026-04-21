@@ -1,6 +1,6 @@
 # Collision Matrix — Architecture
 
-**Last updated:** 2026-04-19
+**Last updated:** 2026-04-21
 
 ---
 
@@ -49,6 +49,10 @@ The collision matrix is a flat `Uint8Array` covering the full map volume at 1-in
 | `42` | `CELL.ROOF_S` | Roofs stage — label pass | Roof cell with exposed **south** edge |
 | `43` | `CELL.ROOF_E` | Roofs stage — label pass | Roof cell with exposed **east** edge |
 | `44` | `CELL.ROOF_W` | Roofs stage — label pass | Roof cell with exposed **west** edge |
+| `45` | `CELL.ROOF_NE` | Roofs stage — label pass | Roof corner cell with exposed **north and east** edges |
+| `46` | `CELL.ROOF_NW` | Roofs stage — label pass | Roof corner cell with exposed **north and west** edges |
+| `47` | `CELL.ROOF_SE` | Roofs stage — label pass | Roof corner cell with exposed **south and east** edges |
+| `48` | `CELL.ROOF_SW` | Roofs stage — label pass | Roof corner cell with exposed **south and west** edges |
 | `50` | `CELL.FOUNDATION_PLACEHOLDER` | Foundations stage | Foundation block ground-slab placeholder — replaced by real geometry in a later stage |
 | `51` | `CELL.STREET_PLACEHOLDER` | Foundations stage | Street ground-slab placeholder — may become river/waterway |
 | `60` | `CELL.IFLOOR_N`  | Floors stage — label pass | Interior-facing floor edge, north exposed (neighbour is SHELL) |
@@ -69,6 +73,19 @@ The collision matrix is a flat `Uint8Array` covering the full map volume at 1-in
 | `82` | `CELL.INTERNAL_WALL_E` | Walls stage — Phase 1 correction | Internal wall face, east-facing |
 | `83` | `CELL.INTERNAL_WALL_W` | Walls stage — Phase 1 correction | Internal wall face, west-facing |
 | `90` | `CELL.DOOR` | Connectivity stage — Step 7b-i | Doorway opening — stamped into the building shell (2 cells wide × 3 cells tall) at each surviving anchor's trigger-cell position, before wall generation runs. Wall generator reads these to carve openings. |
+| `91` | `CELL.IROOF_N` | Roofs stage — label pass | Interior-facing roof edge, north exposed (neighbour is SHELL) |
+| `92` | `CELL.IROOF_S` | Roofs stage — label pass | Interior-facing roof edge, south exposed |
+| `93` | `CELL.IROOF_E` | Roofs stage — label pass | Interior-facing roof edge, east exposed |
+| `94` | `CELL.IROOF_W` | Roofs stage — label pass | Interior-facing roof edge, west exposed |
+| `95` | `CELL.IROOF_NE` | Roofs stage — label pass | Interior roof corner, north+east exposed |
+| `96` | `CELL.IROOF_NW` | Roofs stage — label pass | Interior roof corner, north+west exposed |
+| `97` | `CELL.IROOF_SE` | Roofs stage — label pass | Interior roof corner, south+east exposed |
+| `98` | `CELL.IROOF_SW` | Roofs stage — label pass | Interior roof corner, south+west exposed |
+| `100` | `CELL.IROOF_END_N` | Roofs stage — label pass | Interior roof end cell, south+east+west exposed |
+| `101` | `CELL.IROOF_END_S` | Roofs stage — label pass | Interior roof end cell, north+east+west exposed |
+| `102` | `CELL.IROOF_END_E` | Roofs stage — label pass | Interior roof end cell, north+south+west exposed |
+| `103` | `CELL.IROOF_END_W` | Roofs stage — label pass | Interior roof end cell, north+south+east exposed |
+| `104` | `CELL.IROOF_ISLAND` | Roofs stage — label pass | Interior roof island, all four edges exposed |
 
 ---
 
@@ -80,6 +97,9 @@ const isInteriorFloor = v => (v >= 60 && v <= 67) || (v >= 70 && v <= 74);
 const isAnyFloor      = v => isExteriorFloor(v) || isInteriorFloor(v);
 const isExteriorWall  = v => v === CELL.WALL || (v >= 20 && v <= 23);
 const isInternalWall  = v => v >= 80 && v <= 83;
+const isExteriorRoof  = v => v === CELL.ROOF || (v >= 41 && v <= 48);
+const isInteriorRoof  = v => (v >= 91 && v <= 98) || (v >= 100 && v <= 104);
+const isAnyRoof       = v => isExteriorRoof(v) || isInteriorRoof(v);
 const isOccupied      = v => v !== CELL.EMPTY;
 ```
 
@@ -110,12 +130,39 @@ With defaults: `slabY(i) = i * 4 - 1`
 
 1. **Buildings** — `fillBox` entire building volume with `CELL.SHELL`
 2. **Floors** — `fillBox` each interior floor slab (index 0 to maxTier−2) with `CELL.FLOOR`
-3. **Roofs** — `fillBox` top slab (index maxTier−1) with `CELL.ROOF`; label pass marks exposed edges as `CELL.ROOF_N/S/E/W`
+3. **Roofs** — `fillBox` top slab (index maxTier−1) with `CELL.ROOF`; label pass marks exposed edges as `CELL.ROOF_N/S/E/W/NE/NW/SE/SW` (exterior) or `CELL.IROOF_*` (interior, edge faces SHELL)
 4. **Connectivity** — stamps `CELL.DOOR` (value 90) into the shell volume at each surviving anchor's trigger-cell position (2 wide × 3 tall), marking where the wall generator must carve doorway openings
 5. **Walls Pass 1** — overwrite each exposed-edge FLOOR cell with `CELL.FLOOR_N/S/E/W` (and END/ISLAND variants)
 6. **Walls Pass 2** — `fillBox` each wall segment with `CELL.WALL_N/S/E/W`, skipping cells already marked `CELL.DOOR` (never above roof level)
 
 Later stages (cover, ladders) will add further types as the pipeline is extended.
+
+---
+
+## Write history — source arrays
+
+Each pipeline stage stores its output objects in arrays on the shared data object. The write history (see `docs/plans/COLLISION_MATRIX_HISTORY_PLAN_2026_04_21.md`) records a direct index into these arrays alongside each cell write, so any cell's history can be resolved to the exact source object without bounding-box lookups.
+
+| Stage enum | Stage | Source array | Object shape (key fields) |
+|---|---|---|---|
+| `0` | Buildings | `data.buildings[]` | `{ x, z, w, d, maxTier, size, blockIndex }` |
+| `1` | Floors | `data.floors[]` | `{ buildingId, buildingIndex, floorIndex, yCollisionLevel, rects[], removedQuadrants }` |
+| `2` | Floors — label pass | `data.floors[]` | Same as above — nearest building, no per-cell object |
+| `3` | Roofs | `data.roofs[]` | `{ buildingId, buildingIndex, yCollisionLevel, rects[], removedQuadrants }` |
+| `4` | Roofs — label pass | `data.roofs[]` | Same as above — nearest building, no per-cell object. Covers ROOF_N/S/E/W, ROOF_NE/NW/SE/SW, and all IROOF_* labels |
+| `5` | Connectivity | `data.connections.doors[]` | `{ anchorId, direction, x, y, z, w, h, d }` |
+| `6` | Walls — Pass 1 (floor labels) | `data.floors[]` | Nearest building — label pass has no per-cell object |
+| `7` | Walls — Pass 2 (segments) | `data.walls[]` | `{ x, y, z, w, h, d, direction, floorY }` |
+| `8` | Walls — internal | `data.internalWalls[]` | Same shape as `walls[]` |
+| `255` | Unknown / no source | — | `sourceIndex` field ignored |
+
+### Byte layout per history record
+
+```
+[ prev:Uint8 | next:Uint8 | stage:Uint8 | sourceIndex:Uint16LE ]
+```
+
+5 bytes total. Records are appended sequentially into a per-cell `Uint8Array` stored in a sparse `Map<cellIndex, Uint8Array>`. Only cells that receive at least one write have an entry.
 
 ---
 
