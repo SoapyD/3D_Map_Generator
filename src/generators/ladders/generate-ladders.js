@@ -120,14 +120,11 @@ function hasConnectionNearby(cx, cy, cz, radius, matrix) {
   return false;
 }
 
-function hasAdjacentBuilding(cx, cy, cz, direction, buildingIndex, range, matrix, buildings) {
+function hasAdjacentBuilding(lcx, cy, lcz, direction, range, matrix) {
   const { dx, dz } = DIR_VEC[direction];
   for (let step = 1; step <= range; step++) {
-    const v = matrix.getCell(cx + dx * step, cy, cz + dz * step);
-    if (v === CELL.SHELL) {
-      const bi = findBuildingIndex(cx + dx * step, cz + dz * step, buildings, matrix);
-      if (bi >= 0 && bi !== buildingIndex) return true;
-    }
+    const v = matrix.getCell(lcx + dx * step, cy, lcz + dz * step);
+    if (v !== CELL.EMPTY) return true;
   }
   return false;
 }
@@ -139,40 +136,55 @@ function phase1Candidates(matrix, buildings, config) {
   const bldgClear = LADDERS.buildingClearance;
   const candidates = [];
 
+  // Cull sets — collect candidate IDs per rule; applied after all candidates are emitted
+  const cullMapEdge    = new Set();
+  const cullConnection = new Set();
+  const cullBuilding   = new Set();
+  const cullCell       = new Set();
+
   for (let cy = 0; cy < matrix.maxY; cy++) {
     for (let cz = 0; cz < matrix.D; cz++) {
       for (let cx = 0; cx < matrix.W; cx++) {
         const facings = CELL_FACINGS.get(matrix.getCell(cx, cy, cz));
         if (!facings) continue;
 
-        // Rule 1: map edge clearance — flag only, not filtered
-        const { x: wx, z: wz } = matrix.cellToWorld(cx, cy, cz);
-        const isMapEdge = wx < mapEdge || wx > mapWidth - mapEdge ||
-                          wz < mapEdge || wz > mapDepth - mapEdge;
-
         const bi = findBuildingIndex(cx, cz, buildings, matrix);
         if (bi < 0) continue;
 
+        const { x: edgeWx, z: edgeWz } = matrix.cellToWorld(cx, cy, cz);
         const tier = floorIndex(cy, tierHeight, slabThickness);
 
-        // Rule 2: connection proximity — flag only, not filtered
-        const isNearConnection = hasConnectionNearby(cx, cy, cz, connClear, matrix);
+        const failsMapEdge    = edgeWx < mapEdge || edgeWx > mapWidth - mapEdge ||
+                                edgeWz < mapEdge || edgeWz > mapDepth - mapEdge;
+        const failsConnection = hasConnectionNearby(cx, cy, cz, connClear, matrix);
 
         for (const { direction, isExternal, isRoof } of facings) {
-          // Rule 3: adjacent building clearance — DISABLED for debug
-          // if (hasAdjacentBuilding(cx, cy, cz, direction, bi, bldgClear, matrix, buildings)) continue;
-
-          // Ladder node sits one step outside the edge cell, facing back toward the slab.
           const { dx, dz } = DIR_VEC[direction];
           const lcx = cx + dx;
           const lcz = cz + dz;
-          const cellVal = matrix.getCell(lcx, cy, lcz);
-          if (cellVal !== CELL.EMPTY && cellVal !== CELL.SHELL) continue;
           const { x: wx, y: wy, z: wz } = matrix.cellToWorld(lcx, cy, lcz);
-          candidates.push({ cx, cy, cz, lcx, lcz, wx, wy, wz, direction, isExternal, isRoof, isMapEdge, isNearConnection, buildingIndex: bi, tier });
+
+          const id = candidates.length;
+          candidates.push({ id, cx, cy, cz, lcx, lcz, wx, wy, wz, direction, isExternal, isRoof, buildingIndex: bi, tier, cullReasons: [] });
+
+          if (failsMapEdge)    cullMapEdge.add(id);
+          if (failsConnection) cullConnection.add(id);
+          if (matrix.getCell(lcx, cy, lcz) !== CELL.EMPTY && matrix.getCell(lcx, cy, lcz) !== CELL.SHELL)
+                               cullCell.add(id);
+          if (hasAdjacentBuilding(lcx, cy, lcz, direction, bldgClear, matrix))
+                               cullBuilding.add(id);
         }
       }
     }
+  }
+
+  // Tag each candidate with its cull reasons
+  for (const c of candidates) {
+    if (cullMapEdge.has(c.id))    c.cullReasons.push('mapEdge');
+    if (cullConnection.has(c.id)) c.cullReasons.push('connection');
+    if (cullCell.has(c.id))       c.cullReasons.push('cell');
+    if (cullBuilding.has(c.id))   c.cullReasons.push('building');
+    c.isCulled = c.cullReasons.length > 0;
   }
 
   return candidates;
@@ -228,9 +240,9 @@ function phase2Ladders(candidates, buildings, config, rng, matrix) {
 
     const { cx, cz, lcx, lcz, direction, buildingIndex } = group[0];
     const building   = buildings[buildingIndex];
-    const isExternal       = group.some(c => c.isExternal);
-    const isMapEdge        = group.some(c => c.isMapEdge);
-    const isNearConnection = group.some(c => c.isNearConnection);
+    const isExternal = group.some(c => c.isExternal);
+    // Union all cull reasons from every candidate in this group
+    const cullReasons = [...new Set(group.flatMap(c => c.cullReasons))];
     const lowestCy   = group[0].cy;
     const highestCy  = group[group.length - 1].cy;
     const lowestTier = floorIndex(lowestCy,  tierHeight, slabThickness);
@@ -248,6 +260,7 @@ function phase2Ladders(candidates, buildings, config, rng, matrix) {
       if (v !== CELL.EMPTY && v !== CELL.SHELL) {
         if (v === CELL.WALKWAY || v === CELL.WALKWAY_CROSSING || v === CELL.DOOR) {
           hitsConnection = true;
+          if (!cullReasons.includes('connection')) cullReasons.push('connection');
         }
         bottomCy = walkCy + 1;
         break;
@@ -281,8 +294,8 @@ function phase2Ladders(candidates, buildings, config, rng, matrix) {
       lcx, lcz,
       direction,
       isExternal,
-      isMapEdge,
-      isNearConnection: isNearConnection || hitsConnection,
+      cullReasons,
+      isCulled: cullReasons.length > 0,
       x: wx + (needsXOff ? 1 - THICKNESS : 0),
       z: wz + (needsZOff ? 1 - THICKNESS : 0),
       w: isNS ? 0.75 : THICKNESS,

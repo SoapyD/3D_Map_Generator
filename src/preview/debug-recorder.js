@@ -295,7 +295,13 @@ function ladderElements(data) {
   const totalG = groups.length;
   for (let i = 0; i < groups.length; i++) {
     const l = groups[i];
-    const color = l.isMapEdge ? '#ff2222' : l.isNearConnection ? '#ffff00' : l.isExternal ? '#44ffaa' : '#ff6644';
+    const r = l.cullReasons || [];
+    const color = r.includes('cell')       ? '#888888'
+                : r.includes('building')   ? '#ff8800'
+                : r.includes('mapEdge')    ? '#ff2222'
+                : r.includes('connection') ? '#ffff00'
+                : l.isExternal             ? '#44ffaa'
+                :                            '#ff6644';
     elements.push({
       label: `Ladders — group ${i + 1}/${totalG} ${l.direction} ${l.isExternal ? 'ext' : 'int'} tiers ${l.startTier}→${l.endTier} (${l.lcx},${l.lcz})`,
       rects: [box('ladder_candidate', l.x, l.bottomY, l.z, l.w, l.height, l.d, color)],
