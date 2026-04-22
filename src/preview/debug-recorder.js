@@ -318,11 +318,21 @@ function ladderElements(data) {
     const path = paths[pi];
     for (let si = 0; si < path.segments.length; si++) {
       const s = path.segments[si];
-      const keptH = s.keptTopY - s.keptBottomY;
-      const rects = [box('ladder_path', s.x, s.keptBottomY, s.z, s.w, keptH, s.d, '#4488ff')];
+      const isNS   = s.direction === 'N' || s.direction === 'S';
+      const keptH  = s.keptTopY - s.keptBottomY;
+      const rects  = [box('ladder_path_kept', s.x, s.keptBottomY, s.z, s.w, keptH, s.d, '#ffdd44')];
+
       if (s.hasDeleted) {
-        rects.push(box('ladder_path', s.x, s.deletedBottomY, s.z, s.w, s.deletedTopY - s.deletedBottomY, s.d, '#ff3333'));
+        rects.push(box('ladder_path_cut', s.x, s.deletedBottomY, s.z, s.w, s.deletedTopY - s.deletedBottomY, s.d, '#ff3333'));
       }
+
+      // Door at the top of this segment — 3 wide perpendicular to facing direction
+      const doorW = isNS ? 3 : 0.1;
+      const doorD = isNS ? 0.1 : 3;
+      const doorX = isNS ? s.x - 1 : s.x;
+      const doorZ = isNS ? s.z : s.z - 1;
+      rects.push(box('ladder_path_door', doorX, s.keptTopY, doorZ, doorW, 3, doorD, '#aaaaaa', 0.8));
+
       elements.push({
         label: `Ladder path — building ${path.buildingIndex} seg ${si + 1}/${path.segments.length} ${s.direction}`,
         rects,

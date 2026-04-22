@@ -437,13 +437,15 @@
       });
     }
 
-    const DEBUG_TYPES  = new Set(['trigger', 'anchor', 'connection', 'door']);
-    const LADDER_TYPES = new Set(['ladder_candidate']);
-    const PATH_TYPES   = new Set(['ladder_path']);
+    const DEBUG_TYPES      = new Set(['trigger', 'anchor', 'connection', 'door']);
+    const LADDER_TYPES     = new Set(['ladder_candidate']);
+    const PATH_TYPES       = new Set(['ladder_path_cut', 'ladder_path_door']);
+    const PATH_KEPT_TYPES  = new Set(['ladder_path_kept']);
 
-    function isDebugRect(r)  { return DEBUG_TYPES.has(r.type); }
-    function isLadderRect(r) { return LADDER_TYPES.has(r.type); }
-    function isPathRect(r)   { return PATH_TYPES.has(r.type); }
+    function isDebugRect(r)     { return DEBUG_TYPES.has(r.type); }
+    function isLadderRect(r)    { return LADDER_TYPES.has(r.type); }
+    function isPathRect(r)      { return PATH_TYPES.has(r.type); }
+    function isPathKeptRect(r)  { return PATH_KEPT_TYPES.has(r.type); }
 
     // Assembles rects for a given frame from the compact stage data.
     // Prior stages are dimmed; current stage accumulated up to elementIdx.
@@ -486,7 +488,7 @@
               if (!showDebugLadders && isLadderRect(r)) continue;
               if (!showDebugPaths && isPathRect(r)) continue;
               if (isDebugRect(r) || isCulledLadder || isPathRect(r)) rects.push({ ...r, opacity: 1, transparent: false });
-              else rects.push({ ...r, opacity: DIM_OPACITY, transparent: true });
+              else rects.push({ ...r, opacity: DIM_OPACITY, transparent: true }); // includes ladder_path_kept (dimmed in prior)
             }
           }
         }
@@ -501,6 +503,7 @@
           if (!showDebugLadders && isLadderRect(r)) continue;
           if (!showDebugPaths && isPathRect(r)) continue;
           if (isDebugRect(r) || isCulledLadder || isPathRect(r)) rects.push({ ...r, opacity: 1, transparent: false });
+          // ladder_path_kept falls through to the else branch (regular opacity)
           else rects.push({ ...r, opacity: r.opacity !== undefined ? r.opacity * curOpacity : curOpacity, transparent: gridVisible });
         }
       }

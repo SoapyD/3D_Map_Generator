@@ -482,7 +482,7 @@ const PATH_QUOTA = {
 };
 const PATH_MIN_SPACING = 3;
 
-function buildDebugPaths(ladderGroups, buildings, config, rng) {
+function buildDebugPaths(ladderGroups, buildings, config, rng, matrix) {
   const { tierHeight, slabThickness } = config;
   const tierH = tierHeight + slabThickness;
 
@@ -538,8 +538,23 @@ function buildDebugPaths(ladderGroups, buildings, config, rng) {
         const deletedTopY    = picked.topY;
         const hasDeleted     = nextTier < roofTier && deletedTopY > deletedBottomY;
 
+        // Stamp CELL.DOOR at every floor level the segment passes through, 3 cells wide
+        const isNSDir    = picked.direction === 'N' || picked.direction === 'S';
+        const spread     = isNSDir ? [[-1,0],[0,0],[1,0]] : [[0,-1],[0,0],[0,1]];
+        const startFloor = currentTier === 0 ? 1 : currentTier;
+        const endFloor   = Math.round(keptTopY / tierH);
+        for (let floorIdx = startFloor; floorIdx <= endFloor; floorIdx++) {
+          const baseCy = floorIdx * tierH;
+          for (const [ddcx, ddcz] of spread) {
+            matrix.setCell(picked.cx + ddcx, baseCy,     picked.cz + ddcz, CELL.DOOR);
+            matrix.setCell(picked.cx + ddcx, baseCy + 1, picked.cz + ddcz, CELL.DOOR);
+            matrix.setCell(picked.cx + ddcx, baseCy + 2, picked.cz + ddcz, CELL.DOOR);
+          }
+        }
+
         segments.push({
           x: picked.x, z: picked.z, w: picked.w, d: picked.d,
+          cx: picked.cx, cz: picked.cz,
           direction: picked.direction,
           keptBottomY, keptTopY,
           hasDeleted, deletedBottomY, deletedTopY,
@@ -560,6 +575,6 @@ function buildDebugPaths(ladderGroups, buildings, config, rng) {
 export function generateLadders(data, config, rng, matrix) {
   const candidates   = phase1Candidates(matrix, data.buildings, config);
   const ladderGroups = phase2Ladders(candidates, data.buildings, config, rng, matrix);
-  const ladderPaths  = buildDebugPaths(ladderGroups, data.buildings, config, rng);
+  const ladderPaths  = buildDebugPaths(ladderGroups, data.buildings, config, rng, matrix);
   return { ...data, ladders: [], ladderCandidates: candidates, ladderGroups, ladderPaths };
 }
