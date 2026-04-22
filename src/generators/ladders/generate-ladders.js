@@ -139,7 +139,7 @@ function phase1Candidates(matrix, buildings, config) {
   const bldgClear = LADDERS.buildingClearance;
   const candidates = [];
 
-  for (let cy = -slabThickness; cy < matrix.maxY; cy++) {
+  for (let cy = 0; cy < matrix.maxY; cy++) {
     for (let cz = 0; cz < matrix.D; cz++) {
       for (let cx = 0; cx < matrix.W; cx++) {
         const facings = CELL_FACINGS.get(matrix.getCell(cx, cy, cz));
@@ -166,8 +166,9 @@ function phase1Candidates(matrix, buildings, config) {
           const { dx, dz } = DIR_VEC[direction];
           const lcx = cx + dx;
           const lcz = cz + dz;
-          const cellVal = matrix.getCell(lcx, cy, lcz);
-          if (cellVal !== CELL.EMPTY && cellVal !== CELL.SHELL) continue;
+          // Cell value check — DISABLED for debug
+          // const cellVal = matrix.getCell(lcx, cy, lcz);
+          // if (cellVal !== CELL.EMPTY && cellVal !== CELL.SHELL) continue;
           const { x: wx, y: wy, z: wz } = matrix.cellToWorld(lcx, cy, lcz);
           candidates.push({ cx, cy, cz, lcx, lcz, wx, wy, wz, direction, isExternal, isRoof, buildingIndex: bi, tier });
         }
@@ -236,24 +237,12 @@ function phase2Ladders(candidates, buildings, config, rng, matrix) {
 
     let bottomY, topY, startTier, endTier;
 
-    if (isExternal) {
-      bottomY   = 0;
-      topY      = highestCy + 1;
-      startTier = 0;
-    } else {
-      const belowTier = Math.max(lowestTier - 1, 0);
-      bottomY   = slabY(belowTier, tierHeight, slabThickness);
-      startTier = belowTier;
-      topY      = highestCy + 1;
-    }
-    endTier = highestTier + 1;
+    bottomY   = 0;
+    topY      = highestCy + 1;
+    startTier = 0;
+    endTier   = highestTier + 1;
 
-    // Step 2c — optional full-height culling
-    if (startTier === 0 && endTier === building.maxTier &&
-        rng.chance(LADDERS.fullHeightCullChance)) {
-      const culled = cullFullHeight(startTier, endTier, rng, tierHeight, slabThickness);
-      if (culled) { ({ startTier, endTier, bottomY, topY } = culled); }
-    }
+    // Step 2c — full-height culling DISABLED for debug
 
     const height = topY - bottomY;
     if (height <= 0) continue;

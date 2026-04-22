@@ -287,7 +287,7 @@ function ladderElements(data) {
     const color = c.isExternal ? '#88aaff' : '#ffaa44';
     elements.push({
       label: `Ladders — candidate ${i + 1}/${totalC} ${c.direction} ${c.isExternal ? 'ext' : 'int'} (${c.cx},${c.cy},${c.cz})`,
-      rects: [box('ladder_candidate', c.wx, c.wy, c.wz, 0.75, 0.75, 0.75, color)],
+      rects: [{ ...box('ladder_candidate', c.wx, c.wy, c.wz, 0.75, 0.75, 0.75, color), label: String(i + 1) }],
     });
   }
 
