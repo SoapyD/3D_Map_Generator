@@ -85,17 +85,17 @@ async function main() {
   console.log(`  ${connectivityData.connections.anchors.length} anchors, ${connectivityData.connections.candidates.length} candidate connections`);
   recorder?.capture(7, connectivityData);
 
-  // Stage 6: Walls
-  console.log('[6/7] Generating walls...');
-  const wallData = generateWalls(connectivityData, config, rng, matrix);
-  console.log(`  ${wallData.walls.length} wall segments`);
-  recorder?.capture(6, wallData);
-
-  // Stage 7: Ladders
-  console.log('[7/7] Generating ladders...');
-  const ladderData = generateLadders(wallData, config, rng, matrix);
+  // Stage 6: Ladders (must run before walls so node cells are still SHELL, not WALL_*)
+  console.log('[6/7] Generating ladders...');
+  const ladderData = generateLadders(connectivityData, config, rng, matrix);
   console.log(`  ${ladderData.ladders.length} ladders placed`);
   recorder?.capture(9, ladderData);
+
+  // Stage 7: Walls
+  console.log('[7/7] Generating walls...');
+  const wallData = generateWalls(ladderData, config, rng, matrix);
+  console.log(`  ${wallData.walls.length} wall segments`);
+  recorder?.capture(6, wallData);
 
   const geometry = buildGeometry(ladderData, config);
 

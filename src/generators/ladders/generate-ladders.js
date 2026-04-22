@@ -166,9 +166,8 @@ function phase1Candidates(matrix, buildings, config) {
           const { dx, dz } = DIR_VEC[direction];
           const lcx = cx + dx;
           const lcz = cz + dz;
-          // Cell value check — DISABLED for debug
-          // const cellVal = matrix.getCell(lcx, cy, lcz);
-          // if (cellVal !== CELL.EMPTY && cellVal !== CELL.SHELL) continue;
+          const cellVal = matrix.getCell(lcx, cy, lcz);
+          if (cellVal !== CELL.EMPTY && cellVal !== CELL.SHELL) continue;
           const { x: wx, y: wy, z: wz } = matrix.cellToWorld(lcx, cy, lcz);
           candidates.push({ cx, cy, cz, lcx, lcz, wx, wy, wz, direction, isExternal, isRoof, buildingIndex: bi, tier });
         }
@@ -235,12 +234,24 @@ function phase2Ladders(candidates, buildings, config, rng, matrix) {
     const lowestTier = floorIndex(lowestCy,  tierHeight, slabThickness);
     const highestTier= floorIndex(highestCy, tierHeight, slabThickness);
 
-    let bottomY, topY, startTier, endTier;
+    // Walk down to find where the ladder base sits.
+    // External: walk the node column (open air → reaches ground).
+    // Internal: walk the edge cell column where floor slab labels live.
+    const walkX = isExternal ? lcx : cx;
+    const walkZ = isExternal ? lcz : cz;
+    let bottomCy = 0;
+    for (let walkCy = lowestCy - 1; walkCy >= 0; walkCy--) {
+      const v = matrix.getCell(walkX, walkCy, walkZ);
+      if (v !== CELL.EMPTY && v !== CELL.SHELL) {
+        bottomCy = walkCy + 1;
+        break;
+      }
+    }
 
-    bottomY   = 0;
-    topY      = highestCy + 1;
-    startTier = 0;
-    endTier   = highestTier + 1;
+    const bottomY   = bottomCy;
+    const topY      = highestCy + 1;
+    const startTier = floorIndex(bottomCy, tierHeight, slabThickness);
+    const endTier   = highestTier + 1;
 
     // Step 2c — full-height culling DISABLED for debug
 
