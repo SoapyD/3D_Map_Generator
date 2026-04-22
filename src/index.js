@@ -91,11 +91,10 @@ async function main() {
   console.log(`  ${ladderData.ladders.length} ladders placed`);
   recorder?.capture(9, ladderData);
 
-  // Stage 7: Walls
-  console.log('[7/7] Generating walls...');
-  const wallData = generateWalls(ladderData, config, rng, matrix);
-  console.log(`  ${wallData.walls.length} wall segments`);
-  recorder?.capture(6, wallData);
+  // Stage 7: Walls — DISABLED
+  // const wallData = generateWalls(ladderData, config, rng, matrix);
+  // recorder?.capture(6, wallData);
+  const wallData = { ...ladderData, walls: [] };
 
   const geometry = buildGeometry(ladderData, config);
 

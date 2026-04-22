@@ -295,10 +295,10 @@ function ladderElements(data) {
   const totalG = groups.length;
   for (let i = 0; i < groups.length; i++) {
     const l = groups[i];
-    const color = l.isExternal ? '#44ffaa' : '#ff6644';
+    const color = l.isMapEdge ? '#ff2222' : l.isNearConnection ? '#ffff00' : l.isExternal ? '#44ffaa' : '#ff6644';
     elements.push({
       label: `Ladders — group ${i + 1}/${totalG} ${l.direction} ${l.isExternal ? 'ext' : 'int'} tiers ${l.startTier}→${l.endTier} (${l.lcx},${l.lcz})`,
-      rects: [{ ...box('ladder_candidate', l.x, l.bottomY, l.z, l.w, l.height, l.d, color), label: String(i + 1) }],
+      rects: [box('ladder_candidate', l.x, l.bottomY, l.z, l.w, l.height, l.d, color)],
     });
   }
 

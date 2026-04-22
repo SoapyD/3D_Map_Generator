@@ -145,18 +145,18 @@ function phase1Candidates(matrix, buildings, config) {
         const facings = CELL_FACINGS.get(matrix.getCell(cx, cy, cz));
         if (!facings) continue;
 
-        // Rule 1: map edge clearance
+        // Rule 1: map edge clearance — flag only, not filtered
         const { x: wx, z: wz } = matrix.cellToWorld(cx, cy, cz);
-        if (wx < mapEdge || wx > mapWidth - mapEdge ||
-            wz < mapEdge || wz > mapDepth - mapEdge) continue;
+        const isMapEdge = wx < mapEdge || wx > mapWidth - mapEdge ||
+                          wz < mapEdge || wz > mapDepth - mapEdge;
 
         const bi = findBuildingIndex(cx, cz, buildings, matrix);
         if (bi < 0) continue;
 
         const tier = floorIndex(cy, tierHeight, slabThickness);
 
-        // Rule 2: connection proximity — DISABLED for debug
-        // if (hasConnectionNearby(cx, cy, cz, connClear, matrix)) continue;
+        // Rule 2: connection proximity — flag only, not filtered
+        const isNearConnection = hasConnectionNearby(cx, cy, cz, connClear, matrix);
 
         for (const { direction, isExternal, isRoof } of facings) {
           // Rule 3: adjacent building clearance — DISABLED for debug
@@ -169,7 +169,7 @@ function phase1Candidates(matrix, buildings, config) {
           const cellVal = matrix.getCell(lcx, cy, lcz);
           if (cellVal !== CELL.EMPTY && cellVal !== CELL.SHELL) continue;
           const { x: wx, y: wy, z: wz } = matrix.cellToWorld(lcx, cy, lcz);
-          candidates.push({ cx, cy, cz, lcx, lcz, wx, wy, wz, direction, isExternal, isRoof, buildingIndex: bi, tier });
+          candidates.push({ cx, cy, cz, lcx, lcz, wx, wy, wz, direction, isExternal, isRoof, isMapEdge, isNearConnection, buildingIndex: bi, tier });
         }
       }
     }
@@ -228,7 +228,9 @@ function phase2Ladders(candidates, buildings, config, rng, matrix) {
 
     const { cx, cz, lcx, lcz, direction, buildingIndex } = group[0];
     const building   = buildings[buildingIndex];
-    const isExternal = group.some(c => c.isExternal);
+    const isExternal       = group.some(c => c.isExternal);
+    const isMapEdge        = group.some(c => c.isMapEdge);
+    const isNearConnection = group.some(c => c.isNearConnection);
     const lowestCy   = group[0].cy;
     const highestCy  = group[group.length - 1].cy;
     const lowestTier = floorIndex(lowestCy,  tierHeight, slabThickness);
@@ -240,9 +242,13 @@ function phase2Ladders(candidates, buildings, config, rng, matrix) {
     const walkX = isExternal ? lcx : cx;
     const walkZ = isExternal ? lcz : cz;
     let bottomCy = 0;
+    let hitsConnection = false;
     for (let walkCy = lowestCy - 1; walkCy >= 0; walkCy--) {
       const v = matrix.getCell(walkX, walkCy, walkZ);
       if (v !== CELL.EMPTY && v !== CELL.SHELL) {
+        if (v === CELL.WALKWAY || v === CELL.WALKWAY_CROSSING || v === CELL.DOOR) {
+          hitsConnection = true;
+        }
         bottomCy = walkCy + 1;
         break;
       }
@@ -275,6 +281,8 @@ function phase2Ladders(candidates, buildings, config, rng, matrix) {
       lcx, lcz,
       direction,
       isExternal,
+      isMapEdge,
+      isNearConnection: isNearConnection || hitsConnection,
       x: wx + (needsXOff ? 1 - THICKNESS : 0),
       z: wz + (needsZOff ? 1 - THICKNESS : 0),
       w: isNS ? 0.75 : THICKNESS,
