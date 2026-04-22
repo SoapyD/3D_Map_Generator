@@ -17,16 +17,28 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
+      overflow-y: auto;
     }
 
-    #transport, #grid-row {
+    #drag-handle {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 6px;
+      cursor: ns-resize;
+      flex-shrink: 0;
+    }
+    #drag-handle:hover, #drag-handle.dragging {
+      background: rgba(170, 170, 255, 0.18);
+    }
+
+    #transport, .control-row {
       display: flex;
       align-items: center;
       gap: 10px;
       flex-wrap: wrap;
     }
 
-    #transport button, #grid-row button {
+    #transport button, .control-row button {
       background: #2a2a44;
       border: 1px solid #555;
       color: #ddd;
@@ -36,19 +48,21 @@
       font-size: 13px;
       border-radius: 3px;
     }
-    #transport button:hover, #grid-row button:hover { background: #3a3a60; }
+    #transport button:hover, .control-row button:hover { background: #3a3a60; }
     #btn-grid.active          { background: #1a3a5a; border-color: #7af; color: #7af; }
     #btn-show-all.active      { background: #1a3a2a; border-color: #7fa; color: #7fa; }
     #btn-debug-markers.active { background: #3a2a1a; border-color: #fa7; color: #fa7; }
+    #btn-debug-ladders.active { background: #1a2a3a; border-color: #88aaff; color: #88aaff; }
     #btn-prior.active         { background: #2a1a3a; border-color: #a7f; color: #a7f; }
 
-    #grid-panel {
+    .panel-items {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       font-size: 12px;
+      flex-wrap: wrap;
     }
-    #grid-panel label {
+    .panel-items label {
       display: flex;
       align-items: center;
       gap: 4px;
@@ -58,8 +72,21 @@
       border-radius: 3px;
       color: #ccc;
     }
-    #grid-panel label:hover { border-color: #666; }
-    #grid-panel label.disabled { opacity: 0.4; }
+    .panel-items label:hover { border-color: #666; }
+    .panel-items label.disabled { opacity: 0.4; }
+
+    .toggle-all-btn {
+      background: #1e1e38;
+      border: 1px solid #555;
+      color: #aaa;
+      padding: 2px 8px;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 11px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .toggle-all-btn:hover { background: #2a2a50; border-color: #888; color: #eee; }
 
     #speed-group { display: flex; gap: 4px; }
     #speed-group button { padding: 4px 8px; font-size: 12px; }
@@ -108,6 +135,7 @@
 </head>
 <body>
   <div id="controls">
+    <div id="drag-handle"></div>
     <div id="label-row">
       <span id="frame-label">Loading...</span>
       <span id="frame-count"></span>
@@ -124,12 +152,10 @@
         <button data-speed="4">4×</button>
       </div>
     </div>
-    <div id="grid-row">
+    <div class="control-row">
       <button id="btn-grid">Grid [G]</button>
-      <button id="btn-show-all">All Layers [A]</button>
-      <button id="btn-prior" class="active">Prior Steps [P]</button>
-      <button id="btn-debug-markers">Debug Markers [D]</button>
-      <div id="grid-panel" style="display:none">
+      <div id="grid-panel" class="panel-items" style="display:none">
+        <button class="toggle-all-btn" id="grid-toggle-all">All/None</button>
         <label><input type="checkbox" id="group-shell"  checked> <span style="color:#ff4422">Shell</span></label>
         <label><input type="checkbox" id="group-floors" checked> <span style="color:#2288ff">Floors</span></label>
         <label><input type="checkbox" id="group-roofs"  checked> <span style="color:#88aaff">Roofs</span></label>
@@ -140,6 +166,18 @@
         <label><input type="checkbox" id="group-doors" checked>  <span style="color:#888888">Doors</span></label>
         <label><input type="checkbox" id="group-iroofs"> <span style="color:#886644">IRoofs</span></label>
       </div>
+    </div>
+    <div class="control-row">
+      <button id="btn-show-all">All Layers [A]</button>
+      <div id="all-layers-panel" class="panel-items" style="display:none"></div>
+    </div>
+    <div class="control-row">
+      <button id="btn-prior" class="active">Prior Steps [P]</button>
+      <div id="prior-panel" class="panel-items" style="display:flex"></div>
+    </div>
+    <div class="control-row">
+      <button id="btn-debug-markers">Debug Connections [D]</button>
+      <button id="btn-debug-ladders">Debug Ladders [L]</button>
     </div>
     <div id="legend"></div>
   </div>
@@ -188,6 +226,7 @@
       { stage: 6, name: 'Walls',        color: '#cc5533' },
       { stage: 7, name: 'Connectivity', color: '#aa44cc' },
       { stage: 8, name: 'Cover',        color: '#33bbcc' },
+      { stage: 9, name: 'Ladders',      color: '#88aaff' },
     ];
 
     // --- State ---
@@ -199,6 +238,8 @@
     let playTimeout = null;
     let speed = 1;
     let currentGroup = null;
+    let allLayerStages = new Set();
+    let priorStages    = new Set();
 
     // --- Load data ---
     let data;
@@ -222,6 +263,66 @@
       }
     }
     totalFrames = frameMap.length;
+
+    // Populate per-stage toggle state and build All Layers / Prior Steps panels
+    const stageColorMap = Object.fromEntries(STAGE_META.map(m => [m.stage, m.color]));
+    for (const s of stages) {
+      allLayerStages.add(s.stage);
+      priorStages.add(s.stage);
+    }
+    for (const [panelId, prefix] of [['all-layers-panel', 'al'], ['prior-panel', 'pr']]) {
+      const panel = document.getElementById(panelId);
+      const btn = document.createElement('button');
+      btn.className = 'toggle-all-btn';
+      btn.textContent = 'All/None';
+      btn.dataset.panel = panelId;
+      panel.appendChild(btn);
+      for (const s of stages) {
+        const color = stageColorMap[s.stage] ?? '#888888';
+        const label = document.createElement('label');
+        label.innerHTML = `<input type="checkbox" id="${prefix}-stage-${s.stage}" checked> <span style="color:${color}">${s.name}</span>`;
+        panel.appendChild(label);
+      }
+    }
+
+    document.getElementById('grid-toggle-all').addEventListener('click', () => {
+      const cbs = [...document.querySelectorAll('#grid-panel input[type="checkbox"]')];
+      const allChecked = cbs.every(cb => cb.checked);
+      cbs.forEach(cb => { cb.checked = !allChecked; });
+      applyGridVisibility();
+    });
+
+    document.getElementById('all-layers-panel').addEventListener('click', e => {
+      if (!e.target.classList.contains('toggle-all-btn')) return;
+      const cbs = [...document.querySelectorAll('#all-layers-panel input[type="checkbox"]')];
+      const allChecked = cbs.every(cb => cb.checked);
+      cbs.forEach(cb => {
+        cb.checked = !allChecked;
+        const m = cb.id.match(/^al-stage-(\d+)$/);
+        if (m) { const n = +m[1]; cb.checked ? allLayerStages.add(n) : allLayerStages.delete(n); }
+      });
+      setFrame(currentIndex);
+    });
+    document.getElementById('all-layers-panel').addEventListener('change', e => {
+      const m = e.target.id.match(/^al-stage-(\d+)$/);
+      if (m) { const n = +m[1]; e.target.checked ? allLayerStages.add(n) : allLayerStages.delete(n); setFrame(currentIndex); }
+    });
+
+    document.getElementById('prior-panel').addEventListener('click', e => {
+      if (!e.target.classList.contains('toggle-all-btn')) return;
+      const cbs = [...document.querySelectorAll('#prior-panel input[type="checkbox"]')];
+      const allChecked = cbs.every(cb => cb.checked);
+      cbs.forEach(cb => {
+        cb.checked = !allChecked;
+        const m = cb.id.match(/^pr-stage-(\d+)$/);
+        if (m) { const n = +m[1]; cb.checked ? priorStages.add(n) : priorStages.delete(n); }
+      });
+      setFrame(currentIndex);
+    });
+    document.getElementById('prior-panel').addEventListener('change', e => {
+      const m = e.target.id.match(/^pr-stage-(\d+)$/);
+      if (m) { const n = +m[1]; e.target.checked ? priorStages.add(n) : priorStages.delete(n); setFrame(currentIndex); }
+    });
 
     const { mapWidth, mapDepth, tiers, tierHeight } = data.config;
     const cx = mapWidth / 2;
@@ -335,9 +436,11 @@
       });
     }
 
-    const DEBUG_TYPES = new Set(['trigger', 'anchor', 'connection', 'door']);
+    const DEBUG_TYPES  = new Set(['trigger', 'anchor', 'connection', 'door']);
+    const LADDER_TYPES = new Set(['ladder_candidate']);
 
-    function isDebugRect(r) { return DEBUG_TYPES.has(r.type); }
+    function isDebugRect(r)  { return DEBUG_TYPES.has(r.type); }
+    function isLadderRect(r) { return LADDER_TYPES.has(r.type); }
 
     // Assembles rects for a given frame from the compact stage data.
     // Prior stages are dimmed; current stage accumulated up to elementIdx.
@@ -346,10 +449,14 @@
       if (showAll) {
         const rects = [];
         for (const stage of stages) {
+          const stageOn = allLayerStages.has(stage.stage);
           for (const el of stage.elements) {
             for (const r of el.rects) {
               if (r.type === 'building') continue;
+              const isDebug  = isDebugRect(r) || isLadderRect(r);
+              if (!stageOn && !isDebug) continue;
               if (!showDebugMarkers && isDebugRect(r)) continue;
+              if (!showDebugLadders && isLadderRect(r)) continue;
               rects.push({ ...r, opacity: 1, transparent: false });
             }
           }
@@ -366,10 +473,13 @@
 
         for (let s = 0; s < stageIdx; s++) {
           if (pastBuildings && s < 2) continue;
+          if (!priorStages.has(stages[s].stage)) continue;
           for (const el of stages[s].elements) {
             for (const r of el.rects) {
               if (!showDebugMarkers && isDebugRect(r)) continue;
-              rects.push({ ...r, opacity: DIM_OPACITY, transparent: true });
+              if (!showDebugLadders && isLadderRect(r)) continue;
+              if (isDebugRect(r) || isLadderRect(r)) rects.push({ ...r, opacity: 1, transparent: false });
+              else rects.push({ ...r, opacity: DIM_OPACITY, transparent: true });
             }
           }
         }
@@ -380,7 +490,9 @@
       for (let e = 0; e <= elementIdx; e++) {
         for (const r of current.elements[e].rects) {
           if (!showDebugMarkers && isDebugRect(r)) continue;
-          rects.push({ ...r, opacity: r.opacity !== undefined ? r.opacity * curOpacity : curOpacity, transparent: gridVisible });
+          if (!showDebugLadders && isLadderRect(r)) continue;
+          if (isDebugRect(r) || isLadderRect(r)) rects.push({ ...r, opacity: 1, transparent: false });
+          else rects.push({ ...r, opacity: r.opacity !== undefined ? r.opacity * curOpacity : curOpacity, transparent: gridVisible });
         }
       }
 
@@ -464,6 +576,7 @@
       if (e.key === 'a' || e.key === 'A') toggleShowAll();
       if (e.key === 'p' || e.key === 'P') togglePrior();
       if (e.key === 'd' || e.key === 'D') toggleDebugMarkers();
+      if (e.key === 'l' || e.key === 'L') toggleDebugLadders();
     });
 
     // --- Collision grid toggle ---
@@ -552,6 +665,7 @@
     let showAll = false;
     let showPrior = true;
     let showDebugMarkers = false;
+    let showDebugLadders = false;
 
     async function loadCollisionGrid() {
       if (gridLoaded) return;
@@ -673,12 +787,14 @@
     function togglePrior() {
       showPrior = !showPrior;
       document.getElementById('btn-prior').classList.toggle('active', showPrior);
+      document.getElementById('prior-panel').style.display = showPrior ? 'flex' : 'none';
       setFrame(currentIndex);
     }
 
     function toggleShowAll() {
       showAll = !showAll;
       document.getElementById('btn-show-all').classList.toggle('active', showAll);
+      document.getElementById('all-layers-panel').style.display = showAll ? 'flex' : 'none';
       setFrame(currentIndex);
     }
 
@@ -688,10 +804,17 @@
       setFrame(currentIndex);
     }
 
+    function toggleDebugLadders() {
+      showDebugLadders = !showDebugLadders;
+      document.getElementById('btn-debug-ladders').classList.toggle('active', showDebugLadders);
+      setFrame(currentIndex);
+    }
+
     document.getElementById('btn-grid').addEventListener('click', toggleGrid);
     document.getElementById('btn-show-all').addEventListener('click', toggleShowAll);
     document.getElementById('btn-prior').addEventListener('click', togglePrior);
     document.getElementById('btn-debug-markers').addEventListener('click', toggleDebugMarkers);
+    document.getElementById('btn-debug-ladders').addEventListener('click', toggleDebugLadders);
     for (const g of CELL_GROUPS) {
       document.getElementById(g.id)?.addEventListener('change', applyGridVisibility);
     }
@@ -699,13 +822,43 @@
     // --- Resize ---
     const controlsEl = document.getElementById('controls');
     function resize() {
-      const h = window.innerHeight - controlsEl.offsetHeight;
+      const h = Math.max(1, window.innerHeight - controlsEl.offsetHeight);
       renderer.setSize(window.innerWidth, h);
       camera.aspect = window.innerWidth / h;
       camera.updateProjectionMatrix();
     }
     window.addEventListener('resize', resize);
     resize();
+
+    // --- Drag to resize controls bar ---
+    const dragHandle = document.getElementById('drag-handle');
+    let isDragging = false;
+    let dragStartY = 0;
+    let dragStartHeight = 0;
+
+    dragHandle.addEventListener('mousedown', e => {
+      isDragging = true;
+      dragStartY = e.clientY;
+      dragStartHeight = controlsEl.offsetHeight;
+      dragHandle.classList.add('dragging');
+      document.body.style.cursor = 'ns-resize';
+      e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', e => {
+      if (!isDragging) return;
+      const dy = dragStartY - e.clientY; // up = positive = taller bar
+      const newH = Math.max(60, Math.min(window.innerHeight * 0.85, dragStartHeight + dy));
+      controlsEl.style.height = newH + 'px';
+      resize();
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (!isDragging) return;
+      isDragging = false;
+      dragHandle.classList.remove('dragging');
+      document.body.style.cursor = '';
+    });
 
     // --- Render loop ---
     function animate() {

@@ -134,6 +134,16 @@ export const LADDER_DISPLAY = {
   rungInset: 0.1,            // how far rungs sit inside the poles
 };
 
+// --- Ladders ---
+export const LADDERS = {
+  mapEdgeClearance:     5,    // units from map edge — no ladders within this distance
+  connectionClearance:  4,    // units (Chebyshev) from any WALKWAY/DOOR cell
+  buildingClearance:    4,    // units from another building's SHELL cells along facing ray
+  pathSpacing:          6,    // min world distance between ladders from different paths
+  maxSideCount:         2,    // max ladders per facing direction per building
+  fullHeightCullChance: 0.30, // chance to randomly trim a full-height ladder
+};
+
 // --- Deletion Toggles --- (_old_system only)
 // export const DELETIONS = { ... };  // see _old_system/config.js
 

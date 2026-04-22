@@ -18,6 +18,7 @@ const STAGE_COLORS = {
   6: '#cc5533', // Walls
   7: '#aa44cc', // Connectivity
   8: '#33bbcc', // Cover
+  9: '#88aaff', // Ladders (external) — internal uses #ffaa44 per-element
 };
 
 const STAGE_NAMES = {
@@ -29,6 +30,7 @@ const STAGE_NAMES = {
   6: 'Walls',
   7: 'Connectivity',
   8: 'Cover',
+  9: 'Ladders',
 };
 
 export function createRecorder(seed, config) {
@@ -61,6 +63,7 @@ function stageToElements(stageIndex, data, color, config) {
     case 6: return wallElements(data);
     case 7: return connectivityElements(data, color, config);
     case 8: return coverElements(data, color);
+    case 9: return ladderElements(data);
     default: return [];
   }
 }
@@ -272,6 +275,34 @@ function coverElements(data, color) {
     label: `Cover — ${i + 1}/${total}`,
     rects: [box('cover', c.x, c.y, c.z, c.w, c.height, c.d, color)],
   }));
+}
+
+function ladderElements(data) {
+  const elements = [];
+
+  const candidates = data.ladderCandidates || [];
+  const totalC = candidates.length;
+  for (let i = 0; i < candidates.length; i++) {
+    const c = candidates[i];
+    const color = c.isExternal ? '#88aaff' : '#ffaa44';
+    elements.push({
+      label: `Ladders — candidate ${i + 1}/${totalC} ${c.direction} ${c.isExternal ? 'ext' : 'int'} (${c.cx},${c.cy},${c.cz})`,
+      rects: [box('ladder_candidate', c.wx, c.wy, c.wz, 0.75, 0.75, 0.75, color)],
+    });
+  }
+
+  const groups = data.ladderGroups || [];
+  const totalG = groups.length;
+  for (let i = 0; i < groups.length; i++) {
+    const l = groups[i];
+    const color = l.isExternal ? '#44ffaa' : '#ff6644';
+    elements.push({
+      label: `Ladders — group ${i + 1}/${totalG} ${l.direction} ${l.isExternal ? 'ext' : 'int'} tiers ${l.startTier}→${l.endTier} (${l.lcx},${l.lcz})`,
+      rects: [box('ladder_candidate', l.x, l.bottomY, l.z, l.w, l.height, l.d, color)],
+    });
+  }
+
+  return elements;
 }
 
 function box(type, x, y, z, w, h, d, color, opacity = 1) {

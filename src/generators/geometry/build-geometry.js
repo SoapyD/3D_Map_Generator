@@ -16,6 +16,7 @@ import { buildWalkwayPrimitives } from './build-walkway-primitives.js';
 import { buildPillarPrimitives } from './build-pillar-primitives.js';
 import { buildRoofPrimitives } from './build-roof-primitives.js';
 import { buildAllLadderPrimitives } from './build-all-ladder-primitives.js';
+import { buildLadderPrimitive } from './build-ladder-primitive.js';
 import { buildLadderPlatformPrimitives } from './build-ladder-platform-primitives.js';
 import { buildJunctionPlatformPrimitives } from './build-junction-platform-primitives.js';
 import { buildBridgePrimitives } from './build-bridge-primitives.js';
@@ -65,6 +66,11 @@ export function buildGeometry(data, config) {
   primitives.push(...buildAllLadderPrimitives(conn, walls));
   primitives.push(...buildLadderPlatformPrimitives(conn.ladderPlatforms || []));
   primitives.push(...buildJunctionPlatformPrimitives(conn.junctionPlatforms || []));
+
+  for (const l of (data.ladders || [])) {
+    const p = buildLadderPrimitive(l.id, { x: l.x, z: l.z, w: l.w, d: l.d, y0: l.bottomY, y1: l.topY }, l.buildingIndex, walls);
+    if (p) primitives.push(p);
+  }
 
   return { version: 1, primitives };
 }
