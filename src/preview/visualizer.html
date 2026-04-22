@@ -177,7 +177,7 @@
     </div>
     <div class="control-row">
       <button id="btn-debug-markers">Debug Connections [D]</button>
-      <button id="btn-debug-ladders">Debug Ladders [L]</button>
+      <button id="btn-debug-ladders">Debug Cull Ladders [L]</button>
     </div>
     <div id="legend"></div>
   </div>
@@ -453,10 +453,11 @@
           for (const el of stage.elements) {
             for (const r of el.rects) {
               if (r.type === 'building') continue;
-              const isDebug  = isDebugRect(r) || isLadderRect(r);
+              const isCulledLadder = isLadderRect(r) && r.isCulled;
+              const isDebug = isDebugRect(r) || isCulledLadder;
               if (!stageOn && !isDebug) continue;
               if (!showDebugMarkers && isDebugRect(r)) continue;
-              if (!showDebugLadders && isLadderRect(r)) continue;
+              if (!showDebugLadders && isCulledLadder) continue;
               rects.push({ ...r, opacity: 1, transparent: false });
             }
           }
@@ -476,9 +477,10 @@
           if (!priorStages.has(stages[s].stage)) continue;
           for (const el of stages[s].elements) {
             for (const r of el.rects) {
+              const isCulledLadder = isLadderRect(r) && r.isCulled;
               if (!showDebugMarkers && isDebugRect(r)) continue;
-              if (!showDebugLadders && isLadderRect(r)) continue;
-              if (isDebugRect(r) || isLadderRect(r)) rects.push({ ...r, opacity: 1, transparent: false });
+              if (!showDebugLadders && isCulledLadder) continue;
+              if (isDebugRect(r) || isCulledLadder) rects.push({ ...r, opacity: 1, transparent: false });
               else rects.push({ ...r, opacity: DIM_OPACITY, transparent: true });
             }
           }
@@ -489,9 +491,10 @@
       const curOpacity = gridVisible ? GRID_OPACITY : 1;
       for (let e = 0; e <= elementIdx; e++) {
         for (const r of current.elements[e].rects) {
+          const isCulledLadder = isLadderRect(r) && r.isCulled;
           if (!showDebugMarkers && isDebugRect(r)) continue;
-          if (!showDebugLadders && isLadderRect(r)) continue;
-          if (isDebugRect(r) || isLadderRect(r)) rects.push({ ...r, opacity: 1, transparent: false });
+          if (!showDebugLadders && isCulledLadder) continue;
+          if (isDebugRect(r) || isCulledLadder) rects.push({ ...r, opacity: 1, transparent: false });
           else rects.push({ ...r, opacity: r.opacity !== undefined ? r.opacity * curOpacity : curOpacity, transparent: gridVisible });
         }
       }

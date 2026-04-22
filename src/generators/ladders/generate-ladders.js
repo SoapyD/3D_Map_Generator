@@ -124,7 +124,7 @@ function hasAdjacentBuilding(lcx, cy, lcz, direction, range, matrix) {
   const { dx, dz } = DIR_VEC[direction];
   for (let step = 1; step <= range; step++) {
     const v = matrix.getCell(lcx + dx * step, cy, lcz + dz * step);
-    if (v !== CELL.EMPTY) return true;
+    if (v !== CELL.EMPTY && v !== CELL.SHELL) return true;
   }
   return false;
 }

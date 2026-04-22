@@ -136,7 +136,7 @@ export const LADDER_DISPLAY = {
 
 // --- Ladders ---
 export const LADDERS = {
-  mapEdgeClearance:     5,    // units from map edge — no ladders within this distance
+  mapEdgeClearance:     3,    // units from map edge — no ladders within this distance
   connectionClearance:  2,    // units (Chebyshev) from any WALKWAY/DOOR cell
   buildingClearance:    4,    // units from another building's SHELL cells along facing ray
   pathSpacing:          6,    // min world distance between ladders from different paths

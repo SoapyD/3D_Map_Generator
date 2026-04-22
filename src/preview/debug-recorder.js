@@ -287,7 +287,7 @@ function ladderElements(data) {
     const color = c.isExternal ? '#88aaff' : '#ffaa44';
     elements.push({
       label: `Ladders — candidate ${i + 1}/${totalC} ${c.direction} ${c.isExternal ? 'ext' : 'int'} (${c.cx},${c.cy},${c.cz})`,
-      rects: [box('ladder_candidate', c.wx, c.wy, c.wz, 0.75, 0.75, 0.75, color)],
+      rects: [{ ...box('ladder_candidate', c.wx, c.wy, c.wz, 0.75, 0.75, 0.75, color), isCulled: true }],
     });
   }
 
@@ -304,7 +304,7 @@ function ladderElements(data) {
                 :                            '#ff6644';
     elements.push({
       label: `Ladders — group ${i + 1}/${totalG} ${l.direction} ${l.isExternal ? 'ext' : 'int'} tiers ${l.startTier}→${l.endTier} (${l.lcx},${l.lcz})`,
-      rects: [box('ladder_candidate', l.x, l.bottomY, l.z, l.w, l.height, l.d, color)],
+      rects: [{ ...box('ladder_candidate', l.x, l.bottomY, l.z, l.w, l.height, l.d, color), isCulled: l.isCulled }],
     });
   }
 
