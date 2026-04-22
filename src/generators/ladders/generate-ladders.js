@@ -145,10 +145,10 @@ function phase1Candidates(matrix, buildings, config) {
         const facings = CELL_FACINGS.get(matrix.getCell(cx, cy, cz));
         if (!facings) continue;
 
-        // Rule 1: map edge clearance — DISABLED for debug
-        // const { x: wx, z: wz } = matrix.cellToWorld(cx, cy, cz);
-        // if (wx < mapEdge || wx > mapWidth - mapEdge ||
-        //     wz < mapEdge || wz > mapDepth - mapEdge) continue;
+        // Rule 1: map edge clearance
+        const { x: wx, z: wz } = matrix.cellToWorld(cx, cy, cz);
+        if (wx < mapEdge || wx > mapWidth - mapEdge ||
+            wz < mapEdge || wz > mapDepth - mapEdge) continue;
 
         const bi = findBuildingIndex(cx, cz, buildings, matrix);
         if (bi < 0) continue;
