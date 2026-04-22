@@ -267,12 +267,15 @@ function phase2Ladders(candidates, buildings, config, rng, matrix) {
       }
     }
 
-    const bottomY   = bottomCy;
-    const topY      = highestCy + 1;
+    let bottomY   = bottomCy;
+    let topY      = highestCy + 1;
     const startTier = floorIndex(bottomCy, tierHeight, slabThickness);
     const endTier   = highestTier + 1;
 
-    // Step 2c — full-height culling DISABLED for debug
+    const height0 = topY - bottomY;
+    if (height0 <= 0) continue;
+
+    let trimSection = null;
 
     const height = topY - bottomY;
     if (height <= 0) continue;
@@ -302,6 +305,7 @@ function phase2Ladders(candidates, buildings, config, rng, matrix) {
       d: isNS ? THICKNESS : 0.75,
       bottomY, topY, height,
       startTier, endTier,
+      trimSection,
       triggers: group.map(c => ({ cx: c.cx, cy: c.cy, cz: c.cz, isRoof: c.isRoof })),
     });
   }
@@ -469,8 +473,93 @@ function phase4Select(pathsByBuilding, buildings, rng) {
 
 // ─── Main export ─────────────────────────────────────────────────────────────
 
+// ─── Debug path builder ───────────────────────────────────────────────────────
+
+const PATH_QUOTA = {
+  'ruins-small': 1, 'small': 1,
+  'medium': 2, 'ruins-medium-h': 2, 'ruins-medium-v': 2,
+  'largeA': 3, 'largeB': 3,
+};
+const PATH_MIN_SPACING = 3;
+
+function buildDebugPaths(ladderGroups, buildings, config, rng) {
+  const { tierHeight, slabThickness } = config;
+  const tierH = tierHeight + slabThickness;
+
+  const byBuilding = new Map();
+  for (const l of ladderGroups) {
+    if (!l.isExternal || l.isCulled) continue;
+    if (!byBuilding.has(l.buildingIndex)) byBuilding.set(l.buildingIndex, []);
+    byBuilding.get(l.buildingIndex).push(l);
+  }
+
+  const allPaths = [];
+
+  for (const [bi, ladders] of byBuilding) {
+    const building      = buildings[bi];
+    const roofTier      = building.maxTier - 1;
+    const quota         = PATH_QUOTA[building.size] ?? 1;
+    const placedLadders = []; // all ladders picked across all paths this building
+
+    for (let pathIdx = 0; pathIdx < quota; pathIdx++) {
+      const segments    = [];
+      let   currentTier = 0;
+      const usedDirs    = new Set();
+
+      while (currentTier < roofTier) {
+        // Prefer unused directions; reset if all exhausted
+        let pool = ladders.filter(l => !usedDirs.has(l.direction));
+        if (pool.length === 0) { usedDirs.clear(); pool = [...ladders]; }
+
+        // Additional paths: require spacing from all already-placed ladders
+        if (pathIdx > 0) {
+          pool = pool.filter(l => placedLadders.every(p => ladderDist(l, p) >= PATH_MIN_SPACING));
+          if (pool.length === 0) {
+            // No viable ladder at this tier — skip up one and try again
+            currentTier++;
+            continue;
+          }
+        }
+
+        if (pool.length === 0) break;
+
+        const picked = rng.pick(pool);
+        usedDirs.add(picked.direction);
+        placedLadders.push(picked);
+
+        const remaining = roofTier - currentTier;
+        const nextTier  = remaining <= 2
+          ? roofTier
+          : Math.min(roofTier, currentTier + rng.int(1, 2));
+
+        const keptBottomY    = Math.max(currentTier * tierH, picked.bottomY);
+        const keptTopY       = Math.min(nextTier * tierH, picked.topY);
+        const deletedBottomY = keptTopY;
+        const deletedTopY    = picked.topY;
+        const hasDeleted     = nextTier < roofTier && deletedTopY > deletedBottomY;
+
+        segments.push({
+          x: picked.x, z: picked.z, w: picked.w, d: picked.d,
+          direction: picked.direction,
+          keptBottomY, keptTopY,
+          hasDeleted, deletedBottomY, deletedTopY,
+        });
+
+        currentTier = nextTier;
+      }
+
+      if (segments.length > 0) allPaths.push({ buildingIndex: bi, pathIndex: pathIdx, segments });
+    }
+  }
+
+  return allPaths;
+}
+
+// ─── Main export ─────────────────────────────────────────────────────────────
+
 export function generateLadders(data, config, rng, matrix) {
-  const candidates = phase1Candidates(matrix, data.buildings, config);
+  const candidates   = phase1Candidates(matrix, data.buildings, config);
   const ladderGroups = phase2Ladders(candidates, data.buildings, config, rng, matrix);
-  return { ...data, ladders: [], ladderCandidates: candidates, ladderGroups };
+  const ladderPaths  = buildDebugPaths(ladderGroups, data.buildings, config, rng);
+  return { ...data, ladders: [], ladderCandidates: candidates, ladderGroups, ladderPaths };
 }

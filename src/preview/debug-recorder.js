@@ -302,10 +302,32 @@ function ladderElements(data) {
                 : r.includes('connection') ? '#ffff00'
                 : l.isExternal             ? '#44ffaa'
                 :                            '#ff6644';
+    const rects = [{ ...box('ladder_candidate', l.x, l.bottomY, l.z, l.w, l.height, l.d, color), isCulled: l.isCulled }];
+    if (l.trimSection) {
+      const ts = l.trimSection;
+      rects.push({ ...box('ladder_candidate', l.x, ts.bottomY, l.z, l.w, ts.topY - ts.bottomY, l.d, '#333333'), isCulled: l.isCulled });
+    }
     elements.push({
       label: `Ladders — group ${i + 1}/${totalG} ${l.direction} ${l.isExternal ? 'ext' : 'int'} tiers ${l.startTier}→${l.endTier} (${l.lcx},${l.lcz})`,
-      rects: [{ ...box('ladder_candidate', l.x, l.bottomY, l.z, l.w, l.height, l.d, color), isCulled: l.isCulled }],
+      rects,
     });
+  }
+
+  const paths = data.ladderPaths || [];
+  for (let pi = 0; pi < paths.length; pi++) {
+    const path = paths[pi];
+    for (let si = 0; si < path.segments.length; si++) {
+      const s = path.segments[si];
+      const keptH = s.keptTopY - s.keptBottomY;
+      const rects = [box('ladder_path', s.x, s.keptBottomY, s.z, s.w, keptH, s.d, '#4488ff')];
+      if (s.hasDeleted) {
+        rects.push(box('ladder_path', s.x, s.deletedBottomY, s.z, s.w, s.deletedTopY - s.deletedBottomY, s.d, '#ff3333'));
+      }
+      elements.push({
+        label: `Ladder path — building ${path.buildingIndex} seg ${si + 1}/${path.segments.length} ${s.direction}`,
+        rects,
+      });
+    }
   }
 
   return elements;
