@@ -44,14 +44,14 @@ export function generateStreets(data, config, rng, matrix) {
   console.log(`  Streets: ${nonRiverStreets.length} surfaces`);
 
   // Phase 5 — pavements (foundation areas not covered by building shells)
-  const pavementCells = writePavements(blocks, matrix, config);
-  console.log(`  Pavements: ${pavementCells} cells`);
+  const { cellCount: pavementCells, rects: pavementRects } = writePavements(blocks, matrix, config);
+  console.log(`  Pavements: ${pavementCells} cells, ${pavementRects.length} rects`);
 
   return {
     ...data,
     streetNodes,
     rivers:    riverRects.length > 0 ? [{ path: riverNodeIds, rects: riverRects, banks: riverBanks }] : [],
     streets:   nonRiverStreets,
-    pavements: blocks,
+    pavements: pavementRects,
   };
 }

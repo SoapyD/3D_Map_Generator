@@ -127,6 +127,10 @@ export const GEOMETRY = {
   platformSize: 2,           // ladder platform width/depth (inches)
   platformThickness: 0.2,    // ladder platform thickness (inches)
   walkwayThickness: 0.25,    // walkway slab thickness (inches)
+  riverThickness:    0.25,   // river bed slab thickness
+  riverBankThickness: 0.25,  // bank wall thickness
+  streetThickness:   0.25,   // street surface slab thickness
+  pavementThickness: 0.25,   // pavement slab thickness
 };
 
 // --- Ladder Display ---

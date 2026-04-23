@@ -30,6 +30,10 @@ export function resolveTexturedMaterial(textureKey, pools) {
   if (parts[0] === 'object') return pickFromPool(pools.objects, parseInt(parts[1], 10));
   if (parts[0] === 'courtyard') return pickFromPool(pools.courtyards, 0);
   if (parts[0] === 'ladder') return pickFromPool(pools.ladders, parseInt(parts[1], 10));
+  if (parts[0] === 'river') return pickFromPool(pools.rivers, parseInt(parts[1] ?? 0, 10));
+  if (parts[0] === 'river_bank') return pickFromPool(pools.river_banks, parseInt(parts[1] ?? 0, 10));
+  if (parts[0] === 'street') return pickFromPool(pools.streets, parseInt(parts[1] ?? 0, 10));
+  if (parts[0] === 'pavement') return pickFromPool(pools.pavements, parseInt(parts[1] ?? 0, 10));
 
   return pickFromPool(pools.walls, 0);
 }

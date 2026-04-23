@@ -23,6 +23,10 @@ import { buildBridgePrimitives } from './build-bridge-primitives.js';
 import { buildBoxSlabPrimitives } from './build-scatter-primitives.js';
 import { buildCourtyardPrimitives } from './build-courtyard-primitives.js';
 import { buildBuildingFootprintPrimitives } from './build-building-footprint-primitives.js';
+import { buildRiverPrimitives } from './build-river-primitives.js';
+import { buildRiverBankPrimitives } from './build-river-bank-primitives.js';
+import { buildStreetPrimitives } from './build-street-primitives.js';
+import { buildPavementPrimitives } from './build-pavement-primitives.js';
 
 // ─── Main builder ─────────────────────────────────────────────────────
 
@@ -60,6 +64,10 @@ export function buildGeometry(data, config) {
   primitives.push(...buildBoxSlabPrimitives(data.interiorCover || [], 'interior_cover', objTexKey));
   primitives.push(...buildBoxSlabPrimitives(data.streetScatter || [], 'street_scatter', objTexKey));
   primitives.push(...buildCourtyardPrimitives(data.deletedFootprints || []));
+  primitives.push(...buildRiverPrimitives(data.rivers || []));
+  primitives.push(...buildRiverBankPrimitives(data.rivers || []));
+  primitives.push(...buildStreetPrimitives(data.streets || [], config));
+  primitives.push(...buildPavementPrimitives(data.pavements || [], config));
   primitives.push(...buildRoofPrimitives(data.roofs || [], buildings, config));
 
   const conn = data.connections || {};
