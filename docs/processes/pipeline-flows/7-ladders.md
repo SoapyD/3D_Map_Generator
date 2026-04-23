@@ -1,4 +1,4 @@
-# Stage 6: Ladder Placement
+# Stage 7: Ladder Placement
 
 > Last verified: 2026-04-23
 

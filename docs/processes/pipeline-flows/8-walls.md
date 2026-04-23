@@ -1,4 +1,4 @@
-# Stage 7: Wall Generation
+# Stage 8: Wall Generation
 
 > Last verified: 2026-04-23
 

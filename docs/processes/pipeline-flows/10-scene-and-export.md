@@ -1,4 +1,4 @@
-# Stage 9: Scene Build and Export
+# Stage 10: Scene Build and Export
 
 > Last verified: 2026-04-21
 

@@ -16,16 +16,25 @@ export function filterCandidates(activeCandidates, config, rng) {
   const strategy = config.filterStrategy ?? 'longestAndShortest';
   const N        = config.filterN        ?? 2;
 
-  // 6e — per-tier independence
+  const survivors = [];
+  const culled    = [];
+
+  // River crossing candidates: cull to 1 per river section, 10% chance of a 2nd.
+  // Grouped by their fixed perpendicular coordinate — all crossings of the same
+  // corridor share the same anchor cz (NS-axis) or cx (WE-axis).
+  const riverCrossing = activeCandidates.filter(c => c.fromBuildingId === 'river_crossing');
+  const regular       = activeCandidates.filter(c => c.fromBuildingId !== 'river_crossing');
+  const { kept: rcKept, rejected: rcRejected } = cullRiverCrossings(riverCrossing, rng);
+  survivors.push(...rcKept);
+  culled.push(...rcRejected);
+
+  // 6e — per-tier independence for regular candidates
   const byTier = new Map();
-  for (const c of activeCandidates) {
+  for (const c of regular) {
     const tier = c.from.tier;
     if (!byTier.has(tier)) byTier.set(tier, []);
     byTier.get(tier).push(c);
   }
-
-  const survivors = [];
-  const culled    = [];
 
   for (const tierCandidates of byTier.values()) {
     const kept = filterTier(tierCandidates, strategy, N, rng);
@@ -43,7 +52,64 @@ export function filterCandidates(activeCandidates, config, rng) {
   return { survivors, culled };
 }
 
-// --- internals ---
+// --- river crossing cull ---
+
+const RIVER_CROSSING_LONG_THRESHOLD = 10; // units — stretches longer than this guarantee a 2nd crossing
+
+function cullRiverCrossings(candidates, rng) {
+  // Group by section: NS-axis crossings share cz, WE-axis share cx
+  const sections = new Map();
+  for (const c of candidates) {
+    const key = c.axis === 'NS'
+      ? `NS:${c.from.cells[0].cz}`
+      : `WE:${c.from.cells[0].cx}`;
+    if (!sections.has(key)) sections.set(key, []);
+    sections.get(key).push(c);
+  }
+
+  const kept = [], rejected = [];
+  for (const group of sections.values()) {
+    // Shuffle so the kept crossing is random
+    const shuffled = group.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rng.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    const first    = shuffled[0];
+    const firstPos = first.axis === 'NS' ? first.from.cells[0].cx : first.from.cells[0].cz;
+    const rest     = shuffled.slice(1);
+
+    // Candidates more than RIVER_CROSSING_LONG_THRESHOLD units from the first
+    const farCandidates = rest.filter(c => {
+      const pos = c.axis === 'NS' ? c.from.cells[0].cx : c.from.cells[0].cz;
+      return Math.abs(pos - firstPos) > RIVER_CROSSING_LONG_THRESHOLD;
+    });
+
+    // Long stretch → guarantee a 2nd from the far candidates.
+    // Short stretch → 10% chance of any remaining candidate.
+    let second = null;
+    if (farCandidates.length > 0) {
+      second = rng.pick(farCandidates);
+    } else if (rest.length > 0 && rng.chance(0.10)) {
+      second = rest[0]; // already shuffled
+    }
+
+    kept.push(first);
+    for (const c of rest) {
+      if (c === second) {
+        kept.push(c);
+      } else {
+        c.filterCulled = true;
+        rejected.push(c);
+      }
+    }
+  }
+
+  return { kept, rejected };
+}
+
+// --- per-building filter internals ---
 
 function filterTier(candidates, strategy, N, rng) {
   // 6b — group by fromBuildingId, sort each group ascending by length

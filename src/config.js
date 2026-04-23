@@ -84,6 +84,9 @@ export const CONNECTIVITY = {
     low:         30,
     battlement:  60,
   },
+  riverCrossingPeriod:     2,     // anchor spacing along bank edge (cells)
+  riverCrossingMaxLength:  5,     // max ray-cast length for river crossing candidates
+  riverCrossingSpacing:    3,     // min cells between a river crossing and any same-axis connection
   bridgeThickness:         0.5,   // slab thickness; top face flush with cell top
   bridgeWallHeight:        1,     // base wall height (inches, = 1 cell)
   bridgeWallThickness:     0.25,

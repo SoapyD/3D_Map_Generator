@@ -1,6 +1,6 @@
-# Stage 5: Connectivity
+# Stage 6: Connectivity
 
-> Last verified: 2026-04-23
+> Last verified: 2026-04-23 (added river crossing anchors)
 
 ## Overview
 
@@ -16,12 +16,14 @@ data: {
   // all prior fields carried forward
 }
 config: {
-  anchorPeriod: number,         // P — grid counter period (default 4)
-  maxConnectionLength: number,  // cap on walkway span in cells
-  filterStrategy: string,       // 'longestAndShortest' | 'longest' | 'shortest' | 'random'
-  filterN: number,              // quota per building per tier
-  bridgeMinLength: number,      // min length (cells) eligible for bridge type (default 6)
-  bridgeLongThreshold: number,  // length at which long-bridge chances apply (default 12)
+  anchorPeriod: number,            // P — grid counter period (default 4)
+  maxConnectionLength: number,     // cap on walkway span in cells
+  filterStrategy: string,          // 'longestAndShortest' | 'longest' | 'shortest' | 'random'
+  filterN: number,                 // quota per building per tier
+  bridgeMinLength: number,         // min length (cells) eligible for bridge type (default 6)
+  bridgeLongThreshold: number,     // length at which long-bridge chances apply (default 12)
+  riverCrossingMaxLength: number,  // max ray length for river crossing candidates (default 5)
+  riverCrossingSpacing: number,    // reserved for future spacing cull (default 3)
 }
 rng: RNG
 matrix: CollisionMatrix
@@ -29,7 +31,7 @@ matrix: CollisionMatrix
 
 ## Algorithm
 
-### Phase 1 — Anchor emission (`emitAnchors`)
+### Phase 1a — Building anchor emission (`emitAnchors`)
 
 For every Y level that contains a floor or roof slab:
 
@@ -56,6 +58,17 @@ Each anchor record:
 ```
 
 Trigger cells (the floor-edge cells the anchor fired from) are also recorded separately for debug rendering when `config.visualize` is set.
+
+### Phase 1b — River crossing anchor emission (`emitRiverCrossingAnchors`)
+
+Runs after Phase 1a. For each bank record in `data.rivers[].banks`:
+- Anchor direction = `OPPOSITE[bank.facing]` (fires toward the river)
+- `cy = Math.floor(-slabThickness / cellSize)` — matches tier-0 floor anchors so walkways sit flush with ground
+- Walk along the bank edge checking `cx % anchorPeriod === 0` (WE-axis) or `cz % anchorPeriod === 0` (NS-axis) — same global grid as building anchors
+- Emit 2-wide anchor where both cells are `CELL.EMPTY` at that cy
+- `buildingId = 'river_crossing'` — flags candidates for dedicated culling in the filter pass
+
+River crossing candidates are paired separately with `maxConnectionLength = 5` (river corridors are 4 cells wide), then merged into the main candidate list before the stacking cull.
 
 ### Phase 2 — Anchor pairing (`pairAnchors`)
 
@@ -88,11 +101,18 @@ Each candidate:
 - For each component of 2+, mark all but the longest `stackCulled = true`. RNG breaks ties.
 
 **Steps 6b–6e — Per-building filter (`filterCandidates`)**:
-- Remove stack-culled candidates.
-- Group remaining candidates by `fromBuildingId`, sort each group by `length` ascending.
-- Apply `filterStrategy` to select up to `filterN` candidates per building (or `2*filterN` for `longestAndShortest`).
-- Bidirectional duplicate check: skip if a connection between this building pair already exists in the filtered output.
-- Rejected candidates are marked `filterCulled = true`.
+
+River crossing candidates (`fromBuildingId === 'river_crossing'`) are separated first and processed by `cullRiverCrossings`:
+- Group by **section key**: `czAnchor` for NS-axis, `cxAnchor` for WE-axis — each unique value corresponds to one river corridor rect (stretch between two nodes)
+- Shuffle within each group; keep 1
+- **Long stretch rule**: if any remaining candidate is >10 cells from the first along the corridor, randomly pick one as a guaranteed 2nd
+- **Short stretch fallback**: 10% chance of a 2nd otherwise
+
+Regular candidates (non-river) are then processed normally:
+- Remove stack-culled candidates; group by `fromBuildingId`; sort ascending by length
+- Apply `filterStrategy` to select up to `filterN` per building (or `2*filterN` for `longestAndShortest`)
+- Bidirectional duplicate check per tier
+- Rejected candidates marked `filterCulled = true`
 
 **Bridge culling (`cullBridges`)**:
 - Enumerates span cells for all filter survivors to find crossing connections (cells shared by ≥ 2 connections). Crossing connections are immune to culling.
@@ -151,7 +171,8 @@ Connections with `length ≥ CONNECTIVITY.pillarMinLength` (default 8) receive s
 - [src/generators/connectivity/cull-bridges.js](../../../../src/generators/connectivity/cull-bridges.js) — Phase 3 bridge culling; crossing detection + probabilistic survival rates
 - [src/generators/connectivity/enumerate-cells.js](../../../../src/generators/connectivity/enumerate-cells.js) — shared helper; span cell enumeration (used by cull-bridges and rasterise-connections)
 - [src/generators/connectivity/rasterise-connections.js](../../../../src/generators/connectivity/rasterise-connections.js) — Phase 4; type assignment, crossing detection, segment splitting, matrix writes
-- [src/generators/connectivity/generate-pillars.js](../../../../src/generators/connectivity/generate-pillars.js) — Phase 4; pillar placement for long spans
+- [src/generators/connectivity/generate-pillars.js](../../../../src/generators/connectivity/generate-pillars.js) — Phase 4; pillar placement for long spans; scan extended to `-BELOW_GROUND` so pillars over rivers reach the river bed
+- [src/generators/connectivity/emit-river-crossing-anchors.js](../../../../src/generators/connectivity/emit-river-crossing-anchors.js) — Phase 1b; ground-level anchors from bank edges
 
 ## Edge Cases & Constraints
 
@@ -160,3 +181,6 @@ Connections with `length ≥ CONNECTIVITY.pillarMinLength` (default 8) receive s
 - Anchors only emit from cells whose Y level matches a known floor or roof Y — no free-floating anchor emission.
 - `IFLOOR_*` and `IROOF_*` cells are included in the eligible label sets, so walkways can bridge damaged quadrants within a single building and connect to rooftop edges.
 - Bridge culling survival rates are probabilistic per-connection. Crossing-protected connections are immune regardless of length band.
+- River crossing anchors emit at `cy = -slabThickness` to match tier-0 floor anchors — `CELL.STREET_PLACEHOLDER` is cleared from river rects in the Streets stage so these cells are `CELL.EMPTY`.
+- River crossings are always `connectionType = 'walkway'` (not bridge) because `cy = -1` → `elevated = false` in `assignType`.
+- `generate-pillars` scan extended to `-BELOW_GROUND` so bridge pillars over rivers reach `CELL.RIVER` at the river bed rather than stopping at ground level.

@@ -12,11 +12,12 @@ docs/processes/
     2-buildings.md
     3-floors.md
     4-roofs.md
-    5-connectivity.md
-    6-ladders.md
-    7-walls.md
-    8-geometry.md
-    9-scene-and-export.md
+    5-streets.md
+    6-connectivity.md
+    7-ladders.md
+    8-walls.md
+    9-geometry.md
+    10-scene-and-export.md
     archive/                   <- superseded docs
 ```
 

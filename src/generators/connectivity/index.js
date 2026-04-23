@@ -1,11 +1,13 @@
 import { writeFileSync } from 'fs';
 import { emitAnchors } from './emit-anchors.js';
+import { emitRiverCrossingAnchors } from './emit-river-crossing-anchors.js';
 import { pairAnchors } from './pair-anchors.js';
 import { filterCandidates } from './filter-candidates.js';
 import { cullBridges } from './cull-bridges.js';
 import { rasteriseConnections } from './rasterise-connections.js';
 import { generatePillars } from './generate-pillars.js';
 import { CELL, STAGE } from '../collision/matrix.js';
+import { CONNECTIVITY } from '../../config.js';
 
 // Step 7b-i — vectors pointing FROM anchor cell BACK TO its trigger (floor-edge) cell
 const TO_TRIGGER = { N: [0, 1], S: [0, -1], E: [-1, 0], W: [1, 0] };
@@ -58,6 +60,18 @@ function stampDoors(survivors, matrix) {
 export function generateConnectivity(data, config, rng, matrix) {
   const { anchors, triggerCells } = emitAnchors(data, matrix, config);
   const candidates = pairAnchors(anchors, matrix, config);
+
+  // River crossing candidates — ground-level anchors on pavement/river edges,
+  // paired with a tight max-length cap. Merged before stacking cull.
+  const riverAnchors     = emitRiverCrossingAnchors(data.rivers ?? [], matrix, config);
+  const riverCandidates  = pairAnchors(riverAnchors, matrix, {
+    maxConnectionLength: config.riverCrossingMaxLength ?? CONNECTIVITY.riverCrossingMaxLength,
+  });
+  if (riverCandidates.length > 0) {
+    console.log(`  River crossings: ${riverCandidates.length} candidates`);
+    candidates.push(...riverCandidates);
+    anchors.push(...riverAnchors);
+  }
 
   // Step 6a — vertical stacking detection
   // Two candidates are stacked if: same axis, same perpendicular coordinate,

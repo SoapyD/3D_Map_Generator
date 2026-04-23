@@ -9,10 +9,10 @@ import { STREETS } from '../../config.js';
 // Weighted river mode selection — probabilities must sum to 1.
 // Override with --all-rivers flag to force all-rivers mode.
 const RIVER_WEIGHTS = [
-  { mode: 'none', p: 0.40 },
-  { mode: 'one',  p: 0.25 },
-  { mode: 'two',  p: 0.25 },
-  { mode: 'all',  p: 0.10 },
+  { mode: 'none', p: 0.800 },
+  { mode: 'one',  p: 0.100 },
+  { mode: 'two',  p: 0.075 },
+  { mode: 'all',  p: 0.025 },
 ];
 
 function pickRiverMode(rng) {
