@@ -2,6 +2,7 @@ import { buildNodeGraph } from './build-node-graph.js';
 import { findRiverPath } from './find-river-path.js';
 import { writeRiver } from './write-river.js';
 import { deriveRiverBanks } from './derive-river-banks.js';
+import { writeStreets } from './write-streets.js';
 import { STREETS } from '../../config.js';
 
 export function generateStreets(data, config, rng, matrix) {
@@ -35,13 +36,19 @@ export function generateStreets(data, config, rng, matrix) {
     console.log(`  River banks: ${riverBanks.length} edges`);
   }
 
-  // Phases 4 & 5 (street surfaces, pavements) — not yet implemented
+  // Phase 4 — street surfaces (all street rects not on the river path)
+  const riverRectSet   = new Set(riverRects);
+  const nonRiverStreets = streetBounds.filter(r => !riverRectSet.has(r));
+  writeStreets(nonRiverStreets, matrix, config);
+  console.log(`  Streets: ${nonRiverStreets.length} surfaces`);
+
+  // Phase 5 (pavements) — not yet implemented
 
   return {
     ...data,
     streetNodes,
     rivers:    riverRects.length > 0 ? [{ path: riverNodeIds, rects: riverRects, banks: riverBanks }] : [],
-    streets:   [],
+    streets:   nonRiverStreets,
     pavements: [],
   };
 }

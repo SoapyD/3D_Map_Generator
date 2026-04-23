@@ -11,7 +11,7 @@
 
 const STAGE_COLORS = {
   1:  '#5588cc', // Foundation
-  2:  '#2244aa', // Streets
+  2:  '#444444', // Streets
   3:  '#44bb88', // Buildings
   4:  '#ccaa33', // Floors
   5:  '#88aaff', // Roofs
