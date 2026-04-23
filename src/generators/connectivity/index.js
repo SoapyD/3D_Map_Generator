@@ -2,6 +2,7 @@ import { writeFileSync } from 'fs';
 import { emitAnchors } from './emit-anchors.js';
 import { pairAnchors } from './pair-anchors.js';
 import { filterCandidates } from './filter-candidates.js';
+import { cullBridges } from './cull-bridges.js';
 import { rasteriseConnections } from './rasterise-connections.js';
 import { generatePillars } from './generate-pillars.js';
 import { CELL, STAGE } from '../collision/matrix.js';
@@ -128,14 +129,17 @@ export function generateConnectivity(data, config, rng, matrix) {
   const activeCandidates = candidates.filter(c => !c.stackCulled);
 
   // Steps 6b–6e — per-tier filter pass
-  const { survivors, culled: filterCulled } = filterCandidates(activeCandidates, config, rng);
+  const { survivors: filterSurvivors, culled: filterCulled } = filterCandidates(activeCandidates, config, rng);
 
   // Mark anchors whose every remaining connection was filter-culled
-  const survivorAnchorIds = new Set(survivors.flatMap(c => [c.from.id, c.to.id]));
+  const filterSurvivorAnchorIds = new Set(filterSurvivors.flatMap(c => [c.from.id, c.to.id]));
   for (const c of filterCulled) {
-    if (!survivorAnchorIds.has(c.from.id)) c.from.filterCulled = true;
-    if (!survivorAnchorIds.has(c.to.id))   c.to.filterCulled   = true;
+    if (!filterSurvivorAnchorIds.has(c.from.id)) c.from.filterCulled = true;
+    if (!filterSurvivorAnchorIds.has(c.to.id))   c.to.filterCulled   = true;
   }
+
+  // Bridge culling — probabilistic cull of short/long bridge candidates
+  const { survivors, culled: bridgeCulled } = cullBridges(filterSurvivors, config, rng);
 
   if (config.debugConnectivity) {
     const dump = {
@@ -148,6 +152,9 @@ export function generateConnectivity(data, config, rng, matrix) {
         fromBuildingId: c.fromBuildingId, toBuildingId: c.toBuildingId,
         axis: c.axis, length: c.length,
         debugRect: c.debugRect,
+        stackCulled:  c.stackCulled  ?? false,
+        filterCulled: c.filterCulled ?? false,
+        bridgeCulled: c.bridgeCulled ?? false,
       })),
     };
     writeFileSync('debug_connectivity.json', JSON.stringify(dump, null, 2));
