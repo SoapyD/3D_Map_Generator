@@ -79,26 +79,27 @@ async function main() {
   console.log(`  ${roofData.roofs.length} roof slabs`);
   recorder?.capture(5, roofData);
 
-  // Stage 5: Streets / Rivers (pipeline position TBD — running after Roofs for now)
-  console.log('[5/?] Generating streets and rivers...');
+  // Stage 5: Streets / Rivers / Pavements — must run before Connectivity so river cells are in the matrix
+  console.log('[5/8] Generating streets and rivers...');
   const streetData = generateStreets(roofData, config, rng, matrix);
   recorder?.capture(2, streetData);
   recorder?.capture(10, streetData);
   recorder?.capture(11, streetData);
 
   // Stage 6: Connectivity
-  console.log('[6/7] Generating connectivity...');
+  console.log('[6/8] Generating connectivity...');
   const connectivityData = generateConnectivity(streetData, config, rng, matrix);
   console.log(`  ${connectivityData.connections.anchors.length} anchors, ${connectivityData.connections.candidates.length} candidate connections`);
   recorder?.capture(7, connectivityData);
 
-  // Stage 6: Ladders (must run before walls so node cells are still SHELL, not WALL_*)
-  console.log('[6/7] Generating ladders...');
+  // Stage 7: Ladders — must run before Walls so edge cells are still SHELL/FLOOR_* during scan
+  console.log('[7/8] Generating ladders...');
   const ladderData = generateLadders(connectivityData, config, rng, matrix);
   console.log(`  ${ladderData.ladders.length} ladders placed`);
   recorder?.capture(9, ladderData);
 
-  // Stage 7: Walls
+  // Stage 8: Walls
+  console.log('[8/8] Generating walls...');
   const wallData = generateWalls(ladderData, config, rng, matrix);
   recorder?.capture(6, wallData);
 
