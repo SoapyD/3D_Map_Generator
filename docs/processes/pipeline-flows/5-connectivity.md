@@ -1,10 +1,10 @@
 # Stage 5: Connectivity
 
-> Last verified: 2026-04-21
+> Last verified: 2026-04-23
 
 ## Overview
 
-Discovers walkway connection points between buildings by scanning the collision matrix for floor/roof edge labels. Three phases produce a curated set of surviving connections, then `CELL.DOOR` markers are stamped into the matrix at each connection's trigger cells so the Wall stage can carve openings. See `docs/plans/CONNECTIVITY_PLAN_V2_2026_04_20.md` for full design rationale.
+Discovers walkway connection points between buildings by scanning the collision matrix for floor/roof edge labels. Four phases produce a curated set of surviving connections, then stamps doors, rasterises walkways and crossings into the matrix, and places support pillars under long spans. See `docs/plans/archive/CONNECTIVITY_PLAN_V2_2026_04_20.md` for full design rationale.
 
 ## Input Contract
 
@@ -20,6 +20,8 @@ config: {
   maxConnectionLength: number,  // cap on walkway span in cells
   filterStrategy: string,       // 'longestAndShortest' | 'longest' | 'shortest' | 'random'
   filterN: number,              // quota per building per tier
+  bridgeMinLength: number,      // min length (cells) eligible for bridge type (default 6)
+  bridgeLongThreshold: number,  // length at which long-bridge chances apply (default 12)
 }
 rng: RNG
 matrix: CollisionMatrix
@@ -59,9 +61,12 @@ Trigger cells (the floor-edge cells the anchor fired from) are also recorded sep
 
 For each anchor, project a ray outward cell-by-cell in its facing direction. The ray terminates when:
 - Distance exceeds `maxConnectionLength` → anchor dies.
+- A non-empty, non-shell matrix cell blocks the path → ray blocked.
 - The ray hits another anchor facing the **opposite** direction (N↔S, W↔E) → candidate pair found.
 
-Duplicate pairs (both anchors fire, so each pair is discovered twice) are deduplicated via a `{from, to}` registry check.
+Partial-cell hits are accepted: if anchor cells from two buildings don't align exactly on the perpendicular axis, a one-cell offset is tolerated as long as only one ray cell hits the opposite anchor and the other is clear. Hits on two different anchors are rejected.
+
+Duplicate pairs (both anchors fire, so each pair is discovered twice) are deduplicated via a seen-set.
 
 Each candidate:
 ```js
@@ -70,6 +75,7 @@ Each candidate:
   fromBuildingId, toBuildingId,
   axis: 'NS' | 'WE',
   length: number,         // span in cells
+  blocked: false,
   debugRect: { x, z, w, d },
 }
 ```
@@ -83,14 +89,32 @@ Each candidate:
 
 **Steps 6b–6e — Per-building filter (`filterCandidates`)**:
 - Remove stack-culled candidates.
-- Group remaining candidates by `fromBuildingId`.
-- Within each group, sort by `length` ascending.
+- Group remaining candidates by `fromBuildingId`, sort each group by `length` ascending.
 - Apply `filterStrategy` to select up to `filterN` candidates per building (or `2*filterN` for `longestAndShortest`).
 - Bidirectional duplicate check: skip if a connection between this building pair already exists in the filtered output.
+- Rejected candidates are marked `filterCulled = true`.
 
-### Door stamping (`stampDoors`)
+**Bridge culling (`cullBridges`)**:
+- Enumerates span cells for all filter survivors to find crossing connections (cells shared by ≥ 2 connections). Crossing connections are immune to culling.
+- Short bridges (`bridgeMinLength ≤ length < bridgeLongThreshold`, 6–11 cells): 50% survival chance.
+- Long bridges (`length ≥ bridgeLongThreshold`, 12+ cells): 30% survival chance.
+- Connections below `bridgeMinLength` (ground-level walkways) are never culled here.
+- Rejected candidates are marked `bridgeCulled = true`.
 
+### Phase 4 — Stamp, rasterise, and pillar
+
+**Door stamping (`stampDoors`)**:
 For each surviving connection, derive trigger cells from anchor cells by stepping one cell back toward the floor edge. Stamp `CELL.DOOR` (value 90) at each trigger cell from `cy+1` to `cy+3` (2 cells wide × 3 cells tall). Deduplication prevents double-stamping when two connections share an anchor.
+
+**Rasterisation (`rasteriseConnections`)**:
+1. Assign connection type per survivor: `walkway` (ground-level or short), `bridge_low`, or `bridge_battlement` based on length band and a weighted RNG roll against `CONNECTIVITY.bridgeVariants` / `bridgeVariantsLong`.
+2. Enumerate span cells for each connection.
+3. Detect cell-level crossings (shared span cells between two connections). Crossing connections share a `texIndex` via union-find so the renderer can apply a consistent texture across the junction. Connection type propagates from the union root.
+4. Split crossing connections into segments (`isCrossing: true/false`) for geometry.
+5. Write `CELL.WALKWAY` and `CELL.WALKWAY_CROSSING` into the matrix (non-crossing pass first, then crossing pass).
+
+**Pillar generation (`generatePillars`)**:
+Connections with `length ≥ CONNECTIVITY.pillarMinLength` (default 8) receive support pillars. Pillar pairs are placed at `pillarSpacing` intervals along the travel axis, inset `pillarEdgeInset` cells from each end. Written as `CELL.PILLAR` into the matrix.
 
 ## Output Contract
 
@@ -104,21 +128,35 @@ For each surviving connection, derive trigger cells from anchor cells by steppin
     doors: [                    // one per stamped anchor end
       { anchorId, direction, x, y, z, w, h, d }
     ],
-    walkways: [],               // populated by Stage 7c (pending)
+    walkways: [                 // one per surviving connection
+      {
+        id, connectionType, axis,
+        fromBuildingId, toBuildingId,
+        tier, hasCrossing, texIndex,
+        segments: [{ isCrossing, cells, worldRect }],
+      }
+    ],
+    crossings: [{ cx, cy, cz, connectionIds }],
+    pillars: PillarRecord[],
   },
 }
 ```
 
 ## Key Files
 
-- [src/generators/connectivity/index.js](../../../../src/generators/connectivity/index.js) — entry; orchestrates all phases, stacking cull, door stamping
+- [src/generators/connectivity/index.js](../../../../src/generators/connectivity/index.js) — entry; orchestrates all phases, stacking cull, door stamping, rasterisation, pillars
 - [src/generators/connectivity/emit-anchors.js](../../../../src/generators/connectivity/emit-anchors.js) — Phase 1; N-S and W-E matrix scans
 - [src/generators/connectivity/pair-anchors.js](../../../../src/generators/connectivity/pair-anchors.js) — Phase 2; ray projection and candidate registration
 - [src/generators/connectivity/filter-candidates.js](../../../../src/generators/connectivity/filter-candidates.js) — Phase 3 steps 6b–6e; strategy-based per-building selection
+- [src/generators/connectivity/cull-bridges.js](../../../../src/generators/connectivity/cull-bridges.js) — Phase 3 bridge culling; crossing detection + probabilistic survival rates
+- [src/generators/connectivity/enumerate-cells.js](../../../../src/generators/connectivity/enumerate-cells.js) — shared helper; span cell enumeration (used by cull-bridges and rasterise-connections)
+- [src/generators/connectivity/rasterise-connections.js](../../../../src/generators/connectivity/rasterise-connections.js) — Phase 4; type assignment, crossing detection, segment splitting, matrix writes
+- [src/generators/connectivity/generate-pillars.js](../../../../src/generators/connectivity/generate-pillars.js) — Phase 4; pillar placement for long spans
 
 ## Edge Cases & Constraints
 
 - Connectivity runs **before** Walls. The wall generator reads `CELL.DOOR` markers to skip those cells during wall placement (`fillBoxUnless`).
+- Connectivity runs **after** Ladders. Ladder door stamps (`CELL.DOOR`) are already present in the matrix, and the anchor ray-cast treats them as passable so walkways can still connect over ladder openings.
 - Anchors only emit from cells whose Y level matches a known floor or roof Y — no free-floating anchor emission.
 - `IFLOOR_*` and `IROOF_*` cells are included in the eligible label sets, so walkways can bridge damaged quadrants within a single building and connect to rooftop edges.
-- Walkway rasterisation (Step 7c) and full doorway carving (Step 7b-ii) are not yet implemented.
+- Bridge culling survival rates are probabilistic per-connection. Crossing-protected connections are immune regardless of length band.

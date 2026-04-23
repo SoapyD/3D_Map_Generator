@@ -1,6 +1,6 @@
-# Stage 6: Wall Generation
+# Stage 7: Wall Generation
 
-> Last verified: 2026-04-21
+> Last verified: 2026-04-23
 
 ## Overview
 
@@ -12,7 +12,7 @@ Derives wall geometry from floor-edge labels in the collision matrix. Each expos
 data: {
   floors: FloorRecord[],
   buildings: Building[],
-  connections: { candidates, doors, ... },   // from Stage 5
+  connections: { candidates, doors, ... },   // from Stage 5 (Connectivity)
   // all prior fields carried forward
 }
 config: {
@@ -31,13 +31,17 @@ matrix: CollisionMatrix
 
 Reads the matrix and the `floors[]` data to derive raw wall candidates. For each floor slab's exposed-edge cells (labelled `FLOOR_N/S/E/W` etc.), a wall segment is produced: a box starting at `Y = floor.yCollisionLevel + slabThickness` and rising for `tierHeight` cells, facing the exposed direction.
 
-**2. Optional: cull to two sides (`cullToTwoSides`)** — controlled by `WALL.applySegmentCull`
+**2. Optional: cull to max sides (`cullToMaxSides`)** — controlled by `WALL.applySegmentCull`
 
-For each `(buildingIndex, floorY)` pair, collect the set of wall directions present. If more than 2 directions exist:
+For each `(buildingIndex, floorY)` pair, collect the set of wall directions present. The maximum number of directions kept depends on building type:
+- Ruin buildings (`ruins-*`): keep at most **2** directions.
+- All others: keep at most **3** directions.
+
+When culling is required:
 - `ruins-medium-h`: keep one long-axis direction (N or S) and one short-axis direction (E or W), chosen by `rng.pick`.
-- All others: pick any 2 directions at random.
+- All others: pick directions at random up to the applicable maximum.
 
-This produces the ruined look — most buildings only have walls on 2 sides.
+This produces the ruined look — ruin buildings have walls on at most 2 sides; standard buildings on at most 3.
 
 **3. Build window plans (`buildWindowPlans`)**
 
@@ -94,6 +98,6 @@ Internal walls (from `extractWallSegments`) are written separately with `CELL.IN
 ## Edge Cases & Constraints
 
 - `fillBoxUnless(..., CELL.DOOR)` is the mechanism by which door openings carved in Stage 5 survive wall generation — no cell already marked `CELL.DOOR` is overwritten.
-- Wall generator runs **after** Connectivity (`src/index.js` pipeline order). If the order is reversed, door markers won't exist yet and openings will be filled in.
-- `cullToTwoSides` is only applied when `WALL.applySegmentCull` is true. With it off, all four sides get walls.
+- Wall generator runs **after** Ladders and Connectivity (`src/index.js` pipeline order). If the order is reversed, door markers won't exist yet and openings will be filled in.
+- `cullToMaxSides` is only applied when `WALL.applySegmentCull` is true. With it off, all four sides get walls.
 - Internal walls are written at `CELL.INTERNAL_WALL_*` (80–83) — these are marker values only; geometry is still generated from them.
