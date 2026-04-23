@@ -1,4 +1,4 @@
-import { CELL, STAGE } from '../collision/matrix.js';
+import { CELL, STAGE, BELOW_GROUND } from '../collision/matrix.js';
 import { CONNECTIVITY, GEOMETRY } from '../../config.js';
 
 function isSlabCell(v) {
@@ -22,13 +22,14 @@ function placePillar(cx, cz, cy, connectionType, matrix, slabThickness) {
   const connThickness = connSlabThickness(connectionType);
   const topY_world = cy + 1 - connThickness;
 
-  // Scan downward from cy-1 (integer cells below connection) to find a surface.
-  // If we hit another connection (walkway/bridge), abort — no pillar here.
+  // Scan downward from cy-1 to find a surface to land on.
+  // Extends into negative Y so pillars over rivers reach the river bed.
+  // Aborts if another connection is in the way.
   let bottomY = 0;
-  for (let scanY = cy - 1; scanY >= 0; scanY--) {
+  for (let scanY = cy - 1; scanY >= -BELOW_GROUND; scanY--) {
     const v = matrix.getCell(cx, scanY, cz);
     if (v === CELL.WALKWAY || v === CELL.WALKWAY_CROSSING) return null;
-    if (isSlabCell(v)) {
+    if (v === CELL.RIVER || isSlabCell(v)) {
       bottomY = scanY + slabThickness;
       break;
     }
