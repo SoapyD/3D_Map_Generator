@@ -5,13 +5,15 @@
  */
 
 import { PNG } from 'pngjs';
-import { writeFileSync } from 'fs';
+import { writeFileSync, mkdirSync } from 'fs';
 import path from 'path';
 
 const TEX_SIZE = 32;
 const BASE_DIR = 'assets/textures/base';
 
-function writeSolidPng(dir, name, r, g, b) {
+function writeSolidPng(dir, name, r, g, b, packDir = BASE_DIR) {
+  const fullDir = path.join(packDir, dir);
+  mkdirSync(fullDir, { recursive: true });
   const png = new PNG({ width: TEX_SIZE, height: TEX_SIZE });
   for (let y = 0; y < TEX_SIZE; y++) {
     for (let x = 0; x < TEX_SIZE; x++) {
@@ -22,7 +24,7 @@ function writeSolidPng(dir, name, r, g, b) {
       png.data[idx + 3] = 255;
     }
   }
-  const filePath = path.join(BASE_DIR, dir, `${name}.png`);
+  const filePath = path.join(fullDir, `${name}.png`);
   writeFileSync(filePath, PNG.sync.write(png));
   console.log(`  ${filePath}`);
 }
@@ -84,5 +86,9 @@ writeSolidPng('domes', 'rusty_red', 102, 51, 36);
 writeSolidPng('domes', 'dark_rust', 82, 41, 28);
 writeSolidPng('domes', 'oxidised_copper', 56, 77, 64);
 writeSolidPng('domes', 'dark_bronze', 71, 56, 36);
+
+console.log('Map Skirt:');
+writeSolidPng('map_skirt', 'dark_earth', 46, 28, 15);
+writeSolidPng('map_skirt', 'dark_earth', 46, 28, 15, 'assets/textures/loaded');
 
 console.log('\nDone!');

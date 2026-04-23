@@ -27,6 +27,7 @@ import { buildRiverPrimitives } from './build-river-primitives.js';
 import { buildRiverBankPrimitives } from './build-river-bank-primitives.js';
 import { buildStreetPrimitives } from './build-street-primitives.js';
 import { buildPavementPrimitives } from './build-pavement-primitives.js';
+import { buildMapSkirtPrimitives } from './build-map-skirt-primitives.js';
 
 // ─── Main builder ─────────────────────────────────────────────────────
 
@@ -68,6 +69,7 @@ export function buildGeometry(data, config) {
   primitives.push(...buildRiverBankPrimitives(data.rivers || []));
   primitives.push(...buildStreetPrimitives(data.streets || [], config));
   primitives.push(...buildPavementPrimitives(data.pavements || [], config));
+  primitives.push(...buildMapSkirtPrimitives(config));
   primitives.push(...buildRoofPrimitives(data.roofs || [], buildings, config));
 
   const conn = data.connections || {};

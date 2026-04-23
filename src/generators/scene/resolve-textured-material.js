@@ -34,6 +34,7 @@ export function resolveTexturedMaterial(textureKey, pools) {
   if (parts[0] === 'river_bank') return pickFromPool(pools.river_banks, parseInt(parts[1] ?? 0, 10));
   if (parts[0] === 'street') return pickFromPool(pools.streets, parseInt(parts[1] ?? 0, 10));
   if (parts[0] === 'pavement') return pickFromPool(pools.pavements, parseInt(parts[1] ?? 0, 10));
+  if (parts[0] === 'map_skirt') return pickFromPool(pools.map_skirt, 0);
 
   return pickFromPool(pools.walls, 0);
 }

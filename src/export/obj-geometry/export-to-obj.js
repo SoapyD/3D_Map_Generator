@@ -50,6 +50,8 @@ export async function exportToObj(geometry, config, outputDir, baseName) {
   const streetTextures = streetPool.length > 0 ? streetPool : baseTextures;
   const pavementPool = loadTexPool(packDir, 'pavements');
   const pavementTextures = pavementPool.length > 0 ? pavementPool : baseTextures;
+  const mapSkirtPool = loadTexPool(packDir, 'map_skirt');
+  const mapSkirtTextures = mapSkirtPool.length > 0 ? mapSkirtPool : baseTextures;
 
   // Build atlas: collect unique textures needed
   const atlasState = createAtlasState();
@@ -60,7 +62,7 @@ export async function exportToObj(geometry, config, outputDir, baseName) {
     baseIdx: atlasState.baseIdx,
     wallTextures, landmarkTextures, floorTextures,
     walkwayTextures, objectTextures, courtyardTextures, ladderTextures, roofTextures,
-    riverTextures, riverBankTextures, streetTextures, pavementTextures,
+    riverTextures, riverBankTextures, streetTextures, pavementTextures, mapSkirtTextures,
   };
 
   // Pre-register all textures from primitives
