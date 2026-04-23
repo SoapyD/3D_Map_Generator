@@ -20,6 +20,7 @@ const STAGE_COLORS = {
   8:  '#33bbcc', // Cover
   9:  '#88aaff', // Ladders
   10: '#2266dd', // Rivers
+  11: '#888877', // Pavements
 };
 
 const STAGE_NAMES = {
@@ -33,6 +34,7 @@ const STAGE_NAMES = {
   8:  'Cover',
   9:  'Ladders',
   10: 'Rivers',
+  11: 'Pavements',
 };
 
 export function createRecorder(seed, config) {
@@ -67,6 +69,7 @@ function stageToElements(stageIndex, data, color, config) {
     case 8: return coverElements(data, color);
     case 9:  return ladderElements(data);
     case 10: return riverElements(data, config);
+    case 11: return pavementElements(data);
     default: return [];
   }
 }
@@ -80,12 +83,24 @@ function foundationElements(data, color, config) {
 }
 
 function streetElements(data, color, config) {
+  const elements = [];
+
   const streetRects = data.streets?.length
     ? data.streets
     : deriveStreetRects(data.blocks, config.mapWidth, config.mapDepth);
-  return streetRects.map((s, i) => ({
-    label: `Street — ${i + 1}/${streetRects.length}`,
-    rects: [box('street', s.x, 0, s.z, s.w, 0.05, s.d, color)],
+  for (let i = 0; i < streetRects.length; i++) {
+    const s = streetRects[i];
+    elements.push({ label: `Street — ${i + 1}/${streetRects.length}`, rects: [box('street', s.x, 0, s.z, s.w, 0.05, s.d, color)] });
+  }
+
+  return elements;
+}
+
+function pavementElements(data) {
+  const pavements = data.pavements ?? [];
+  return pavements.map((p, i) => ({
+    label: `Pavement — block ${i + 1}/${pavements.length}`,
+    rects: [box('pavement', p.x, 0, p.z, p.w, 0.05, p.d, '#888877')],
   }));
 }
 

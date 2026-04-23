@@ -3,6 +3,7 @@ import { findRiverPath } from './find-river-path.js';
 import { writeRiver } from './write-river.js';
 import { deriveRiverBanks } from './derive-river-banks.js';
 import { writeStreets } from './write-streets.js';
+import { writePavements } from './write-pavements.js';
 import { STREETS } from '../../config.js';
 
 export function generateStreets(data, config, rng, matrix) {
@@ -42,13 +43,15 @@ export function generateStreets(data, config, rng, matrix) {
   writeStreets(nonRiverStreets, matrix, config);
   console.log(`  Streets: ${nonRiverStreets.length} surfaces`);
 
-  // Phase 5 (pavements) — not yet implemented
+  // Phase 5 — pavements (foundation areas not covered by building shells)
+  const pavementCells = writePavements(blocks, matrix, config);
+  console.log(`  Pavements: ${pavementCells} cells`);
 
   return {
     ...data,
     streetNodes,
     rivers:    riverRects.length > 0 ? [{ path: riverNodeIds, rects: riverRects, banks: riverBanks }] : [],
     streets:   nonRiverStreets,
-    pavements: [],
+    pavements: blocks,
   };
 }
