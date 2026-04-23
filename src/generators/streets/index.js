@@ -29,7 +29,7 @@ export function generateStreets(data, config, rng, matrix) {
   // Phase 3b — bank edges (foundation faces adjacent to river)
   const riverDepth = config.riverDepth ?? STREETS.riverDepth;
   const riverBanks = riverRects.length > 0
-    ? deriveRiverBanks(riverRects, blocks, riverDepth)
+    ? deriveRiverBanks(riverRects, matrix, riverDepth)
     : [];
   if (riverBanks.length > 0) {
     console.log(`  River banks: ${riverBanks.length} edges`);

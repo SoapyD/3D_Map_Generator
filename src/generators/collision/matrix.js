@@ -48,6 +48,7 @@ export const CELL = {
   STREET:           110,   // street corridor not covered by river
   PAVEMENT:         111,   // foundation area not under a building shell
   RIVER:            112,   // water volume (below ground, Y = -riverDepth to Y = -1)
+  RIVER_BANK:       113,   // bank marker at river-bed level on the non-river side of each edge
 };
 
 // Stage enum used in write-history records.
