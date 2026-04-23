@@ -77,12 +77,50 @@ function foundationElements(data, color, config) {
 }
 
 function streetElements(data, color, config) {
-  const rects = deriveStreetRects(data.blocks, config.mapWidth, config.mapDepth);
-  const total = rects.length;
-  return rects.map((s, i) => ({
-    label: `Streets — ${i + 1}/${total}`,
-    rects: [box('street', s.x, 0, s.z, s.w, 0.05, s.d, color)],
-  }));
+  const elements = [];
+
+  // Street bounds (non-river)
+  const streetRects = data.streets?.length
+    ? data.streets
+    : deriveStreetRects(data.blocks, config.mapWidth, config.mapDepth);
+  for (let i = 0; i < streetRects.length; i++) {
+    const s = streetRects[i];
+    elements.push({
+      label: `Street — ${i + 1}/${streetRects.length}`,
+      rects: [box('street', s.x, 0, s.z, s.w, 0.05, s.d, color)],
+    });
+  }
+
+  // River segments — drawn below ground at correct depth
+  const rivers = data.rivers ?? [];
+  const riverDepth = config.riverDepth ?? 3;
+  for (const river of rivers) {
+    for (let i = 0; i < river.rects.length; i++) {
+      const r = river.rects[i];
+      const rects = [box('river', r.x, -riverDepth, r.z, r.w, 1, r.d, '#2266dd', 0.85)];
+
+      // Banks — thin vertical slabs on foundation faces bordering this segment
+      for (const bank of (river.banks ?? [])) {
+        // Only include banks that touch this river rect
+        if (bank.axis === 'NS') {
+          if (bank.z >= r.z && bank.z < r.z + r.d) {
+            rects.push(box('bank', bank.x - 0.1, bank.bottomY, bank.z, 0.2, riverDepth, bank.length, '#886644', 0.9));
+          }
+        } else {
+          if (bank.x >= r.x && bank.x < r.x + r.w) {
+            rects.push(box('bank', bank.x, bank.bottomY, bank.z - 0.1, bank.length, riverDepth, 0.2, '#886644', 0.9));
+          }
+        }
+      }
+
+      elements.push({
+        label: `River — segment ${i + 1}/${river.rects.length}`,
+        rects,
+      });
+    }
+  }
+
+  return elements;
 }
 
 // Build street rects by sweeping all block edge coordinates.

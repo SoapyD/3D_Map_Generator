@@ -13,6 +13,7 @@ import { generateBuildings } from './generators/buildings/index.js';
 import { createCollisionMatrix, CELL, STAGE, BELOW_GROUND } from './generators/collision/matrix.js';
 import { generateFloors } from './generators/floors/index.js';
 import { generateRoofs } from './generators/roofs/index.js';
+import { generateStreets } from './generators/streets/index.js';
 import { generateWalls } from './generators/walls/index.js';
 import { generateLadders } from './generators/ladders/index.js';
 import { generateConnectivity } from './generators/connectivity/index.js';
@@ -45,7 +46,6 @@ async function main() {
   const gridData = generateGrid(config, rng);
   console.log(`  ${gridData.blocks.length} city blocks`);
   recorder?.capture(1, gridData);
-  recorder?.capture(2, gridData);
 
   const matrix = createCollisionMatrix(gridData.activeArea, config.tiers, config.tierHeight, config.slabThickness);
 
@@ -79,9 +79,14 @@ async function main() {
   console.log(`  ${roofData.roofs.length} roof slabs`);
   recorder?.capture(5, roofData);
 
-  // Stage 5: Connectivity
-  console.log('[5/6] Generating connectivity...');
-  const connectivityData = generateConnectivity(roofData, config, rng, matrix);
+  // Stage 5: Streets / Rivers (pipeline position TBD — running after Roofs for now)
+  console.log('[5/?] Generating streets and rivers...');
+  const streetData = generateStreets(roofData, config, rng, matrix);
+  recorder?.capture(2, streetData);
+
+  // Stage 6: Connectivity
+  console.log('[6/7] Generating connectivity...');
+  const connectivityData = generateConnectivity(streetData, config, rng, matrix);
   console.log(`  ${connectivityData.connections.anchors.length} anchors, ${connectivityData.connections.candidates.length} candidate connections`);
   recorder?.capture(7, connectivityData);
 

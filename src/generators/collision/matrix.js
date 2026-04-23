@@ -44,6 +44,10 @@ export const CELL = {
   WALKWAY_CROSSING: 106,
   // Pillar support columns — stamped by connectivity after walkway rasterisation
   PILLAR:           107,
+  // Ground-level surface geometry (streets/rivers stage)
+  STREET:           110,   // street corridor not covered by river
+  PAVEMENT:         111,   // foundation area not under a building shell
+  RIVER:            112,   // water volume (below ground, Y = -riverDepth to Y = -1)
 };
 
 // Stage enum used in write-history records.
@@ -59,12 +63,15 @@ export const STAGE = {
   WALLS_INT:    8,
   WALKWAYS:     9,
   PILLARS:      10,
+  STREETS:      11,
+  PAVEMENTS:    12,
   UNKNOWN:      255,
 };
 
 const STAGE_NAMES = {
   0: 'buildings', 1: 'floors', 2: 'floors-label', 3: 'roofs', 4: 'roofs-label',
-  5: 'connectivity', 6: 'walls-label', 7: 'walls', 8: 'walls-internal', 9: 'walkways', 10: 'pillars', 255: 'unknown',
+  5: 'connectivity', 6: 'walls-label', 7: 'walls', 8: 'walls-internal', 9: 'walkways',
+  10: 'pillars', 11: 'streets', 12: 'pavements', 255: 'unknown',
 };
 
 // Number of cells reserved below world Y=0 (for rivers, sewers, tunnels).

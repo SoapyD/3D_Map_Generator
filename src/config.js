@@ -90,6 +90,11 @@ export const CONNECTIVITY = {
   bridgeBattlementTallH:   2,     // height of tall post (inches)
 };
 
+// --- Streets / Rivers ---
+export const STREETS = {
+  riverDepth: 3,   // cells below Y=0 occupied by river volume (must be <= BELOW_GROUND)
+};
+
 // --- Cover --- (_old_system only)
 // export const COVER = { ... };  // see _old_system/config.js
 
