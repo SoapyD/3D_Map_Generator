@@ -85,7 +85,9 @@ function foundationElements(data, color, config) {
 function streetElements(data, color, config) {
   const elements = [];
 
-  const streetRects = data.streets?.length
+  // Use the pipeline's streets array if it exists (may be empty in all-rivers mode);
+  // only fall back to deriving from blocks when streets hasn't been computed yet.
+  const streetRects = Array.isArray(data.streets)
     ? data.streets
     : deriveStreetRects(data.blocks, config.mapWidth, config.mapDepth);
   for (let i = 0; i < streetRects.length; i++) {

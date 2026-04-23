@@ -1,45 +1,57 @@
 /**
- * Selects two edge nodes and finds a path between them via A*.
- * Source is chosen at random; mouth is the edge node farthest from the source.
- * Retries with a different source if A* finds no path.
+ * River path finding — single and multiple path variants.
+ *
+ * findRiverPaths(nodes, count, rng):
+ *   Finds up to `count` river paths through the street node graph.
+ *   Each path connects a unique (source, mouth) edge node pair.
+ *   Multiple paths may share intermediate nodes (intersections) but
+ *   no two paths may use the same source-mouth combination.
  */
 
-const MAX_RETRIES = 5;
-
-export function findRiverPath(nodes, rng) {
+export function findRiverPaths(nodes, count, rng) {
   const edgeNodes = nodes.filter(n => n.isEdgeNode);
-  if (edgeNodes.length < 2) return null;
+  if (edgeNodes.length < 2) return [];
 
-  // Shuffle so retries try different sources
+  // Shuffle for variety across seeds
   const shuffled = edgeNodes.slice();
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(rng.random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
 
-  for (let attempt = 0; attempt < Math.min(MAX_RETRIES, shuffled.length); attempt++) {
-    const source = shuffled[attempt];
-    const mouth  = farthestEdgeNode(source, edgeNodes);
-    if (!mouth) continue;
+  const usedPairs = new Set();
+  const paths     = [];
 
+  for (const source of shuffled) {
+    if (paths.length >= count) break;
+    const mouth = farthestUnused(source, edgeNodes, usedPairs);
+    if (!mouth) continue;
     const path = aStar(source.id, mouth.id, nodes);
-    if (path) return path;
+    if (path) {
+      usedPairs.add(pairId(source.id, mouth.id));
+      paths.push(path);
+    }
   }
 
-  return null;
+  return paths;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function pairId(a, b) {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
 
 function dist(a, b) {
   return Math.hypot(a.x - b.x, a.z - b.z);
 }
 
-function farthestEdgeNode(from, edgeNodes) {
+function farthestUnused(source, edgeNodes, usedPairs) {
   let best = null, bestDist = -1;
   for (const node of edgeNodes) {
-    if (node.id === from.id) continue;
-    const d = dist(from.center, node.center);
+    if (node.id === source.id) continue;
+    if (usedPairs.has(pairId(source.id, node.id))) continue;
+    const d = dist(source.center, node.center);
     if (d > bestDist) { bestDist = d; best = node; }
   }
   return best;
@@ -66,9 +78,9 @@ function aStar(sourceId, mouthId, nodes) {
     for (const neighbour of nodes[current].neighbours) {
       if (closed.has(neighbour)) continue;
 
-      const edgeCost     = dist(nodes[current].center, nodes[neighbour].center);
-      const tentativeG   = gScore.get(current) + edgeCost;
-      const existingG    = gScore.get(neighbour) ?? Infinity;
+      const edgeCost   = dist(nodes[current].center, nodes[neighbour].center);
+      const tentativeG = gScore.get(current) + edgeCost;
+      const existingG  = gScore.get(neighbour) ?? Infinity;
 
       if (tentativeG < existingG) {
         gScore.set(neighbour, tentativeG);

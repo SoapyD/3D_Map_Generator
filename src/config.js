@@ -29,6 +29,7 @@ export const DEFAULTS = {
   debug: false,
   obj: false,
   outputDir: 'output',
+  allRivers: false,   // treat every street corridor as a river
 };
 
 // --- Buildings --- (_old_system only)
@@ -191,6 +192,11 @@ export function parseArgs(argv) {
 
     if (arg === '--obj') {
       config.obj = true;
+      continue;
+    }
+
+    if (arg === '--all-rivers') {
+      config.allRivers = true;
       continue;
     }
 
