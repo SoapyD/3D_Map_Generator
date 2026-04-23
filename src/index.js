@@ -83,6 +83,7 @@ async function main() {
   console.log('[5/?] Generating streets and rivers...');
   const streetData = generateStreets(roofData, config, rng, matrix);
   recorder?.capture(2, streetData);
+  recorder?.capture(10, streetData);
 
   // Stage 6: Connectivity
   console.log('[6/7] Generating connectivity...');

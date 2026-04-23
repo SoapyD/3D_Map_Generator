@@ -10,27 +10,29 @@
  */
 
 const STAGE_COLORS = {
-  1: '#5588cc', // Foundation
-  2: '#2244aa', // Streets
-  3: '#44bb88', // Buildings
-  4: '#ccaa33', // Floors
-  5: '#88aaff', // Roofs
-  6: '#cc5533', // Walls
-  7: '#aa44cc', // Connectivity
-  8: '#33bbcc', // Cover
-  9: '#88aaff', // Ladders (external) — internal uses #ffaa44 per-element
+  1:  '#5588cc', // Foundation
+  2:  '#2244aa', // Streets
+  3:  '#44bb88', // Buildings
+  4:  '#ccaa33', // Floors
+  5:  '#88aaff', // Roofs
+  6:  '#cc5533', // Walls
+  7:  '#aa44cc', // Connectivity
+  8:  '#33bbcc', // Cover
+  9:  '#88aaff', // Ladders
+  10: '#2266dd', // Rivers
 };
 
 const STAGE_NAMES = {
-  1: 'Foundation',
-  2: 'Streets',
-  3: 'Buildings',
-  4: 'Floors',
-  5: 'Roofs',
-  6: 'Walls',
-  7: 'Connectivity',
-  8: 'Cover',
-  9: 'Ladders',
+  1:  'Foundation',
+  2:  'Streets',
+  3:  'Buildings',
+  4:  'Floors',
+  5:  'Roofs',
+  6:  'Walls',
+  7:  'Connectivity',
+  8:  'Cover',
+  9:  'Ladders',
+  10: 'Rivers',
 };
 
 export function createRecorder(seed, config) {
@@ -63,7 +65,8 @@ function stageToElements(stageIndex, data, color, config) {
     case 6: return wallElements(data);
     case 7: return connectivityElements(data, color, config);
     case 8: return coverElements(data, color);
-    case 9: return ladderElements(data);
+    case 9:  return ladderElements(data);
+    case 10: return riverElements(data, config);
     default: return [];
   }
 }
@@ -77,23 +80,20 @@ function foundationElements(data, color, config) {
 }
 
 function streetElements(data, color, config) {
-  const elements = [];
-
-  // Street bounds (non-river)
   const streetRects = data.streets?.length
     ? data.streets
     : deriveStreetRects(data.blocks, config.mapWidth, config.mapDepth);
-  for (let i = 0; i < streetRects.length; i++) {
-    const s = streetRects[i];
-    elements.push({
-      label: `Street — ${i + 1}/${streetRects.length}`,
-      rects: [box('street', s.x, 0, s.z, s.w, 0.05, s.d, color)],
-    });
-  }
+  return streetRects.map((s, i) => ({
+    label: `Street — ${i + 1}/${streetRects.length}`,
+    rects: [box('street', s.x, 0, s.z, s.w, 0.05, s.d, color)],
+  }));
+}
 
-  // River segments — drawn below ground at correct depth
+function riverElements(data, config) {
+  const elements = [];
   const rivers = data.rivers ?? [];
   const riverDepth = config.riverDepth ?? 3;
+
   for (const river of rivers) {
     for (let i = 0; i < river.rects.length; i++) {
       const r = river.rects[i];
@@ -101,7 +101,6 @@ function streetElements(data, color, config) {
 
       // Banks — thin vertical slabs on foundation faces bordering this segment
       for (const bank of (river.banks ?? [])) {
-        // Only include banks that touch this river rect
         if (bank.axis === 'NS') {
           if (bank.z >= r.z && bank.z < r.z + r.d) {
             rects.push(box('bank', bank.x - 0.1, bank.bottomY, bank.z, 0.2, riverDepth, bank.length, '#886644', 0.9));
