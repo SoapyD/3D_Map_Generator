@@ -95,7 +95,7 @@ async function main() {
   const wallData = generateWalls(ladderData, config, rng, matrix);
   recorder?.capture(6, wallData);
 
-  const geometry = buildGeometry(ladderData, config);
+  const geometry = buildGeometry(wallData, config);
 
   // Export
   await mkdir(config.outputDir, { recursive: true });

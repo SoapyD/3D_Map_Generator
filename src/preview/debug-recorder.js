@@ -320,7 +320,7 @@ function ladderElements(data) {
       const s = path.segments[si];
       const isNS   = s.direction === 'N' || s.direction === 'S';
       const keptH  = s.keptTopY - s.keptBottomY;
-      const rects  = [box('ladder_path_kept', s.x, s.keptBottomY, s.z, s.w, keptH, s.d, '#ffdd44')];
+      const rects  = [box('ladder_path_kept', s.x, s.keptBottomY, s.z, s.w, keptH, s.d, '#ff0000')];
 
       if (s.hasDeleted) {
         rects.push(box('ladder_path_cut', s.x, s.deletedBottomY, s.z, s.w, s.deletedTopY - s.deletedBottomY, s.d, '#ff3333'));

@@ -72,5 +72,15 @@ export function buildGeometry(data, config) {
     if (p) primitives.push(p);
   }
 
+  // Path-segment ladders (kept portions of the new ladder path system)
+  for (const path of (data.ladderPaths || [])) {
+    for (let si = 0; si < path.segments.length; si++) {
+      const s = path.segments[si];
+      const name = `ladder_path_${path.buildingIndex}_${path.pathIndex}_${si}`;
+      const p = buildLadderPrimitive(name, { x: s.x, z: s.z, w: s.w, d: s.d, y0: s.keptBottomY, y1: s.keptTopY }, path.buildingIndex, walls);
+      if (p) primitives.push(p);
+    }
+  }
+
   return { version: 1, primitives };
 }

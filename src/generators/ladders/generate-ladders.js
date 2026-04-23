@@ -301,8 +301,8 @@ function phase2Ladders(candidates, buildings, config, rng, matrix) {
       isCulled: cullReasons.length > 0,
       x: wx + (needsXOff ? 1 - THICKNESS : 0),
       z: wz + (needsZOff ? 1 - THICKNESS : 0),
-      w: isNS ? 0.75 : THICKNESS,
-      d: isNS ? THICKNESS : 0.75,
+      w: isNS ? 1 : THICKNESS,
+      d: isNS ? THICKNESS : 1,
       bottomY, topY, height,
       startTier, endTier,
       trimSection,
@@ -497,6 +497,10 @@ function buildDebugPaths(ladderGroups, buildings, config, rng, matrix) {
 
   for (const [bi, ladders] of byBuilding) {
     const building      = buildings[bi];
+
+    // Small ruins only have a 40% chance of generating any ladders at all
+    if (building.size === 'ruins-small' && !rng.chance(0.4)) continue;
+
     const roofTier      = building.maxTier - 1;
     const quota         = PATH_QUOTA[building.size] ?? 1;
     const placedLadders = []; // all ladders picked across all paths this building
