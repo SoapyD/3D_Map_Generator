@@ -1,7 +1,7 @@
 # Pipeline Migration Plan
 
-**Created:** 2026-04-19  
-**Last updated:** 2026-04-20
+**Created:** 2026-04-19
+**Last updated:** 2026-04-23
 
 ---
 
@@ -30,7 +30,7 @@
 
 5. **Roofs** (`src/generators/roofs/`) — consumes `data.roofSlabs` from the Floors stage; uses the same quadrant-damage shape as the topmost interior floor. Written as `CELL.ROOF` and labelled `ROOF_N/S/E/W`. No walls are placed above roof slabs.
 
-6. **Walls Phase 1** (`src/generators/walls/`) — two-pass exterior wall generation from labelled floor cells. Includes corner truncation, end cells (3 exposed edges), and island cells (4 exposed edges). See `WALLS_PLAN_2026_04_19.md`.
+6. **Walls** (`src/generators/walls/`) — two-pass exterior wall generation from labelled floor cells, plus Phase 2 damage (quadrant/blob removal, window cuts) and interior walls for medium/large buildings. Ladder-generated `CELL.DOOR` cells suppress wall segments. See `WALLS_PLAN_2026_04_19.md` (archived).
 
 7. **Shared utilities** (`src/generators/utils/label-cells.js`) — generic cardinal-neighbour labelling used by both floors and roofs.
 
@@ -38,44 +38,30 @@
 
 9. **Preview visualiser** (`src/preview/visualiser.html`) — per-type collision grid overlay, animated stage playback, "All Layers" toggle (hides building shells), compass labels.
 
+10. **Connectivity** (`src/generators/connectivity/`) — anchors, candidate connections, walkways, bridges, pillars, stack-group filtering, proximity culling. Stamps `CELL.WALKWAY`, `CELL.WALKWAY_CROSSING`, `CELL.PILLAR`, `CELL.DOOR` into the matrix.
+
+11. **Ladders** (`src/generators/ladders/`) — five-phase ladder pipeline (candidate scan, column grouping, path discovery, path selection, debug path output). Runs *before* walls so edge cells remain `SHELL`/`FLOOR_*` labels during the scan. Debug path builder emits per-building multi-segment paths (ground→roof) with 3-wide door stamps at every floor level the path crosses. See `LADDER_PLACEMENT_PLAN_2026_04_21.md` (archived).
+
 ### ⬜ Not started
 
-- Walls Phase 2 (damage + interior walls)
-- Connectivity
 - Cover
 
 ---
 
 ## What is left to do
 
-### Stage 1 — Walls Phase 2
-**Detail:** `WALLS_PLAN_2026_04_19.md` — Phase 2 section
-
-- `apply-wall-damage.js` — quadrant subdivision + removal per exterior wall segment
-- `merge-segments.js` — merge contiguous post-damage segments
-- `generate-interior-walls.js` — interior dividing walls for medium/large buildings
-
-### Stage 2 — Connectivity
-**Source:** `_old_system/connectivity/` + `_old_system/gap-detection/`
-
-- Port walkways, bridges, ladders (ground, yellow, interior, tower, orange, cyan), pillars
-- Port gap detection alongside — ensures every area is reachable
-- Depends on floors + walls
-
-### Stage 3 — Cover
+### Stage 1 — Cover
 **Source:** `_old_system/cover/`
 
 - Port rooftop, interior, and ground/street scatter
-- Depends on floors, walls, and connectivity
+- Depends on floors, walls, connectivity, and ladders
 
 ---
 
 ## Execution order (remaining)
 
-1. Walls Phase 2 — damage + interior walls
-2. Connectivity — port gap-detection and connectivity together (tightly coupled)
-3. Cover
-4. Delete `_old_system/` once all stages verified end-to-end
+1. Cover
+2. Delete `_old_system/` once cover is verified end-to-end
 
 ---
 

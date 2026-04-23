@@ -1,7 +1,26 @@
 # Ladder Placement Plan
 
 **Created:** 2026-04-21
+**Archived:** 2026-04-23 — implemented and shipped (see deltas below)
 **Depends on:** Connectivity (complete), Floors (complete), Roofs (complete), Walls (complete)
+
+---
+
+## Deltas vs. as-built
+
+The pipeline landed close to this plan but diverged in several places as the debug workflow revealed better ergonomics:
+
+- **Pipeline position reversed.** Ladders now run *before* walls so the candidate scan sees `SHELL`/`FLOOR_*` labels rather than wall cells. Ladder-stamped `CELL.DOOR` cells then suppress wall segments in the subsequent walls stage.
+- **Culling became advisory, not destructive.** `mapEdge`, `connection`, `building`, `cell` checks collect into cull sets and tag each group with a `cullReasons[]` array + `isCulled` flag. Hard filtering happens only at the debug-path-building stage (externals + non-culled). Visualiser color-codes groups by cull reason.
+- **Full-height culling removed.** `cullFullHeight` / 30% chance dropped entirely — didn't survive debugging and was never re-enabled.
+- **Clearance values retuned.** `mapEdgeClearance: 3` (from 5), `connectionClearance: 2` (from 4), `buildingClearance: 4`, `pathSpacing: 6`. Adjacent-building ray ignores `SHELL`/`EMPTY`; only non-empty occupied cells count.
+- **Path system replaced with debug paths.** Phase 3/4 of the original plan (DFS chain finding + quota-based selection with proximity/side-limit relaxation) is present as `phase3Paths` / `phase4Select` but the actual ladder output uses a separate `buildDebugPaths` path. It greedily walks up from ground to roof, picks an external non-culled ladder per step, advances 1–2 tiers at a time, and emits `ladderPaths[]`. Quotas: small/ruins-small=1, medium=2, large=3. Small ruins gated behind a 40% RNG roll.
+- **Multi-path spacing = 3 units** (not 6) between new ladders and already-placed ones on the same building.
+- **Segment-level trimming.** Each path segment carries `keptBottomY`/`keptTopY` (the rendered portion) and optionally `deletedBottomY`/`deletedTopY` for the visualiser's red "cut" overlay when a segment doesn't reach the next target tier.
+- **Door stamping per floor.** At each floor the segment crosses, a 3-wide × 3-tall block of `CELL.DOOR` is stamped (spread perpendicular to facing direction) so walls get suppressed at every landing, not just the top.
+- **Ladder dimensions.** 1" wide (up from the planned 0.75"), 0.25" thick, flush to the wall face via a directional offset.
+- **`data.ladders` is empty.** The output shape is `{ ladderCandidates, ladderGroups, ladderPaths }`. Geometry builder iterates `ladderPaths[].segments[]` and builds one ladder primitive per segment using `buildLadderPrimitive`.
+- **No `LADDERS` block in config** was needed as a separate file — clearances live directly in `src/config.js` under `LADDERS`.
 
 ---
 
@@ -320,10 +339,10 @@ generateGrid → generateBuildings → generateFloors → generateRoofs
 
 | Step | Status |
 |---|---|
-| Phase 1 — Candidate scan | ⏳ Pending |
-| Phase 2 — Column grouping + culling | ⏳ Pending |
-| Phase 3 — Path discovery | ⏳ Pending |
-| Phase 4 — Path selection | ⏳ Pending |
-| Phase 5 — Output + geometry wiring | ⏳ Pending |
-| Config additions | ⏳ Pending |
-| Visualiser support | ⏳ Pending |
+| Phase 1 — Candidate scan | ✅ Done (culling became advisory) |
+| Phase 2 — Column grouping + culling | ✅ Done (full-height cull dropped) |
+| Phase 3 — Path discovery | ✅ Done (present but superseded by debug paths) |
+| Phase 4 — Path selection | ✅ Done (present but superseded by debug paths) |
+| Phase 5 — Output + geometry wiring | ✅ Done (via `ladderPaths` → `buildLadderPrimitive`) |
+| Config additions | ✅ Done |
+| Visualiser support | ✅ Done (cull colors + path kept/cut/door rects) |
