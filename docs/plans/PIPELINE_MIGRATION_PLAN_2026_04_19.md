@@ -1,7 +1,7 @@
 # Pipeline Migration Plan
 
 **Created:** 2026-04-19
-**Last updated:** 2026-04-23
+**Last updated:** 2026-04-23 (added Streets / Rivers stage)
 
 ---
 
@@ -44,24 +44,61 @@
 
 ### ⬜ Not started
 
+- Streets / Rivers
 - Cover
 
 ---
 
 ## What is left to do
 
-### Stage 1 — Cover
+### Stage 1 — Streets / Rivers
+**New system** (`src/generators/streets/`)
+
+Runs after Foundations. No old-system equivalent — new feature.
+
+#### 1a. Street node graph
+- The 1-BBD gaps between foundations form the street network. Walk the foundation layout to find all intersection points where streets meet (corners, T-junctions, crossings) and record these as **street nodes** in world-space.
+- Also detect where each street corridor meets the map boundary and record these as **edge nodes** (entry/exit points for rivers).
+
+#### 1b. River path generation
+- Select 2 edge nodes as river source and mouth.
+- Run A\* through the street node graph to find a path. When evaluating neighbours, skip any node that would require passing through a foundation footprint to reach — this keeps the river confined to street corridors.
+- The resulting ordered node list is the **river centreline path**.
+
+#### 1c. River geometry
+- Rivers are 3 units deep.
+- Width at each segment is determined by the projected edges of the adjacent foundations on either side of the street corridor — the river fills the full street width between them.
+- Write river cells into the collision matrix. River cell values must not block the connectivity anchor ray-cast (i.e. treated as passable like `CELL.EMPTY` or `CELL.SHELL` during bridge candidate generation).
+
+#### 1d. Connections across water
+- Between consecutive river nodes, generate crossing connections using the existing connectivity logic (anchors → candidates → filter → rasterise).
+- These bridges span the river and are stamped as normal walkway/bridge geometry.
+
+#### 1e. Street surfaces
+- Street corridor areas **not** covered by river are flat ground surfaces, written to the collision matrix as `CELL.STREET`.
+- Streets get a different texture to pavements.
+
+#### 1f. Pavements
+- After rivers and streets are placed, scan each foundation's ground-level footprint.
+- Areas not occupied by building shells (`CELL.SHELL`) are **pavement** — written to the matrix as `CELL.PAVEMENT`.
+- Pavements are the primary placement surface for ground-level cover scatter (alongside roofs).
+
+---
+
+### Stage 2 — Cover
 **Source:** `_old_system/cover/`
 
 - Port rooftop, interior, and ground/street scatter
-- Depends on floors, walls, connectivity, and ladders
+- Ground scatter targets `CELL.PAVEMENT` and `CELL.STREET` surfaces (replaces old uniform grid scatter)
+- Depends on floors, walls, connectivity, ladders, and streets/rivers
 
 ---
 
 ## Execution order (remaining)
 
-1. Cover
-2. Delete `_old_system/` once cover is verified end-to-end
+1. Streets / Rivers
+2. Cover
+3. Delete `_old_system/` once cover is verified end-to-end
 
 ---
 
