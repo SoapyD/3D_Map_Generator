@@ -319,16 +319,56 @@ function connectivityElements(data, color, config) {
 }
 
 function coverElements(data, color) {
+  const elements = [];
+
+  const fs = data.freeSpace ?? {};
+
+  for (const g of (fs.shells ?? [])) {
+    elements.push({
+      label: `Cover — floor B${g.buildingIndex} tier ${g.tier} (${g.cells.length} cells, ${g.pieces.length} placed)`,
+      rects: [
+        ...g.cells.map(c => box('free_space', c.wx + 0.25, c.wy, c.wz + 0.25, 0.5, 0.1, 0.5, '#44ccff', 0.6)),
+        ...g.pieces.map(p => box('cover', p.x, p.y, p.z, p.w, p.height, p.d, color)),
+      ],
+    });
+  }
+
+  for (const g of (fs.roofs ?? [])) {
+    elements.push({
+      label: `Cover — roof B${g.buildingIndex} (${g.cells.length} cells, ${g.pieces.length} placed)`,
+      rects: [
+        ...g.cells.map(c => box('free_space', c.wx + 0.25, c.wy, c.wz + 0.25, 0.5, 0.1, 0.5, '#88ffcc', 0.6)),
+        ...g.pieces.map(p => box('cover', p.x, p.y, p.z, p.w, p.height, p.d, color)),
+      ],
+    });
+  }
+
+  for (const g of (fs.streets ?? [])) {
+    elements.push({
+      label: `Cover — street corridor ${g.index} (${g.cells.length} cells, ${g.pieces.length} placed)`,
+      rects: [
+        ...g.cells.map(c => box('free_space', c.wx + 0.25, c.wy, c.wz + 0.25, 0.5, 0.1, 0.5, g.color, 0.6)),
+        ...g.pieces.map(p => box('cover', p.x, p.y, p.z, p.w, p.height, p.d, color)),
+      ],
+    });
+  }
+
+
   const all = [
     ...(data.cover || []),
     ...(data.interiorCover || []),
     ...(data.streetScatter || []),
   ];
   const total = all.length;
-  return all.map((c, i) => ({
-    label: `Cover — ${i + 1}/${total}`,
-    rects: [box('cover', c.x, c.y, c.z, c.w, c.height, c.d, color)],
-  }));
+  for (let i = 0; i < all.length; i++) {
+    const c = all[i];
+    elements.push({
+      label: `Cover — ${i + 1}/${total}`,
+      rects: [box('cover', c.x, c.y, c.z, c.w, c.height, c.d, color)],
+    });
+  }
+
+  return elements;
 }
 
 function ladderElements(data) {

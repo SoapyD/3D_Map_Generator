@@ -51,9 +51,10 @@
     #transport button:hover, .control-row button:hover { background: #3a3a60; }
     #btn-grid.active          { background: #1a3a5a; border-color: #7af; color: #7af; }
     #btn-show-all.active      { background: #1a3a2a; border-color: #7fa; color: #7fa; }
-    #btn-debug-markers.active { background: #3a2a1a; border-color: #fa7; color: #fa7; }
-    #btn-debug-ladders.active { background: #1a2a3a; border-color: #88aaff; color: #88aaff; }
-    #btn-prior.active         { background: #2a1a3a; border-color: #a7f; color: #a7f; }
+    #btn-debug-markers.active    { background: #3a2a1a; border-color: #fa7; color: #fa7; }
+    #btn-debug-ladders.active    { background: #1a2a3a; border-color: #88aaff; color: #88aaff; }
+    #btn-debug-free-space.active { background: #1a3a2a; border-color: #33ffcc; color: #33ffcc; }
+    #btn-prior.active            { background: #2a1a3a; border-color: #a7f; color: #a7f; }
 
     .panel-items {
       display: flex;
@@ -166,6 +167,7 @@
         <label><input type="checkbox" id="group-doors" checked>  <span style="color:#888888">Doors</span></label>
         <label><input type="checkbox" id="group-iroofs"> <span style="color:#886644">IRoofs</span></label>
         <label><input type="checkbox" id="group-walkways" checked> <span style="color:#44ddaa">Walkways</span></label>
+        <label><input type="checkbox" id="group-pillars" checked> <span style="color:#8866aa">Pillars</span></label>
         <label><input type="checkbox" id="group-rivers"  checked> <span style="color:#2266dd">Rivers</span></label>
       </div>
     </div>
@@ -181,6 +183,7 @@
       <button id="btn-debug-markers">Debug Connections [D]</button>
       <button id="btn-debug-ladders">Debug Cull Ladders [L]</button>
       <button id="btn-debug-paths">Debug Ladder Paths [H]</button>
+      <button id="btn-debug-free-space">Debug Free Space [F]</button>
     </div>
     <div id="legend"></div>
   </div>
@@ -441,15 +444,17 @@
       });
     }
 
-    const DEBUG_TYPES      = new Set(['trigger', 'anchor', 'connection', 'door']);
-    const LADDER_TYPES     = new Set(['ladder_candidate']);
-    const PATH_TYPES       = new Set(['ladder_path_cut', 'ladder_path_door']);
-    const PATH_KEPT_TYPES  = new Set(['ladder_path_kept']);
+    const DEBUG_TYPES       = new Set(['trigger', 'anchor', 'connection', 'door']);
+    const LADDER_TYPES      = new Set(['ladder_candidate']);
+    const PATH_TYPES        = new Set(['ladder_path_cut', 'ladder_path_door']);
+    const PATH_KEPT_TYPES   = new Set(['ladder_path_kept']);
+    const FREE_SPACE_TYPES  = new Set(['free_space']);
 
-    function isDebugRect(r)     { return DEBUG_TYPES.has(r.type); }
-    function isLadderRect(r)    { return LADDER_TYPES.has(r.type); }
-    function isPathRect(r)      { return PATH_TYPES.has(r.type); }
-    function isPathKeptRect(r)  { return PATH_KEPT_TYPES.has(r.type); }
+    function isDebugRect(r)      { return DEBUG_TYPES.has(r.type); }
+    function isLadderRect(r)     { return LADDER_TYPES.has(r.type); }
+    function isPathRect(r)       { return PATH_TYPES.has(r.type); }
+    function isPathKeptRect(r)   { return PATH_KEPT_TYPES.has(r.type); }
+    function isFreeSpaceRect(r)  { return FREE_SPACE_TYPES.has(r.type); }
 
     // Assembles rects for a given frame from the compact stage data.
     // Prior stages are dimmed; current stage accumulated up to elementIdx.
@@ -463,11 +468,12 @@
             for (const r of el.rects) {
               if (r.type === 'building') continue;
               const isCulledLadder = isLadderRect(r) && r.isCulled;
-              const isDebug = isDebugRect(r) || isLadderRect(r) || isPathRect(r);
+              const isDebug = isDebugRect(r) || isLadderRect(r) || isPathRect(r) || isFreeSpaceRect(r);
               if (!stageOn && !isDebug) continue;
               if (!showDebugMarkers && isDebugRect(r)) continue;
               if (!showDebugLadders && isLadderRect(r)) continue;
               if (!showDebugPaths && isPathRect(r)) continue;
+              if (!showDebugFreeSpace && isFreeSpaceRect(r)) continue;
               rects.push({ ...r, opacity: 1, transparent: false });
             }
           }
@@ -491,7 +497,8 @@
               if (!showDebugMarkers && isDebugRect(r)) continue;
               if (!showDebugLadders && isLadderRect(r)) continue;
               if (!showDebugPaths && isPathRect(r)) continue;
-              if (isDebugRect(r) || isCulledLadder || isPathRect(r)) rects.push({ ...r, opacity: 1, transparent: false });
+              if (!showDebugFreeSpace && isFreeSpaceRect(r)) continue;
+              if (isDebugRect(r) || isCulledLadder || isPathRect(r) || isFreeSpaceRect(r)) rects.push({ ...r, opacity: 1, transparent: false });
               else rects.push({ ...r, opacity: DIM_OPACITY, transparent: true }); // includes ladder_path_kept (dimmed in prior)
             }
           }
@@ -506,7 +513,8 @@
           if (!showDebugMarkers && isDebugRect(r)) continue;
           if (!showDebugLadders && isLadderRect(r)) continue;
           if (!showDebugPaths && isPathRect(r)) continue;
-          if (isDebugRect(r) || isCulledLadder || isPathRect(r)) rects.push({ ...r, opacity: 1, transparent: false });
+          if (!showDebugFreeSpace && isFreeSpaceRect(r)) continue;
+          if (isDebugRect(r) || isCulledLadder || isPathRect(r) || isFreeSpaceRect(r)) rects.push({ ...r, opacity: 1, transparent: false });
           // ladder_path_kept falls through to the else branch (regular opacity)
           else rects.push({ ...r, opacity: r.opacity !== undefined ? r.opacity * curOpacity : curOpacity, transparent: gridVisible });
         }
@@ -594,6 +602,7 @@
       if (e.key === 'd' || e.key === 'D') toggleDebugMarkers();
       if (e.key === 'l' || e.key === 'L') toggleDebugLadders();
       if (e.key === 'h' || e.key === 'H') toggleDebugPaths();
+      if (e.key === 'f' || e.key === 'F') toggleDebugFreeSpace();
     });
 
     // --- Collision grid toggle ---
@@ -679,7 +688,8 @@
       { id: 'group-iwalls',    values: new Set([80,81,82,83]) },
       { id: 'group-doors',     values: new Set([90]) },
       { id: 'group-iroofs',    values: new Set([91,92,93,94,95,96,97,98,100,101,102,103,104]) },
-      { id: 'group-walkways',  values: new Set([105,106,107]) },
+      { id: 'group-walkways',  values: new Set([105,106]) },
+      { id: 'group-pillars',   values: new Set([107]) },
       { id: 'group-rivers',    values: new Set([110,111,112,113]) },
     ];
     const CUBE_EDGES = [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
@@ -692,7 +702,8 @@
     let showPrior = true;
     let showDebugMarkers = false;
     let showDebugLadders = false;
-    let showDebugPaths   = false;
+    let showDebugPaths      = false;
+    let showDebugFreeSpace  = false;
 
     async function loadCollisionGrid() {
       if (gridLoaded) return;
@@ -843,12 +854,19 @@
       setFrame(currentIndex);
     }
 
+    function toggleDebugFreeSpace() {
+      showDebugFreeSpace = !showDebugFreeSpace;
+      document.getElementById('btn-debug-free-space').classList.toggle('active', showDebugFreeSpace);
+      setFrame(currentIndex);
+    }
+
     document.getElementById('btn-grid').addEventListener('click', toggleGrid);
     document.getElementById('btn-show-all').addEventListener('click', toggleShowAll);
     document.getElementById('btn-prior').addEventListener('click', togglePrior);
     document.getElementById('btn-debug-markers').addEventListener('click', toggleDebugMarkers);
     document.getElementById('btn-debug-ladders').addEventListener('click', toggleDebugLadders);
     document.getElementById('btn-debug-paths').addEventListener('click', toggleDebugPaths);
+    document.getElementById('btn-debug-free-space').addEventListener('click', toggleDebugFreeSpace);
     for (const g of CELL_GROUPS) {
       document.getElementById(g.id)?.addEventListener('change', applyGridVisibility);
     }

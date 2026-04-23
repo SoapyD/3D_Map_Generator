@@ -17,7 +17,7 @@ import { generateStreets } from './generators/streets/index.js';
 import { generateWalls } from './generators/walls/index.js';
 import { generateLadders } from './generators/ladders/index.js';
 import { generateConnectivity } from './generators/connectivity/index.js';
-// import { generateCover } from './generators/_old_system/cover/index.js';          // stage 6 — scatter cover pieces
+import { generateCover } from './generators/cover/index.js';
 import { buildGeometry } from './generators/geometry/index.js';
 import { buildScene } from './generators/scene/index.js';
 import { exportToGlb, getOutputPath } from './export/glb-exporter.js';
@@ -99,11 +99,16 @@ async function main() {
   recorder?.capture(9, ladderData);
 
   // Stage 8: Walls
-  console.log('[8/8] Generating walls...');
+  console.log('[8/9] Generating walls...');
   const wallData = generateWalls(ladderData, config, rng, matrix);
   recorder?.capture(6, wallData);
 
-  const geometry = buildGeometry(wallData, config);
+  // Stage 9: Cover
+  console.log('[9/9] Generating cover...');
+  const coverData = generateCover(wallData, config, rng, matrix);
+  recorder?.capture(8, coverData);
+
+  const geometry = buildGeometry(coverData, config);
 
   // Export
   await mkdir(config.outputDir, { recursive: true });
