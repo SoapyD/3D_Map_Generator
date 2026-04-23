@@ -1,6 +1,8 @@
 # Bridge Culling Pass — Plan
 _2026-04-23_
 
+**Status: ✅ Implemented 2026-04-23**
+
 ## Overview
 
 Add a probabilistic culling pass for elevated bridge candidates immediately before
@@ -62,60 +64,6 @@ In `cullBridges`:
 
 ---
 
-## New file: `cull-bridges.js`
-
-```js
-import { CONNECTIVITY } from '../../config.js';
-import { enumerateCells } from './enumerate-cells.js';
-
-export function cullBridges(survivors, config, rng) {
-  const minLen  = config.bridgeMinLength     ?? CONNECTIVITY.bridgeMinLength;
-  const longLen = config.bridgeLongThreshold ?? CONNECTIVITY.bridgeLongThreshold;
-
-  // Identify crossing-protected connections
-  const cellOwners = new Map();
-  for (const conn of survivors) {
-    for (const cell of enumerateCells(conn)) {
-      const key = `${cell.cx},${cell.cy},${cell.cz}`;
-      if (!cellOwners.has(key)) cellOwners.set(key, []);
-      cellOwners.get(key).push(conn);
-    }
-  }
-  const crossingProtected = new Set();
-  for (const owners of cellOwners.values()) {
-    if (owners.length >= 2) owners.forEach(c => crossingProtected.add(c));
-  }
-
-  const kept   = [];
-  const culled = [];
-
-  for (const conn of survivors) {
-    const { length } = conn;
-
-    if (length < minLen) {
-      kept.push(conn);      // threshold 1 — no culling
-      continue;
-    }
-    if (crossingProtected.has(conn)) {
-      kept.push(conn);      // crossing — immune
-      continue;
-    }
-
-    const survivalChance = length >= longLen ? 0.3 : 0.5;
-    if (rng.random() < survivalChance) {
-      kept.push(conn);
-    } else {
-      conn.bridgeCulled = true;
-      culled.push(conn);
-    }
-  }
-
-  return { survivors: kept, culled };
-}
-```
-
----
-
 ## Changes summary
 
 | File | Change |
@@ -129,6 +77,5 @@ export function cullBridges(survivors, config, rng) {
 
 ## Debug output
 
-Add culled bridge connections to the `debugConnectivity` dump in `index.js` so they
-appear in `debug_connectivity.json` alongside stack-culled and filter-culled entries.
-Flag field: `bridgeCulled: true`.
+Culled bridge connections appear in `debug_connectivity.json` alongside stack-culled
+and filter-culled entries. Flag field: `bridgeCulled: true`.
