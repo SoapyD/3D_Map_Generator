@@ -1,4 +1,4 @@
-import { CELL } from '../collision/matrix.js';
+import { CELL, STAGE } from '../collision/matrix.js';
 import { labelCells } from '../utils/label-cells.js';
 
 function isFloorCell(v) {
@@ -18,7 +18,15 @@ function allInternal(...neighbours) {
 export function labelFloorCells(data, matrix) {
   const yLevels = new Set(data.floors.map(f => f.yCollisionLevel));
 
+  // Label pass: context points to the building index for each labelled cell.
+  // We set it once per building's Y level — fine-grained enough for history tracing.
+  const buildingIndexForLevel = new Map();
+  for (let i = 0; i < data.floors.length; i++) {
+    buildingIndexForLevel.set(data.floors[i].yCollisionLevel, data.floors[i].buildingIndex);
+  }
+
   labelCells(yLevels, matrix, isFloorCell, (cx, cy, cz, expN, expS, expE, expW, nN, nS, nE, nW) => {
+    matrix.setWriteContext(STAGE.FLOORS_LABEL, buildingIndexForLevel.get(cy) ?? 0);
     const expCount = (expN ? 1 : 0) + (expS ? 1 : 0) + (expE ? 1 : 0) + (expW ? 1 : 0);
 
     if (expCount === 4) {

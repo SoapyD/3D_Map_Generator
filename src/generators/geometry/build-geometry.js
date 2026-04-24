@@ -16,12 +16,18 @@ import { buildWalkwayPrimitives } from './build-walkway-primitives.js';
 import { buildPillarPrimitives } from './build-pillar-primitives.js';
 import { buildRoofPrimitives } from './build-roof-primitives.js';
 import { buildAllLadderPrimitives } from './build-all-ladder-primitives.js';
+import { buildLadderPrimitive } from './build-ladder-primitive.js';
 import { buildLadderPlatformPrimitives } from './build-ladder-platform-primitives.js';
 import { buildJunctionPlatformPrimitives } from './build-junction-platform-primitives.js';
 import { buildBridgePrimitives } from './build-bridge-primitives.js';
 import { buildBoxSlabPrimitives } from './build-scatter-primitives.js';
 import { buildCourtyardPrimitives } from './build-courtyard-primitives.js';
 import { buildBuildingFootprintPrimitives } from './build-building-footprint-primitives.js';
+import { buildRiverPrimitives } from './build-river-primitives.js';
+import { buildRiverBankPrimitives } from './build-river-bank-primitives.js';
+import { buildStreetPrimitives } from './build-street-primitives.js';
+import { buildPavementPrimitives } from './build-pavement-primitives.js';
+import { buildMapSkirtPrimitives } from './build-map-skirt-primitives.js';
 
 // ─── Main builder ─────────────────────────────────────────────────────
 
@@ -37,9 +43,10 @@ export function buildGeometry(data, config) {
   const buildings = data.buildings || [];
   const floorData = data.floors || [];
   const walls = data.walls || [];
-  const walkways = data.connections ? data.connections.walkways : [];
-  const bridges = data.connections ? data.connections.bridges || [] : [];
-  const pillars = data.connections ? data.connections.pillars || [] : [];
+  const allWalkways = data.connections ? data.connections.walkways || [] : [];
+  const walkways = allWalkways.filter(w => w.connectionType === 'walkway');
+  const bridges  = allWalkways.filter(w => w.connectionType?.startsWith('bridge_'));
+  const pillars  = data.connections ? data.connections.pillars || [] : [];
 
   if (floorData.length > 0) {
     primitives.push(...buildFloorPrimitives(floorData, buildings, config));
@@ -51,19 +58,39 @@ export function buildGeometry(data, config) {
 
   const allBranches = [...walkways.filter(w => w.branch), ...bridges.filter(b => b.branch)];
   primitives.push(...buildBridgePrimitives(bridges, walkways, allBranches));
-  primitives.push(...buildPillarPrimitives(pillars, bridges, walkways));
+  primitives.push(...buildPillarPrimitives(pillars));
 
   const objTexKey = (i) => `object:${i}`;
   primitives.push(...buildBoxSlabPrimitives(data.cover || [], 'cover', objTexKey));
   primitives.push(...buildBoxSlabPrimitives(data.interiorCover || [], 'interior_cover', objTexKey));
   primitives.push(...buildBoxSlabPrimitives(data.streetScatter || [], 'street_scatter', objTexKey));
   primitives.push(...buildCourtyardPrimitives(data.deletedFootprints || []));
+  primitives.push(...buildRiverPrimitives(data.rivers || []));
+  primitives.push(...buildRiverBankPrimitives(data.rivers || []));
+  primitives.push(...buildStreetPrimitives(data.streets || [], config));
+  primitives.push(...buildPavementPrimitives(data.pavements || [], config));
+  primitives.push(...buildMapSkirtPrimitives(config));
   primitives.push(...buildRoofPrimitives(data.roofs || [], buildings, config));
 
   const conn = data.connections || {};
   primitives.push(...buildAllLadderPrimitives(conn, walls));
   primitives.push(...buildLadderPlatformPrimitives(conn.ladderPlatforms || []));
   primitives.push(...buildJunctionPlatformPrimitives(conn.junctionPlatforms || []));
+
+  for (const l of (data.ladders || [])) {
+    const p = buildLadderPrimitive(l.id, { x: l.x, z: l.z, w: l.w, d: l.d, y0: l.bottomY, y1: l.topY }, l.buildingIndex, walls);
+    if (p) primitives.push(p);
+  }
+
+  // Path-segment ladders (kept portions of the new ladder path system)
+  for (const path of (data.ladderPaths || [])) {
+    for (let si = 0; si < path.segments.length; si++) {
+      const s = path.segments[si];
+      const name = `ladder_path_${path.buildingIndex}_${path.pathIndex}_${si}`;
+      const p = buildLadderPrimitive(name, { x: s.x, z: s.z, w: s.w, d: s.d, y0: s.keptBottomY, y1: s.keptTopY }, path.buildingIndex, walls);
+      if (p) primitives.push(p);
+    }
+  }
 
   return { version: 1, primitives };
 }

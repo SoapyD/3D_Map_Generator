@@ -10,25 +10,31 @@
  */
 
 const STAGE_COLORS = {
-  1: '#5588cc', // Foundation
-  2: '#2244aa', // Streets
-  3: '#44bb88', // Buildings
-  4: '#ccaa33', // Floors
-  5: '#88aaff', // Roofs
-  6: '#cc5533', // Walls
-  7: '#aa44cc', // Connectivity
-  8: '#33bbcc', // Cover
+  1:  '#5588cc', // Foundation
+  2:  '#444444', // Streets
+  3:  '#44bb88', // Buildings
+  4:  '#ccaa33', // Floors
+  5:  '#88aaff', // Roofs
+  6:  '#cc5533', // Walls
+  7:  '#aa44cc', // Connectivity
+  8:  '#33bbcc', // Cover
+  9:  '#88aaff', // Ladders
+  10: '#2266dd', // Rivers
+  11: '#888877', // Pavements
 };
 
 const STAGE_NAMES = {
-  1: 'Foundation',
-  2: 'Streets',
-  3: 'Buildings',
-  4: 'Floors',
-  5: 'Roofs',
-  6: 'Walls',
-  7: 'Connectivity',
-  8: 'Cover',
+  1:  'Foundation',
+  2:  'Streets',
+  3:  'Buildings',
+  4:  'Floors',
+  5:  'Roofs',
+  6:  'Walls',
+  7:  'Connectivity',
+  8:  'Cover',
+  9:  'Ladders',
+  10: 'Rivers',
+  11: 'Pavements',
 };
 
 export function createRecorder(seed, config) {
@@ -61,6 +67,9 @@ function stageToElements(stageIndex, data, color, config) {
     case 6: return wallElements(data);
     case 7: return connectivityElements(data, color, config);
     case 8: return coverElements(data, color);
+    case 9:  return ladderElements(data);
+    case 10: return riverElements(data, config);
+    case 11: return pavementElements(data);
     default: return [];
   }
 }
@@ -74,12 +83,60 @@ function foundationElements(data, color, config) {
 }
 
 function streetElements(data, color, config) {
-  const rects = deriveStreetRects(data.blocks, config.mapWidth, config.mapDepth);
-  const total = rects.length;
-  return rects.map((s, i) => ({
-    label: `Streets — ${i + 1}/${total}`,
-    rects: [box('street', s.x, 0, s.z, s.w, 0.05, s.d, color)],
+  const elements = [];
+
+  // Use the pipeline's streets array if it exists (may be empty in all-rivers mode);
+  // only fall back to deriving from blocks when streets hasn't been computed yet.
+  const streetRects = Array.isArray(data.streets)
+    ? data.streets
+    : deriveStreetRects(data.blocks, config.mapWidth, config.mapDepth);
+  for (let i = 0; i < streetRects.length; i++) {
+    const s = streetRects[i];
+    elements.push({ label: `Street — ${i + 1}/${streetRects.length}`, rects: [box('street', s.x, 0, s.z, s.w, 0.05, s.d, color)] });
+  }
+
+  return elements;
+}
+
+function pavementElements(data) {
+  const pavements = data.pavements ?? [];
+  return pavements.map((p, i) => ({
+    label: `Pavement — block ${i + 1}/${pavements.length}`,
+    rects: [box('pavement', p.x, 0, p.z, p.w, 0.05, p.d, '#888877')],
   }));
+}
+
+function riverElements(data, config) {
+  const elements = [];
+  const rivers = data.rivers ?? [];
+  const riverDepth = config.riverDepth ?? 3;
+
+  for (const river of rivers) {
+    for (let i = 0; i < river.rects.length; i++) {
+      const r = river.rects[i];
+      const rects = [box('river', r.x, -riverDepth, r.z, r.w, 1, r.d, '#2266dd', 0.85)];
+
+      // Banks — thin vertical slabs on foundation faces bordering this segment
+      for (const bank of (river.banks ?? [])) {
+        if (bank.axis === 'NS') {
+          if (bank.z >= r.z && bank.z < r.z + r.d) {
+            rects.push(box('bank', bank.x - 0.1, bank.bottomY, bank.z, 0.2, riverDepth, bank.length, '#886644', 0.9));
+          }
+        } else {
+          if (bank.x >= r.x && bank.x < r.x + r.w) {
+            rects.push(box('bank', bank.x, bank.bottomY, bank.z - 0.1, bank.length, riverDepth, 0.2, '#886644', 0.9));
+          }
+        }
+      }
+
+      elements.push({
+        label: `River — segment ${i + 1}/${river.rects.length}`,
+        rects,
+      });
+    }
+  }
+
+  return elements;
 }
 
 // Build street rects by sweeping all block edge coordinates.
@@ -174,14 +231,59 @@ function connectivityElements(data, color, config) {
   const elements = [];
   const c = data.connections;
 
-  const walkways = [...(c.walkways || []), ...(c.bridges || [])];
+  const allTriggers = c.triggerCells || [];
+  for (const t of allTriggers) {
+    elements.push({
+      label: `Connectivity — trigger ${t.id} faces:${t.faces} (${t.cx},${t.cz})`,
+      rects: [box('trigger', t.x, t.y, t.z, t.w, 0.05, t.d, '#ffee44')],
+    });
+  }
+
+  const allAnchors = c.anchors || [];
+  for (const a of allAnchors) {
+    const anchorColor = a.filterCulled ? '#226633' : a.stackCulled ? '#882244' : '#ff44aa';
+    elements.push({
+      label: `Connectivity — anchor ${a.id} ${a.direction} (${a.cells[0].cx},${a.cells[0].cz})${a.stackCulled ? ' [CULLED]' : ''}`,
+      rects: [box('anchor', a.x, a.y + 0.25, a.z, a.w, 0.25, a.d, anchorColor)],
+    });
+  }
+
+  const doors = c.doors || [];
+  for (const d of doors) {
+    elements.push({
+      label: `Connectivity — door ${d.anchorId} (${d.direction})`,
+      rects: [box('door', d.x, d.y, d.z, d.w, d.h, d.d, '#888888', 0.7)],
+    });
+  }
+
+  const allCandidates = c.candidates || [];
+  const totalC = allCandidates.length;
+  for (let i = 0; i < allCandidates.length; i++) {
+    const conn = allCandidates[i];
+    const r = conn.debugRect;
+    const connColor   = '#44ddff';
+    const connOpacity = 0.6;
+    const tag = conn.stackGroupId ? ` [${conn.stackGroupId} SURVIVOR]` : '';
+    elements.push({
+      label: `Connectivity — candidate ${i + 1}/${totalC} ${conn.axis} ${conn.fromBuildingId}→${conn.toBuildingId} (${conn.length}c)${tag}`,
+      rects: [box('connection', r.x, r.y, r.z, r.w, r.h, r.d, connColor, connOpacity)],
+    });
+  }
+
+  const walkways = c.walkways || [];
   const totalW = walkways.length;
   for (let i = 0; i < walkways.length; i++) {
     const w = walkways[i];
-    const isBridge = w.type === 'bridge' || w.bridgeWalls;
+    const isBridge = w.connectionType?.startsWith('bridge_');
+    const segRects = w.segments.map(seg => {
+      const r = seg.worldRect;
+      const h = isBridge ? 0.5 : 0.3;
+      const baseColor = seg.isCrossing ? '#ffffff' : (isBridge ? '#7733aa' : color);
+      return box(isBridge ? 'bridge' : 'walkway', r.x, r.y, r.z, r.w, h, r.d, baseColor, seg.isCrossing ? 0.5 : 0.8);
+    });
     elements.push({
-      label: `Connectivity — ${isBridge ? 'bridge' : 'walkway'} ${i + 1}/${totalW}`,
-      rects: [box(isBridge ? 'bridge' : 'walkway', w.x, w.y, w.z, w.w, isBridge ? 0.5 : 0.3, w.d, isBridge ? '#7733aa' : color)],
+      label: `Connectivity — ${isBridge ? w.connectionType : 'walkway'} ${i + 1}/${totalW} ${w.fromBuildingId}→${w.toBuildingId}${w.hasCrossing ? ' [CROSSING]' : ''}`,
+      rects: segRects,
     });
   }
 
@@ -201,20 +303,138 @@ function connectivityElements(data, color, config) {
       rects: [box('ladder', l.x, y0, l.z, l.w, y1 - y0, l.d, '#ffdd44')],
     });
   }
+
+  const allPillars = c.pillars || [];
+  const totalP = allPillars.length;
+  for (let i = 0; i < allPillars.length; i++) {
+    const p = allPillars[i];
+    const isBridge = p.connectionType?.startsWith('bridge_');
+    elements.push({
+      label: `Connectivity — pillar ${i + 1}/${totalP} (${p.connectionType})`,
+      rects: [box('pillar', p.x, p.y, p.z, p.w, p.h, p.d, isBridge ? '#cc7733' : '#88bbdd')],
+    });
+  }
+
   return elements;
 }
 
 function coverElements(data, color) {
+  const elements = [];
+
+  const fs = data.freeSpace ?? {};
+
+  for (const g of (fs.shells ?? [])) {
+    elements.push({
+      label: `Cover — floor B${g.buildingIndex} tier ${g.tier} (${g.cells.length} cells, ${g.pieces.length} placed)`,
+      rects: [
+        ...g.cells.map(c => box('free_space', c.wx + 0.25, c.wy, c.wz + 0.25, 0.5, 0.1, 0.5, '#44ccff', 0.6)),
+        ...g.pieces.map(p => box('cover', p.x, p.y, p.z, p.w, p.height, p.d, color)),
+      ],
+    });
+  }
+
+  for (const g of (fs.roofs ?? [])) {
+    elements.push({
+      label: `Cover — roof B${g.buildingIndex} (${g.cells.length} cells, ${g.pieces.length} placed)`,
+      rects: [
+        ...g.cells.map(c => box('free_space', c.wx + 0.25, c.wy, c.wz + 0.25, 0.5, 0.1, 0.5, '#88ffcc', 0.6)),
+        ...g.pieces.map(p => box('cover', p.x, p.y, p.z, p.w, p.height, p.d, color)),
+      ],
+    });
+  }
+
+  for (const g of (fs.streets ?? [])) {
+    elements.push({
+      label: `Cover — street corridor ${g.index} (${g.cells.length} cells, ${g.pieces.length} placed)`,
+      rects: [
+        ...g.cells.map(c => box('free_space', c.wx + 0.25, c.wy, c.wz + 0.25, 0.5, 0.1, 0.5, g.color, 0.6)),
+        ...g.pieces.map(p => box('cover', p.x, p.y, p.z, p.w, p.height, p.d, color)),
+      ],
+    });
+  }
+
+
   const all = [
     ...(data.cover || []),
     ...(data.interiorCover || []),
     ...(data.streetScatter || []),
   ];
   const total = all.length;
-  return all.map((c, i) => ({
-    label: `Cover — ${i + 1}/${total}`,
-    rects: [box('cover', c.x, c.y, c.z, c.w, c.height, c.d, color)],
-  }));
+  for (let i = 0; i < all.length; i++) {
+    const c = all[i];
+    elements.push({
+      label: `Cover — ${i + 1}/${total}`,
+      rects: [box('cover', c.x, c.y, c.z, c.w, c.height, c.d, color)],
+    });
+  }
+
+  return elements;
+}
+
+function ladderElements(data) {
+  const elements = [];
+
+  const candidates = data.ladderCandidates || [];
+  const totalC = candidates.length;
+  for (let i = 0; i < candidates.length; i++) {
+    const c = candidates[i];
+    const color = c.isExternal ? '#88aaff' : '#ffaa44';
+    elements.push({
+      label: `Ladders — candidate ${i + 1}/${totalC} ${c.direction} ${c.isExternal ? 'ext' : 'int'} (${c.cx},${c.cy},${c.cz})`,
+      rects: [{ ...box('ladder_candidate', c.wx, c.wy, c.wz, 0.75, 0.75, 0.75, color), isCulled: true }],
+    });
+  }
+
+  const groups = data.ladderGroups || [];
+  const totalG = groups.length;
+  for (let i = 0; i < groups.length; i++) {
+    const l = groups[i];
+    const r = l.cullReasons || [];
+    const color = r.includes('cell')       ? '#888888'
+                : r.includes('building')   ? '#ff8800'
+                : r.includes('mapEdge')    ? '#ff2222'
+                : r.includes('connection') ? '#ffff00'
+                : l.isExternal             ? '#44ffaa'
+                :                            '#ff6644';
+    const rects = [{ ...box('ladder_candidate', l.x, l.bottomY, l.z, l.w, l.height, l.d, color), isCulled: l.isCulled }];
+    if (l.trimSection) {
+      const ts = l.trimSection;
+      rects.push({ ...box('ladder_candidate', l.x, ts.bottomY, l.z, l.w, ts.topY - ts.bottomY, l.d, '#333333'), isCulled: l.isCulled });
+    }
+    elements.push({
+      label: `Ladders — group ${i + 1}/${totalG} ${l.direction} ${l.isExternal ? 'ext' : 'int'} tiers ${l.startTier}→${l.endTier} (${l.lcx},${l.lcz})`,
+      rects,
+    });
+  }
+
+  const paths = data.ladderPaths || [];
+  for (let pi = 0; pi < paths.length; pi++) {
+    const path = paths[pi];
+    for (let si = 0; si < path.segments.length; si++) {
+      const s = path.segments[si];
+      const isNS   = s.direction === 'N' || s.direction === 'S';
+      const keptH  = s.keptTopY - s.keptBottomY;
+      const rects  = [box('ladder_path_kept', s.x, s.keptBottomY, s.z, s.w, keptH, s.d, '#ff0000')];
+
+      if (s.hasDeleted) {
+        rects.push(box('ladder_path_cut', s.x, s.deletedBottomY, s.z, s.w, s.deletedTopY - s.deletedBottomY, s.d, '#ff3333'));
+      }
+
+      // Door at the top of this segment — 3 wide perpendicular to facing direction
+      const doorW = isNS ? 3 : 0.1;
+      const doorD = isNS ? 0.1 : 3;
+      const doorX = isNS ? s.x - 1 : s.x;
+      const doorZ = isNS ? s.z : s.z - 1;
+      rects.push(box('ladder_path_door', doorX, s.keptTopY, doorZ, doorW, 3, doorD, '#aaaaaa', 0.8));
+
+      elements.push({
+        label: `Ladder path — building ${path.buildingIndex} seg ${si + 1}/${path.segments.length} ${s.direction}`,
+        rects,
+      });
+    }
+  }
+
+  return elements;
 }
 
 function box(type, x, y, z, w, h, d, color, opacity = 1) {

@@ -1,4 +1,4 @@
-import { CELL } from '../collision/matrix.js';
+import { CELL, STAGE } from '../collision/matrix.js';
 import { processBuildingFloors } from './process-building-floors.js';
 import { labelFloorCells } from './label-floor-cells.js';
 
@@ -23,6 +23,7 @@ export function generateFloors(data, config, rng, matrix) {
       if (level.floorIndex === building.maxTier - 1) {
         roofSlabs.push(level);
       } else {
+        matrix.setWriteContext(STAGE.FLOORS, floors.length);
         for (const rect of level.rects) {
           matrix.fillBox(rect.x, level.yCollisionLevel, rect.z, rect.w, slabThickness, rect.d, CELL.FLOOR);
         }

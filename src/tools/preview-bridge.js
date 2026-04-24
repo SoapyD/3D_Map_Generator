@@ -2,83 +2,58 @@
  * Bridge Preview — generates standalone bridge variants for review.
  *
  * Usage:
- *   node src/tools/preview-bridge.js --variant low --seed 42
- *   node src/tools/preview-bridge.js --variant battlement --seed 42
+ *   node src/tools/preview-bridge.js --variant low --length 8
+ *   node src/tools/preview-bridge.js --variant battlement --length 8
  */
 
 import { mkdir } from 'fs/promises';
-import { createRng } from '../core/rng.js';
-import { CONNECTIVITY, GEOMETRY } from '../config.js';
-import { buildTexturePools } from '../generators/build/index.js';
-import { pickFromPool } from '../generators/pick/index.js';
-import { createSlab } from '../core/geometry-misc.js';
-import { createFloorSlab } from '../core/geometry-rects.js';
+import { CONNECTIVITY } from '../config.js';
+import { buildBridgePrimitives } from '../generators/geometry/build-bridge-primitives.js';
+import { buildPrimitiveMesh } from '../generators/scene/build-primitive-mesh.js';
 import * as THREE from 'three';
 import { exportToGlb } from '../export/glb-exporter.js';
 
-const args = { variant: 'low', seed: 42, textureSet: 'loaded', length: 8 };
+const args = { variant: 'low', length: 8 };
 for (let i = 2; i < process.argv.length; i++) {
   const a = process.argv[i];
   if (a === '--variant' && process.argv[i+1]) args.variant = process.argv[++i];
-  else if (a === '--seed' && process.argv[i+1]) args.seed = parseInt(process.argv[++i]);
-  else if (a === '--texture-set' && process.argv[i+1]) args.textureSet = process.argv[++i];
   else if (a === '--length' && process.argv[i+1]) args.length = parseFloat(process.argv[++i]);
 }
 
-const rng = createRng(args.seed);
-const pools = buildTexturePools(args.textureSet);
+// Build a fake bridge entry matching the format buildBridgePrimitives expects.
+// WE axis: w = length, d = 2 (2 cells wide), y = tier1 anchor Y (cell floor at 4, anchor at 4.75).
+const bridgeY = 4.75;  // from.y for a tier-1 anchor
+const fakeBridge = {
+  connectionType: `bridge_${args.variant}`,
+  axis: 'WE',
+  segments: [{
+    isCrossing: false,
+    worldRect: { x: 0, y: bridgeY, z: 0, w: args.length, d: 2 },
+  }],
+};
 
-const bw = CONNECTIVITY.bridgeWidth;
-const bThick = CONNECTIVITY.bridgeThickness;
-const wallH = CONNECTIVITY.bridgeWallHeight;
-const wallT = CONNECTIVITY.bridgeWallThickness;
-const len = args.length;
-const y = 3; // tier 1 height
+const primitives = buildBridgePrimitives([fakeBridge]);
+
+const mat = new THREE.MeshLambertMaterial({ color: 0x888888, side: THREE.DoubleSide });
+const getMaterial = () => mat;
 
 const scene = new THREE.Scene();
+scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+dirLight.position.set(10, 20, 10);
+scene.add(dirLight);
 
-// Bridge slab
-const slabMat = pickFromPool(pools.landmark_walls, 0);
-const slab = createFloorSlab({ x: 0, z: 0, w: len, d: bw }, y, bThick, slabMat, { rotateUV: true });
-slab.name = 'bridge_slab';
-scene.add(slab);
-
-// Side walls
-const wallMat = pickFromPool(pools.landmark_walls, 1);
-const wallY = y + bThick;
-
-// Left wall (z=0 side)
-const wallL = createSlab(len / 2, wallY + wallH / 2, wallT / 2, len, wallH, wallT, wallMat);
-wallL.name = 'bridge_wall_L';
-scene.add(wallL);
-
-// Right wall (z=bw side)
-const wallR = createSlab(len / 2, wallY + wallH / 2, bw - wallT / 2, len, wallH, wallT, wallMat);
-wallR.name = 'bridge_wall_R';
-scene.add(wallR);
-
-// Battlement sections
-if (args.variant === 'battlement') {
-  const battH = CONNECTIVITY.bridgeBattlementHeight - wallH;
-  const spacing = CONNECTIVITY.bridgeBattlementSpacing;
-  const gap = CONNECTIVITY.bridgeBattlementGap;
-  const pillarW = spacing - gap;
-  const battY = wallY + wallH;
-
-  for (let pos = 0; pos < len - pillarW; pos += spacing) {
-    const pL = createSlab(pos + pillarW / 2, battY + battH / 2, wallT / 2, pillarW, battH, wallT, wallMat);
-    pL.name = `bridge_batt_L_${Math.round(pos)}`;
-    scene.add(pL);
-    const pR = createSlab(pos + pillarW / 2, battY + battH / 2, bw - wallT / 2, pillarW, battH, wallT, wallMat);
-    pR.name = `bridge_batt_R_${Math.round(pos)}`;
-    scene.add(pR);
-  }
+for (const prim of primitives) {
+  const meshes = buildPrimitiveMesh(prim, getMaterial, {});
+  for (const m of meshes) scene.add(m);
 }
 
 await mkdir('output', { recursive: true });
-const baseName = `preview_bridge_${args.variant}_${args.seed}`;
-const glbPath = `output/${baseName}.glb`;
+const glbPath = `output/preview_bridge_${args.variant}_${args.length}.glb`;
 await exportToGlb(scene, glbPath);
 
-console.log(`Bridge preview: variant=${args.variant}, length=${len}", width=${bw}"`);
+const { bridgeThickness, bridgeWallHeight, bridgeBattlementPeriod, bridgeBattlementTallH } = CONNECTIVITY;
+console.log(`Bridge preview: variant=${args.variant}, length=${args.length}"`);
+console.log(`  slab thickness=${bridgeThickness}", wall height=${bridgeWallHeight}", battlement period=${bridgeBattlementPeriod} tallH=${bridgeBattlementTallH}"`);
 console.log(`  GLB: ${glbPath}`);
+console.log(`  primitives: ${primitives.length}`);

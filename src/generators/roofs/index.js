@@ -1,4 +1,4 @@
-import { CELL } from '../collision/matrix.js';
+import { CELL, STAGE } from '../collision/matrix.js';
 import { labelRoofCells } from './label-roof-cells.js';
 
 /**
@@ -14,6 +14,7 @@ export function generateRoofs(data, config, matrix) {
   const roofs = [];
 
   for (const slab of data.roofSlabs) {
+    matrix.setWriteContext(STAGE.ROOFS, roofs.length);
     for (const rect of slab.rects) {
       matrix.fillBox(rect.x, slab.yCollisionLevel, rect.z, rect.w, slabThickness, rect.d, CELL.ROOF);
     }

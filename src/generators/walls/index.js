@@ -3,7 +3,7 @@ import { subdivideWall }       from './subdivide-wall.js';
 import { buildWindowPlans, applyWindowPlan } from './place-windows.js';
 import { applyBlobDamage }     from './apply-blob-damage.js';
 import { mergeWallCells }      from './merge-wall-cells.js';
-import { CELL } from '../collision/matrix.js';
+import { CELL, STAGE } from '../collision/matrix.js';
 import { WALL } from '../../config.js';
 
 const WALL_CELL = { N: CELL.WALL_N, S: CELL.WALL_S, E: CELL.WALL_E, W: CELL.WALL_W };
@@ -27,24 +27,31 @@ function ruinsMediumKeep(dirs, size, rng) {
   return new Set([long, short].filter(Boolean));
 }
 
-// For each building+floor, randomly keep at most 2 wall directions and discard the rest.
-function cullToTwoSides(walls, buildings, rng) {
-  const kept = new Map(); // key → Set of 2 directions to keep
+// For each building+floor, keep at most N wall directions: 2 for ruins, 3 for everything else.
+function cullToMaxSides(walls, buildings, rng) {
+  const kept = new Map();
   for (const wall of walls) {
     const key = `${findBuildingIndex(wall, buildings)}:${wall.floorY}`;
     if (!kept.has(key)) kept.set(key, new Set());
     kept.get(key).add(wall.direction);
   }
   for (const [key, dirs] of kept) {
-    if (dirs.size <= 2) continue;
     const bi = parseInt(key.split(':')[0]);
     const size = buildings[bi].size;
+    const isRuins = size.startsWith('ruins');
+    const max = isRuins ? 2 : 3;
+    if (dirs.size <= max) continue;
     if (size === 'ruins-medium-h' || size === 'ruins-medium-v') {
       kept.set(key, ruinsMediumKeep(dirs, size, rng));
-    } else {
+    } else if (isRuins) {
       const first  = rng.pick([...dirs]);
       const second = rng.pick([...dirs].filter(d => d !== first));
       kept.set(key, new Set([first, second]));
+    } else {
+      const first  = rng.pick([...dirs]);
+      const second = rng.pick([...dirs].filter(d => d !== first));
+      const third  = rng.pick([...dirs].filter(d => d !== first && d !== second));
+      kept.set(key, new Set([first, second, third]));
     }
   }
   return walls.filter(wall => {
@@ -56,7 +63,7 @@ function cullToTwoSides(walls, buildings, rng) {
 export function generateWalls(data, config, rng, matrix) {
   const { walls: rawWalls, internalWalls } = extractWallSegments(data, config, matrix);
 
-  const culledWalls = WALL.applySegmentCull ? cullToTwoSides(rawWalls, data.buildings, rng) : rawWalls;
+  const culledWalls = WALL.applySegmentCull ? cullToMaxSides(rawWalls, data.buildings, rng) : rawWalls;
   const windowPlans = buildWindowPlans(data.buildings, rng);
 
   const walls = [];
@@ -72,8 +79,13 @@ export function generateWalls(data, config, rng, matrix) {
     if (WALL.applyWindows) applyWindowPlan(grid, wall, plan, data.buildings[bi]);
 
     for (const seg of mergeWallCells(grid, wall)) {
+      matrix.setWriteContext(STAGE.WALLS, walls.length);
       walls.push(seg);
-      matrix.fillBox(seg.x, seg.y, seg.z, seg.w, seg.h, seg.d, WALL_CELL[wall.direction]);
+      if (WALL.applyDoorCuts) {
+        matrix.fillBoxUnless(seg.x, seg.y, seg.z, seg.w, seg.h, seg.d, WALL_CELL[wall.direction], CELL.DOOR);
+      } else {
+        matrix.fillBox(seg.x, seg.y, seg.z, seg.w, seg.h, seg.d, WALL_CELL[wall.direction]);
+      }
     }
   }
 

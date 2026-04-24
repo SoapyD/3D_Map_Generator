@@ -8,7 +8,7 @@
  * Output: Array of buildings { x, z, w, d, maxTier, size, blockIndex }
  */
 
-import { CELL } from '../collision/matrix.js';
+import { CELL, STAGE } from '../collision/matrix.js';
 import { treemapBuildings } from './treemap-buildings.js';
 // import { placeSmallBuildings } from './placeSmallBuildings.js';  // old system — random float-positioned buildings
 // import { getLayoutSpecs } from './getLayoutSpecs.js';            // old system — big building layout strategies
@@ -30,7 +30,9 @@ export function generateBuildings(gridData, config, rng, matrix) {
   // Write building shells into the collision matrix.
   // Shells start at Y=-slabThickness (bottom of ground floor slab) so walls begin at Y=0.
   const levelHeight = tierHeight + config.slabThickness;
-  for (const b of buildings) {
+  for (let i = 0; i < buildings.length; i++) {
+    const b = buildings[i];
+    matrix.setWriteContext(STAGE.BUILDINGS, i);
     matrix.fillBox(b.x, -config.slabThickness, b.z, b.w, b.maxTier * levelHeight - config.tierHeight, b.d, CELL.SHELL);
   }
 

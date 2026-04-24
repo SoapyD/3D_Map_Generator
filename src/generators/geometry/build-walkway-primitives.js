@@ -2,27 +2,30 @@ import { GEOMETRY } from '../../config.js';
 
 export function buildWalkwayPrimitives(walkways) {
   const primitives = [];
+  const thickness = GEOMETRY.walkwayThickness;
 
   for (let i = 0; i < walkways.length; i++) {
     const w = walkways[i];
-    const texIdx = (w.textureId !== undefined && w.branch)
-      ? walkways.findIndex(ww => ww.textureId === w.textureId && !ww.branch)
-      : i;
-    const name = w.blocked ? `walkway_BLOCKED_${i}` : `walkway_${i}`;
+    const texKey = `walkway:${w.texIndex ?? i}`;
 
-    primitives.push({
-      type: 'slab', name,
-      x: w.x, y: w.y, z: w.z, w: w.w, h: GEOMETRY.walkwayThickness, d: w.d,
-      textureKey: `walkway:${texIdx >= 0 ? texIdx : i}`,
-      emitTop: true, emitBottom: true, simpleBottom: false,
-      rotateUV: w.w > w.d,
-      shared: true,
-    });
-    primitives.push({
-      type: 'edges', name,
-      x: w.x, y: w.y, z: w.z, w: w.w, h: GEOMETRY.walkwayThickness, d: w.d,
-      textureKey: `walkway:${texIdx >= 0 ? texIdx : i}`,
-    });
+    for (const seg of w.segments) {
+      const r = seg.worldRect;
+      primitives.push({
+        type: 'slab', name: `walkway_${i}`,
+        x: r.x, y: r.y, z: r.z, w: r.w, h: thickness, d: r.d,
+        textureKey: texKey,
+        emitTop: true, emitBottom: true, simpleBottom: false,
+        rotateUV: r.w > r.d,
+        shared: true,
+      });
+      if (!seg.isCrossing) {
+        primitives.push({
+          type: 'edges', name: `walkway_${i}`,
+          x: r.x, y: r.y, z: r.z, w: r.w, h: thickness, d: r.d,
+          textureKey: texKey,
+        });
+      }
+    }
   }
 
   return primitives;

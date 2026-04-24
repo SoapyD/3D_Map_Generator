@@ -13,6 +13,7 @@ export function ensureTexture(atlasState, textureKey, texturePools) {
   const {
     baseIdx, wallTextures, landmarkTextures, floorTextures,
     walkwayTextures, objectTextures, courtyardTextures, ladderTextures, roofTextures,
+    riverTextures, riverBankTextures, streetTextures, pavementTextures, mapSkirtTextures,
   } = texturePools;
 
   if (parts[0] === 'floor') {
@@ -51,6 +52,24 @@ export function ensureTexture(atlasState, textureKey, texturePools) {
     const ti = parseInt(parts[1], 10);
     const tex = ladderTextures[Math.abs(ti) % ladderTextures.length];
     idx = addTexture(atlasState, `ladder_${Math.abs(ti) % ladderTextures.length}`, tex);
+  } else if (parts[0] === 'river') {
+    const ti = parseInt(parts[1] ?? 0, 10);
+    const tex = riverTextures[Math.abs(ti) % riverTextures.length];
+    idx = addTexture(atlasState, `river_${Math.abs(ti) % riverTextures.length}`, tex);
+  } else if (parts[0] === 'river_bank') {
+    const ti = parseInt(parts[1] ?? 0, 10);
+    const tex = riverBankTextures[Math.abs(ti) % riverBankTextures.length];
+    idx = addTexture(atlasState, `river_bank_${Math.abs(ti) % riverBankTextures.length}`, tex);
+  } else if (parts[0] === 'street') {
+    const ti = parseInt(parts[1] ?? 0, 10);
+    const tex = streetTextures[Math.abs(ti) % streetTextures.length];
+    idx = addTexture(atlasState, `street_${Math.abs(ti) % streetTextures.length}`, tex);
+  } else if (parts[0] === 'pavement') {
+    const ti = parseInt(parts[1] ?? 0, 10);
+    const tex = pavementTextures[Math.abs(ti) % pavementTextures.length];
+    idx = addTexture(atlasState, `pavement_${Math.abs(ti) % pavementTextures.length}`, tex);
+  } else if (parts[0] === 'map_skirt') {
+    idx = addTexture(atlasState, 'map_skirt_0', mapSkirtTextures[0]);
   } else {
     idx = baseIdx;
   }

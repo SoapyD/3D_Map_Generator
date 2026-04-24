@@ -11,11 +11,14 @@ docs/processes/
     1-grid.md
     2-buildings.md
     3-floors.md
-    4-walls.md
-    5-connectivity.md
-    6-sightlines.md
-    7-textures.md
-    8-export.md
+    4-roofs.md
+    5-streets.md
+    6-connectivity.md
+    7-ladders.md
+    8-walls.md
+    9-geometry.md
+    10-scene-and-export.md
+    archive/                   <- superseded docs
 ```
 
 ## Document Structure

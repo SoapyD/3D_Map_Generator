@@ -10,12 +10,14 @@ import { parseArgs } from './config.js';
 import { createRng } from './core/rng.js';
 import { generateGrid } from './generators/foundations/grid.js';
 import { generateBuildings } from './generators/buildings/index.js';
-import { createCollisionMatrix, CELL } from './generators/collision/matrix.js';
+import { createCollisionMatrix, CELL, STAGE, BELOW_GROUND } from './generators/collision/matrix.js';
 import { generateFloors } from './generators/floors/index.js';
 import { generateRoofs } from './generators/roofs/index.js';
+import { generateStreets } from './generators/streets/index.js';
 import { generateWalls } from './generators/walls/index.js';
-// import { generateConnectivity } from './generators/_old_system/connectivity/generate-connectivity.js'; // stage 5 — walkways, ladders, pillars
-// import { generateCover } from './generators/_old_system/cover/index.js';          // stage 6 — scatter cover pieces
+import { generateLadders } from './generators/ladders/index.js';
+import { generateConnectivity } from './generators/connectivity/index.js';
+import { generateCover } from './generators/cover/index.js';
 import { buildGeometry } from './generators/geometry/index.js';
 import { buildScene } from './generators/scene/index.js';
 import { exportToGlb, getOutputPath } from './export/glb-exporter.js';
@@ -44,7 +46,6 @@ async function main() {
   const gridData = generateGrid(config, rng);
   console.log(`  ${gridData.blocks.length} city blocks`);
   recorder?.capture(1, gridData);
-  recorder?.capture(2, gridData);
 
   const matrix = createCollisionMatrix(gridData.activeArea, config.tiers, config.tierHeight, config.slabThickness);
 
@@ -52,6 +53,7 @@ async function main() {
   // Buildings will overwrite their footprints with SHELL; remaining cells mark
   // non-building foundation and street areas for future geometry stages.
   const slabY = -config.slabThickness;
+  matrix.setWriteContext(STAGE.BUILDINGS, 0);
   for (const block of gridData.blocks) {
     matrix.fillBox(block.x, slabY, block.z, block.w, config.slabThickness, block.d, CELL.FOUNDATION_PLACEHOLDER);
   }
@@ -77,16 +79,66 @@ async function main() {
   console.log(`  ${roofData.roofs.length} roof slabs`);
   recorder?.capture(5, roofData);
 
-  // Stage 5: Walls
-  console.log('[5/5] Generating walls...');
-  const wallData = generateWalls(roofData, config, rng, matrix);
-  console.log(`  ${wallData.walls.length} wall segments`);
+  // Stage 5: Streets / Rivers / Pavements — must run before Connectivity so river cells are in the matrix
+  console.log('[5/8] Generating streets and rivers...');
+  const streetData = generateStreets(roofData, config, rng, matrix);
+  recorder?.capture(2, streetData);
+  recorder?.capture(10, streetData);
+  recorder?.capture(11, streetData);
+
+  // Stage 6: Connectivity
+  console.log('[6/8] Generating connectivity...');
+  const connectivityData = generateConnectivity(streetData, config, rng, matrix);
+  console.log(`  ${connectivityData.connections.anchors.length} anchors, ${connectivityData.connections.candidates.length} candidate connections`);
+  recorder?.capture(7, connectivityData);
+
+  // Stage 7: Ladders — must run before Walls so edge cells are still SHELL/FLOOR_* during scan
+  console.log('[7/8] Generating ladders...');
+  const ladderData = generateLadders(connectivityData, config, rng, matrix);
+  console.log(`  ${ladderData.ladders.length} ladders placed`);
+  recorder?.capture(9, ladderData);
+
+  // Stage 8: Walls
+  console.log('[8/9] Generating walls...');
+  const wallData = generateWalls(ladderData, config, rng, matrix);
   recorder?.capture(6, wallData);
 
-  const geometry = buildGeometry(wallData, config);
+  // Stage 9: Cover
+  console.log('[9/9] Generating cover...');
+  const coverData = generateCover(wallData, config, rng, matrix);
+  recorder?.capture(8, coverData);
+
+  const geometry = buildGeometry(coverData, config);
 
   // Export
   await mkdir(config.outputDir, { recursive: true });
+
+  if (config.debugMatrix) {
+    const { dir: mDir, baseName: mBase } = getObjOutputPath(config);
+    const historyOut = [];
+    const rawHistory = matrix.dumpHistory();
+    const { cellSize: cs, W: mW, D: mD } = matrix;
+    for (const [cellIndex, buf] of rawHistory) {
+      const writes = [];
+      for (let o = 0; o < buf.length; o += 5) {
+        writes.push({
+          prev: buf[o], next: buf[o + 1],
+          stage: buf[o + 2],
+          stageName: ['buildings','floors','floors-label','roofs','roofs-label','connectivity','walls-label','walls','walls-internal'][buf[o + 2]] ?? 'unknown',
+          sourceIndex: buf[o + 3] | (buf[o + 4] << 8),
+        });
+      }
+      if (writes.length < 2) continue; // skip single-write cells by default
+      const cy_arr = Math.floor(cellIndex / (mW * mD));
+      const rem    = cellIndex % (mW * mD);
+      const cz     = Math.floor(rem / mW);
+      const cx     = rem % mW;
+      historyOut.push({ cx, cy: cy_arr - BELOW_GROUND, cz, writes });
+    }
+    const histPath = path.join(mDir, `${mBase}_matrix_history.json`);
+    await writeFile(histPath, JSON.stringify({ cells: historyOut }, null, 2));
+    console.log(`  Matrix history: ${histPath}`);
+  }
 
   if (recorder) {
     await writeFile(`${config.outputDir}/debug_frames.json`, recorder.serialize());

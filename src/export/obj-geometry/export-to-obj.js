@@ -15,6 +15,7 @@ import { addSharedWall } from './add-shared-wall.js';
 import { wallEdgeCovered } from './wall-edge-covered.js';
 import { addFloorEdgesFromGaps } from './add-floor-edges-from-gaps.js';
 import { emitLadder } from './emit-ladder.js';
+import { GEOMETRY } from '../../config.js';
 import { loadTexPool } from './load-tex-pool.js';
 import { createAtlasState } from './create-atlas-state.js';
 import { addTexture } from './add-texture.js';
@@ -42,6 +43,16 @@ export async function exportToObj(geometry, config, outputDir, baseName) {
   const ladderTextures = ladderPool.length > 0 ? ladderPool : wallTextures;
   const roofPool = loadTexPool(packDir, 'roofs');
   const roofTextures = roofPool.length > 0 ? roofPool : floorTextures;
+  const riverPool = loadTexPool(packDir, 'rivers');
+  const riverTextures = riverPool.length > 0 ? riverPool : baseTextures;
+  const riverBankPool = loadTexPool(packDir, 'river_banks');
+  const riverBankTextures = riverBankPool.length > 0 ? riverBankPool : wallTextures;
+  const streetPool = loadTexPool(packDir, 'streets');
+  const streetTextures = streetPool.length > 0 ? streetPool : baseTextures;
+  const pavementPool = loadTexPool(packDir, 'pavements');
+  const pavementTextures = pavementPool.length > 0 ? pavementPool : baseTextures;
+  const mapSkirtPool = loadTexPool(packDir, 'map_skirt');
+  const mapSkirtTextures = mapSkirtPool.length > 0 ? mapSkirtPool : baseTextures;
 
   // Build atlas: collect unique textures needed
   const atlasState = createAtlasState();
@@ -52,6 +63,7 @@ export async function exportToObj(geometry, config, outputDir, baseName) {
     baseIdx: atlasState.baseIdx,
     wallTextures, landmarkTextures, floorTextures,
     walkwayTextures, objectTextures, courtyardTextures, ladderTextures, roofTextures,
+    riverTextures, riverBankTextures, streetTextures, pavementTextures, mapSkirtTextures,
   };
 
   // Pre-register all textures from primitives
@@ -172,7 +184,7 @@ export async function exportToObj(geometry, config, outputDir, baseName) {
       }
 
       case 'ladder': {
-        emitLadder(state, prim, uv);
+        emitLadder(state, prim, uv, config.flatLadders ?? GEOMETRY.flatLadders);
         break;
       }
     }

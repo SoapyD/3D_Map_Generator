@@ -21,12 +21,16 @@ export const DEFAULTS = {
   streetWidth: GLOBAL_GRID.streetWidth, // derived from GLOBAL_GRID — do not change independently
   damageLevel: 0.5,   // ruin level 0–1, controls floor quadrant removal escalation
   // maxSightline: 24,     // _old_system: max unbroken line of sight (inches)
+  filterStrategy: 'longestAndShortest', // one of: longestAndShortest, longest, shortest, random
+  filterN: 2,             // max connections kept per building per tier (each end for longestAndShortest)
   textureSet: 'base',
+  flatLadders: true,
   preview: false,
   visualize: false,
   debug: false,
   obj: false,
   outputDir: 'output',
+  allRivers: false,   // treat every street corridor as a river
 };
 
 // --- Buildings --- (_old_system only)
@@ -37,15 +41,16 @@ export const WALL = {
   wallThickness: 0.25,
   applySegmentCull: true,   // cull walls to at most 2 sides per building per floor
   applyWindows: true,        // cut window openings in wall segments
-  applyBlobDamage: true,     // apply random blob damage to wall segments              // outer face flush with cell edge, body extends inward
+  applyBlobDamage: true,     // apply random blob damage to wall segments
+  applyDoorCuts: true,       // skip cells marked CELL.DOOR during wall matrix writes              // outer face flush with cell edge, body extends inward
   quadSize: 1.5,                    // inches per damage column (Phase 2)
-  externalRow2RemovalRatio: 0.5,    // Phase 2: max fraction of row 2 (top) removed on exterior walls
+  externalRow2RemovalRatio: 0.4,    // Phase 2: max fraction of row 2 (top) removed on exterior walls
   externalRow2RemovalMin: 0.2,      // Phase 2: min fraction of row 2 removed on exterior walls
   externalRow1RemovalRatio: 0.3,    // Phase 2: max fraction of row 1 (mid) removed — cascades from row 2
   externalRow1RemovalMin: 0.1,      // Phase 2: min fraction of row 1 removed
-  externalRow0RemovalRatio: 0.2,    // Phase 2: max fraction of row 0 (base) removed — cascades from row 1
+  externalRow0RemovalRatio: 0.15,   // Phase 2: max fraction of row 0 (base) removed — cascades from row 1
   externalRow0RemovalMin: 0.0,      // Phase 2: min fraction of row 0 removed
-  internalRow2RemovalRatio: 0.6,    // Phase 2: interior wall ratios
+  internalRow2RemovalRatio: 0.4,    // Phase 2: interior wall ratios
   internalRow1RemovalRatio: 0.3,
   internalRow0RemovalRatio: 0.15,
   interiorWallChance: { medium: 0.75, largeA: 1.0, largeB: 1.0 }, // Phase 2
@@ -61,8 +66,39 @@ export const FLOOR = {
   tier3EscalateChance: 0.5,  // chance to remove third adjacent quadrant
 };
 
-// --- Connectivity --- (_old_system only)
-// export const CONNECTIVITY = { ... };  // see _old_system/config.js
+// --- Connectivity ---
+export const CONNECTIVITY = {
+  bridgeMinLength:     6,  // min connection length (cells) eligible to become a bridge
+  bridgeLongThreshold: 12, // connections this length or longer use long-bridge chances
+  pillarMinLength:   8,    // min connection length (cells) to receive support pillars
+  pillarSpacing:     6,    // cells between pillar pairs along travel axis
+  pillarEdgeInset:   1,    // cells inset from each end before placing first pair
+  pillarWidth:       0.25, // pillar footprint in inches
+  // Direct percentage chances — must sum to 100
+  bridgeVariants: {
+    walkway:     60,
+    low:         40,
+    battlement:   0,
+  },
+  bridgeVariantsLong: {
+    walkway:     10,
+    low:         30,
+    battlement:  60,
+  },
+  riverCrossingPeriod:     2,     // anchor spacing along bank edge (cells)
+  riverCrossingMaxLength:  5,     // max ray-cast length for river crossing candidates
+  riverCrossingSpacing:    3,     // min cells between a river crossing and any same-axis connection
+  bridgeThickness:         0.5,   // slab thickness; top face flush with cell top
+  bridgeWallHeight:        1,     // base wall height (inches, = 1 cell)
+  bridgeWallThickness:     0.25,
+  bridgeBattlementPeriod:  3,     // every N units a tall post appears
+  bridgeBattlementTallH:   2,     // height of tall post (inches)
+};
+
+// --- Streets / Rivers ---
+export const STREETS = {
+  riverDepth: 3,   // cells below Y=0 occupied by river volume (must be <= BELOW_GROUND)
+};
 
 // --- Cover --- (_old_system only)
 // export const COVER = { ... };  // see _old_system/config.js
@@ -95,7 +131,11 @@ export const GEOMETRY = {
   // Platform
   platformSize: 2,           // ladder platform width/depth (inches)
   platformThickness: 0.2,    // ladder platform thickness (inches)
-  walkwayThickness: 0.3,     // walkway slab thickness (inches)
+  walkwayThickness: 0.25,    // walkway slab thickness (inches)
+  riverThickness:    0.25,   // river bed slab thickness
+  riverBankThickness: 0.25,  // bank wall thickness
+  streetThickness:   0.25,   // street surface slab thickness
+  pavementThickness: 0.25,   // pavement slab thickness
 };
 
 // --- Ladder Display ---
@@ -106,6 +146,16 @@ export const LADDER_DISPLAY = {
   rungRadius: 0.08,          // radius of rungs
   rungSpacing: 0.75,         // inches between rungs
   rungInset: 0.1,            // how far rungs sit inside the poles
+};
+
+// --- Ladders ---
+export const LADDERS = {
+  mapEdgeClearance:     3,    // units from map edge — no ladders within this distance
+  connectionClearance:  2,    // units (Chebyshev) from any WALKWAY/DOOR cell
+  buildingClearance:    4,    // units from another building's SHELL cells along facing ray
+  pathSpacing:          6,    // min world distance between ladders from different paths
+  maxSideCount:         2,    // max ladders per facing direction per building
+  fullHeightCullChance: 0.30, // chance to randomly trim a full-height ladder
 };
 
 // --- Deletion Toggles --- (_old_system only)
@@ -134,8 +184,33 @@ export function parseArgs(argv) {
       continue;
     }
 
+    if (arg === '--debug-connectivity') {
+      config.debugConnectivity = true;
+      continue;
+    }
+
+    if (arg === '--debug-matrix') {
+      config.debugMatrix = true;
+      continue;
+    }
+
     if (arg === '--obj') {
       config.obj = true;
+      continue;
+    }
+
+    if (arg === '--all-rivers') {
+      config.allRivers = true;
+      continue;
+    }
+
+    if (arg === '--3d-ladders') {
+      config.flatLadders = false;
+      continue;
+    }
+
+    if (arg === '--flat-ladders') {
+      config.flatLadders = true;
       continue;
     }
 

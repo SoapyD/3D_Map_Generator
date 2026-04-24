@@ -13,6 +13,7 @@ const PACKAGE_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const CATEGORIES = [
   'walls', 'landmark_walls', 'floors', 'objects',
   'ladders', 'walkways', 'courtyards', 'base_map', 'roofs',
+  'rivers', 'river_banks', 'streets', 'pavements', 'map_skirt',
 ];
 
 /**

@@ -1,5 +1,8 @@
-import { CELL } from '../collision/matrix.js';
+import { CELL, STAGE } from '../collision/matrix.js';
 import { WALL } from '../../config.js';
+
+const skipDoor = (matrix, cx, cy, cz) =>
+  WALL.applyDoorCuts && matrix.getCell(cx, cy + 1, cz) === CELL.DOOR;
 
 // Each direction collects its own label set (exterior + interior variants) plus
 // both corner labels that include it. The outward neighbour check at emit time
@@ -65,9 +68,10 @@ const END_FACES = {
 
 function isSlabCell(v) {
   return v === CELL.FLOOR
-    || (v >= 10 && v <= 34)   // FLOOR_N … FLOOR_ISLAND
-    || (v >= 40 && v <= 44)   // ROOF … ROOF_W
-    || (v >= 60 && v <= 74);  // IFLOOR variants
+    || (v >= 10 && v <= 34)    // FLOOR_N … FLOOR_ISLAND
+    || (v >= 40 && v <= 48)    // ROOF … ROOF_SW (incl. corner labels)
+    || (v >= 60 && v <= 74)    // IFLOOR variants
+    || (v >= 91 && v <= 104);  // IROOF variants
 }
 
 const FACE_OFFSET = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] };
@@ -132,6 +136,7 @@ export function extractWallSegments(data, config, matrix) {
         for (let cx = 0; cx < matrix.W; cx++) {
           if (!labels.has(matrix.getCell(cx, cy, cz))) continue;
           if (!isSlabCell(matrix.getCell(cx, cy + levelHeight, cz))) continue;
+          if (skipDoor(matrix, cx, cy, cz)) continue;
           const neighbour = matrix.getCell(cx + dcx, cy, cz + dcz);
           if (neighbour === CELL.SHELL) {
             intCells.push({ cx, cz });
@@ -194,6 +199,7 @@ export function extractWallSegments(data, config, matrix) {
           x = ox + fixedVal * s;            z = oz + runStart * s; w = t; d = runLength * s;
         }
 
+        matrix.setWriteContext(STAGE.WALLS_INT, internalWalls.length);
         internalWalls.push({ direction: dir, floorY: cy, x, y: wallWorldY, z, w, h: tierHeight, d });
         matrix.fillBox(x, wallWorldY, z, w, tierHeight, d, intWallCell);
       }
@@ -210,6 +216,7 @@ export function extractWallSegments(data, config, matrix) {
         const faces = END_FACES[v];
         if (!faces) continue;
         if (!isSlabCell(matrix.getCell(cx, cy + levelHeight, cz))) continue;
+        if (matrix.getCell(cx, cy + 1, cz) === CELL.DOOR) continue;
 
         const hasE = faces.includes('E') && matrix.getCell(cx + 1, cy, cz) !== CELL.SHELL;
         const hasW = faces.includes('W') && matrix.getCell(cx - 1, cy, cz) !== CELL.SHELL;
@@ -234,6 +241,7 @@ export function extractWallSegments(data, config, matrix) {
           }
 
           if (isInternal) {
+            matrix.setWriteContext(STAGE.WALLS_INT, internalWalls.length);
             internalWalls.push({ direction: face, floorY: cy, x, y: wallWorldY, z, w, h: tierHeight, d });
             matrix.fillBox(x, wallWorldY, z, w, tierHeight, d, FACE_INT_WALL[face]);
           } else {
