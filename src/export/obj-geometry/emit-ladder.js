@@ -12,7 +12,7 @@ const RUNG_INSET = GEOMETRY.ladderRungInset;
 /**
  * Emit OBJ ladder from primitive placement data.
  */
-export function emitLadder(state, prim, uv) {
+export function emitLadder(state, prim, uv, flat = GEOMETRY.flatLadders) {
   const height = prim.y1 - prim.y0;
   if (height <= 0) return;
 
@@ -21,7 +21,6 @@ export function emitLadder(state, prim, uv) {
   const cx = prim.x + prim.w / 2;
   const cz = prim.z + prim.d / 2;
   const halfSpread = (ladderWidth / 2) - POLE_WIDTH / 2 - RUNG_INSET;
-  const flat = GEOMETRY.flatLadders;
 
   if (flat) {
     const FLAT_OFFSET = 0.15;

@@ -24,6 +24,7 @@ export const DEFAULTS = {
   filterStrategy: 'longestAndShortest', // one of: longestAndShortest, longest, shortest, random
   filterN: 2,             // max connections kept per building per tier (each end for longestAndShortest)
   textureSet: 'base',
+  flatLadders: true,
   preview: false,
   visualize: false,
   debug: false,
@@ -200,6 +201,16 @@ export function parseArgs(argv) {
 
     if (arg === '--all-rivers') {
       config.allRivers = true;
+      continue;
+    }
+
+    if (arg === '--3d-ladders') {
+      config.flatLadders = false;
+      continue;
+    }
+
+    if (arg === '--flat-ladders') {
+      config.flatLadders = true;
       continue;
     }
 

@@ -6,18 +6,21 @@
  * No subdivision needed — just the bounding box of each walkable surface.
  *
  * Includes:
+ * - Map skirt / base box (skirt_)
+ * - Rivers and river banks (river_)
+ * - Street surfaces (street_)
+ * - Pavement surfaces (pavement_)
  * - Ground level map (base_floor)
  * - All visible floor sections (floor_)
- * - Cover objects (cover_, interior_cover_)
- * - Ladder platforms (ladder_platform_)
- * - Junction platforms (junction_platform_)
- * - Courtyards (deleted_)
+ * - Flat roofs (roof_flat_)
+ * - Pyramid roofs (roof_pyramid_) — base bounding box
+ * - Cover objects (cover_, interior_cover_, street_scatter_)
  * - Walkways (walkway_)
  * - Bridges (bridge_) — slab only, not walls/battlements
  * - Pillar supports (pillar_)
- * - Street scatter (street_scatter_)
- * - Flat roofs (roof_flat_)
- * - Pyramid roofs (roof_pyramid_) — base bounding box
+ * - Ladder platforms (ladder_platform_)
+ * - Junction platforms (junction_platform_)
+ * - Courtyards (deleted_)
  *
  * Excludes walls, ladders, ceilings, edges — so units can move freely.
  */
@@ -26,19 +29,22 @@ import { writeFile } from 'fs/promises';
 import path from 'path';
 
 const COLLIDABLE_PREFIXES = [
+  'skirt_',
+  'river_',
+  'street_',
+  'pavement_',
   'base_floor',
   'floor_',
+  'roof_',
   'cover_',
   'interior_cover_',
-  'ladder_platform_',
-  'junction_platform_',
-  'deleted_',
+  'street_scatter_',
   'walkway_',
   'bridge_',
   'pillar_',
-  'street_scatter_',
-  'roof_flat_',
-  'roof_pyramid_',
+  'ladder_platform_',
+  'junction_platform_',
+  'deleted_',
 ];
 
 /**

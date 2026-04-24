@@ -15,6 +15,7 @@ import { addSharedWall } from './add-shared-wall.js';
 import { wallEdgeCovered } from './wall-edge-covered.js';
 import { addFloorEdgesFromGaps } from './add-floor-edges-from-gaps.js';
 import { emitLadder } from './emit-ladder.js';
+import { GEOMETRY } from '../../config.js';
 import { loadTexPool } from './load-tex-pool.js';
 import { createAtlasState } from './create-atlas-state.js';
 import { addTexture } from './add-texture.js';
@@ -183,7 +184,7 @@ export async function exportToObj(geometry, config, outputDir, baseName) {
       }
 
       case 'ladder': {
-        emitLadder(state, prim, uv);
+        emitLadder(state, prim, uv, config.flatLadders ?? GEOMETRY.flatLadders);
         break;
       }
     }

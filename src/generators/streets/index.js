@@ -38,7 +38,7 @@ export function generateStreets(data, config, rng, matrix) {
 
   // Build the list of (pathIds, rects) pairs.
   // --all-rivers flag overrides the random selection.
-  const riverMode = config.allRivers ? 'all' : 'one';
+  const riverMode = config.allRivers ? 'all' : pickRiverMode(rng);
   const riverCount = riverMode === 'none' ? 0 : riverMode === 'one' ? 1 : riverMode === 'two' ? 2 : 0;
 
   let riverRectLists;
