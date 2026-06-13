@@ -23,7 +23,8 @@ Outputs:
 | `--tiers N` | Number of elevated tiers (+ base) | 4 |
 | `--tier-height N` | Vertical spacing between tiers (inches) | 3 |
 | `--debug` | Use flat debug colours instead of textures | off |
-| `--preview` | Start browser preview server on localhost:3000 | off |
+| `--preview` | Start basic browser preview (model + grid toggle) on localhost:3010 | off |
+| `--visualize` | Start the full visualizer on localhost:3010 — layer/grid toggles, prior-step playback, debug overlays | off |
 | `--texture-set NAME` | Texture pack folder name in assets/textures/ | base |
 
 ## Examples
@@ -38,8 +39,8 @@ node src/index.js --seed 42 --debug
 # Custom map size
 node src/index.js --seed 42 --size 36x36
 
-# Browser preview
-node src/index.js --seed 42 --preview
+# Browser visualize preview
+node src/index.js --seed 42 --visualize 
 
 # Use custom texture pack
 node src/index.js --seed 42 --texture-set my_textures

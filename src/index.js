@@ -8,17 +8,8 @@ import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
 import { parseArgs } from './config.js';
 import { createRng } from './core/rng.js';
-import { generateGrid } from './generators/foundations/grid.js';
-import { generateBuildings } from './generators/buildings/index.js';
-import { createCollisionMatrix, CELL, STAGE, BELOW_GROUND } from './generators/collision/matrix.js';
-import { generateFloors } from './generators/floors/index.js';
-import { generateRoofs } from './generators/roofs/index.js';
-import { generateStreets } from './generators/streets/index.js';
-import { generateWalls } from './generators/walls/index.js';
-import { generateLadders } from './generators/ladders/index.js';
-import { generateConnectivity } from './generators/connectivity/index.js';
-import { generateCover } from './generators/cover/index.js';
-import { buildGeometry } from './generators/geometry/index.js';
+import { runPipeline } from './pipeline.js';
+import { BELOW_GROUND } from './generators/collision/matrix.js';
 import { buildScene } from './generators/scene/index.js';
 import { exportToGlb, getOutputPath } from './export/glb-exporter.js';
 import { exportToObj } from './export/obj-geometry/export-to-obj.js';
@@ -41,74 +32,9 @@ async function main() {
   console.log(`  Tier height: ${config.tierHeight} inches`);
   console.log(`  Damage level: ${config.damageLevel}`);
 
-  // Stage 1: Grid partitioning
-  console.log('\n[1/2] Generating city grid...');
-  const gridData = generateGrid(config, rng);
-  console.log(`  ${gridData.blocks.length} city blocks`);
-  recorder?.capture(1, gridData);
-
-  const matrix = createCollisionMatrix(gridData.activeArea, config.tiers, config.tierHeight, config.slabThickness);
-
-  // Write ground-slab placeholders at Y=-slabThickness.
-  // Buildings will overwrite their footprints with SHELL; remaining cells mark
-  // non-building foundation and street areas for future geometry stages.
-  const slabY = -config.slabThickness;
-  matrix.setWriteContext(STAGE.BUILDINGS, 0);
-  for (const block of gridData.blocks) {
-    matrix.fillBox(block.x, slabY, block.z, block.w, config.slabThickness, block.d, CELL.FOUNDATION_PLACEHOLDER);
-  }
-  for (const street of gridData.streetBounds) {
-    matrix.fillBox(street.x, slabY, street.z, street.w, config.slabThickness, street.d, CELL.STREET_PLACEHOLDER);
-  }
-
-  // Stage 2: Building shells
-  console.log('[2/3] Placing buildings...');
-  const buildingData = generateBuildings(gridData, config, rng, matrix);
-  console.log(`  ${buildingData.buildings.length} buildings`);
-  recorder?.capture(3, buildingData);
-
-  // Stage 3: Floor plates
-  console.log('[3/5] Generating floors...');
-  const floorData = generateFloors(buildingData, config, rng, matrix);
-  console.log(`  ${floorData.floors.length} floor plates`);
-  recorder?.capture(4, floorData);
-
-  // Stage 4: Roofs
-  console.log('[4/5] Generating roofs...');
-  const roofData = generateRoofs(floorData, config, matrix);
-  console.log(`  ${roofData.roofs.length} roof slabs`);
-  recorder?.capture(5, roofData);
-
-  // Stage 5: Streets / Rivers / Pavements — must run before Connectivity so river cells are in the matrix
-  console.log('[5/8] Generating streets and rivers...');
-  const streetData = generateStreets(roofData, config, rng, matrix);
-  recorder?.capture(2, streetData);
-  recorder?.capture(10, streetData);
-  recorder?.capture(11, streetData);
-
-  // Stage 6: Connectivity
-  console.log('[6/8] Generating connectivity...');
-  const connectivityData = generateConnectivity(streetData, config, rng, matrix);
-  console.log(`  ${connectivityData.connections.anchors.length} anchors, ${connectivityData.connections.candidates.length} candidate connections`);
-  recorder?.capture(7, connectivityData);
-
-  // Stage 7: Ladders — must run before Walls so edge cells are still SHELL/FLOOR_* during scan
-  console.log('[7/8] Generating ladders...');
-  const ladderData = generateLadders(connectivityData, config, rng, matrix);
-  console.log(`  ${ladderData.ladders.length} ladders placed`);
-  recorder?.capture(9, ladderData);
-
-  // Stage 8: Walls
-  console.log('[8/9] Generating walls...');
-  const wallData = generateWalls(ladderData, config, rng, matrix);
-  recorder?.capture(6, wallData);
-
-  // Stage 9: Cover
-  console.log('[9/9] Generating cover...');
-  const coverData = generateCover(wallData, config, rng, matrix);
-  recorder?.capture(8, coverData);
-
-  const geometry = buildGeometry(coverData, config);
+  // Full procedural pipeline (grid → … → geometry), shared with lib.js so the
+  // CLI and the programmatic GLB never diverge. See src/pipeline.js.
+  const { geometry, matrix } = runPipeline(config, rng, { recorder, log: true });
 
   // Export
   await mkdir(config.outputDir, { recursive: true });
