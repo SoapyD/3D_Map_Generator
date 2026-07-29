@@ -16,6 +16,11 @@ import { runPipeline } from './pipeline.js';
 import { buildScene } from './generators/scene/index.js';
 import { buildGlbBuffer } from './export/glb-exporter.js';
 
+// In-memory OBJ + collider entry points for Tabletop Simulator (obj + atlas PNG diffuse, and the
+// separate collider mesh). Re-exported here so the package's single public entry (lib.js) exposes them.
+export { generateObjToBuffers } from './generate-obj-buffers.js';
+export { generateColliderToBuffer } from './generate-collider-buffer.js';
+
 /**
  * Run the full generation pipeline for the given seed and return a GLB Buffer.
  *
