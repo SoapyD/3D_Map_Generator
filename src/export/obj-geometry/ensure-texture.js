@@ -14,6 +14,7 @@ export function ensureTexture(atlasState, textureKey, texturePools) {
     baseIdx, wallTextures, landmarkTextures, floorTextures,
     walkwayTextures, objectTextures, courtyardTextures, ladderTextures, roofTextures,
     riverTextures, riverBankTextures, streetTextures, pavementTextures, mapSkirtTextures,
+    mapBorderTextures,
   } = texturePools;
 
   if (parts[0] === 'floor') {
@@ -70,6 +71,8 @@ export function ensureTexture(atlasState, textureKey, texturePools) {
     idx = addTexture(atlasState, `pavement_${Math.abs(ti) % pavementTextures.length}`, tex);
   } else if (parts[0] === 'map_skirt') {
     idx = addTexture(atlasState, 'map_skirt_0', mapSkirtTextures[0]);
+  } else if (parts[0] === 'map_border') {
+    idx = addTexture(atlasState, 'map_border_0', mapBorderTextures[0]);
   } else {
     idx = baseIdx;
   }

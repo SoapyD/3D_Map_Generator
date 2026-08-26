@@ -136,6 +136,9 @@ export const GEOMETRY = {
   riverBankThickness: 0.25,  // bank wall thickness
   streetThickness:   0.25,   // street surface slab thickness
   pavementThickness: 0.25,   // pavement slab thickness
+  // Raised perimeter border wall (parapet), stacked on the outer retaining rim
+  mapBorderHeight:    2,      // parapet height above ground, inches
+  mapBorderThickness: 1,      // parapet wall thickness, inches (matches retaining rim)
 };
 
 // --- Ladder Display ---
