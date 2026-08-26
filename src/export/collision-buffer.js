@@ -9,7 +9,7 @@
  */
 
 const COLLIDABLE_PREFIXES = [
-  'skirt_', 'river_', 'street_', 'pavement_', 'base_floor', 'floor_', 'roof_',
+  'skirt_', 'border_', 'river_', 'street_', 'pavement_', 'base_floor', 'floor_', 'roof_',
   'cover_', 'interior_cover_', 'street_scatter_', 'walkway_', 'bridge_', 'pillar_',
   'ladder_platform_', 'junction_platform_', 'deleted_',
 ];

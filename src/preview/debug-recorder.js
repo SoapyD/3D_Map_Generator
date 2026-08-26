@@ -9,6 +9,11 @@
  * No Three.js dependency.
  */
 
+import { GEOMETRY } from '../config.js';
+
+// Distinct colour for the raised map border wall (matches the debug material).
+const BORDER_COLOR = '#dd22cc';
+
 const STAGE_COLORS = {
   1:  '#5588cc', // Foundation
   2:  '#444444', // Streets
@@ -76,10 +81,29 @@ function stageToElements(stageIndex, data, color, config) {
 
 function foundationElements(data, color, config) {
   const total = data.blocks.length;
-  return data.blocks.map((b, i) => ({
+  const elements = data.blocks.map((b, i) => ({
     label: `Foundation — block ${i + 1}/${total}`,
     rects: [box('block', b.x, 0, b.z, b.w, 0.05, b.d, color)],
   }));
+
+  // Raised perimeter border wall (parapet) — a structural frame around the whole
+  // map. Built in the geometry stage (build-map-skirt-primitives.js), so it must
+  // be reconstructed here from config to appear in the visualizer. Layout mirrors
+  // the mitred frame there: N/S span full width incl. corners, W/E fill between.
+  const t = GEOMETRY.mapBorderThickness;
+  const h = GEOMETRY.mapBorderHeight;
+  const W = config.mapWidth, D = config.mapDepth;
+  elements.push({
+    label: 'Foundation — map border wall',
+    rects: [
+      box('map_border', -t, 0, -t, W + t * 2, h, t, BORDER_COLOR),
+      box('map_border', -t, 0, D,  W + t * 2, h, t, BORDER_COLOR),
+      box('map_border', -t, 0, 0,  t,         h, D, BORDER_COLOR),
+      box('map_border', W,  0, 0,  t,         h, D, BORDER_COLOR),
+    ],
+  });
+
+  return elements;
 }
 
 function streetElements(data, color, config) {

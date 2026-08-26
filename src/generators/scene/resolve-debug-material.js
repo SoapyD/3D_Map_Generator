@@ -24,6 +24,7 @@ const DEBUG_MATERIALS = {
   ladderPlatform: new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.7 }),
   streetScatter: new THREE.MeshStandardMaterial({ color: 0x22ee44, roughness: 0.7 }),
   pillar: new THREE.MeshStandardMaterial({ color: 0x666644, roughness: 0.9 }),
+  mapBorder: new THREE.MeshStandardMaterial({ color: 0xdd22cc, roughness: 0.85 }),
 };
 
 /**
@@ -44,6 +45,7 @@ export function resolveDebugMaterial(name) {
   if (name.startsWith('interior_cover_')) return DEBUG_MATERIALS.interiorCover;
   if (name.startsWith('deleted_')) return DEBUG_MATERIALS.deletedFootprint;
   if (name.startsWith('street_scatter_')) return DEBUG_MATERIALS.streetScatter;
+  if (name.startsWith('border_')) return DEBUG_MATERIALS.mapBorder;
   if (name.startsWith('roof_')) return DEBUG_MATERIALS.floor[0];
   if (name.startsWith('ladder_platform_') || name.startsWith('junction_platform_')) return DEBUG_MATERIALS.ladderPlatform;
   if (name.startsWith('ground_ladder_')) return DEBUG_MATERIALS.groundLadder;

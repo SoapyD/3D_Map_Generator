@@ -12,6 +12,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { addSubBox } from './add-sub-box.js';
 import { addSharedFlat } from './add-shared-flat.js';
+import { addSimpleBox } from './add-simple-box.js';
 import { addPerimeterEdges } from './add-perimeter-edges.js';
 import { addSharedWall } from './add-shared-wall.js';
 import { wallEdgeCovered } from './wall-edge-covered.js';
@@ -61,6 +62,8 @@ export function buildObjAndAtlas(geometry, config) {
   const pavementTextures = pavementPool.length > 0 ? pavementPool : baseTextures;
   const mapSkirtPool = loadTexPool(packDir, 'map_skirt');
   const mapSkirtTextures = mapSkirtPool.length > 0 ? mapSkirtPool : baseTextures;
+  const mapBorderPool = loadTexPool(packDir, 'map_border');
+  const mapBorderTextures = mapBorderPool.length > 0 ? mapBorderPool : baseTextures;
 
   // Build atlas: collect unique textures needed
   const atlasState = createAtlasState();
@@ -71,6 +74,7 @@ export function buildObjAndAtlas(geometry, config) {
     wallTextures, landmarkTextures, floorTextures,
     walkwayTextures, objectTextures, courtyardTextures, ladderTextures, roofTextures,
     riverTextures, riverBankTextures, streetTextures, pavementTextures, mapSkirtTextures,
+    mapBorderTextures,
   };
 
   // Pre-register all textures from primitives
@@ -96,7 +100,10 @@ export function buildObjAndAtlas(geometry, config) {
 
     switch (prim.type) {
       case 'slab': {
-        if (prim.shared) {
+        if (prim.solid) {
+          // Solid-colour box (e.g. map border) — no 3" subdivision, keeps vertex cost minimal.
+          addSimpleBox(state, prim.name, prim.x, prim.y, prim.z, prim.w, prim.h, prim.d, uv);
+        } else if (prim.shared) {
           addSharedFlat(state, prim.name, prim.x, prim.y, prim.z, prim.w, prim.h, prim.d, uv,
             prim.emitBottom, prim.rotateUV, prim.simpleBottom, prim.emitTop);
         } else {

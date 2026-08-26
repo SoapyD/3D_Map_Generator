@@ -91,4 +91,9 @@ console.log('Map Skirt:');
 writeSolidPng('map_skirt', 'dark_earth', 46, 28, 15);
 writeSolidPng('map_skirt', 'dark_earth', 46, 28, 15, 'assets/textures/loaded');
 
+console.log('Map Border:');
+// Raised perimeter parapet — deliberately distinct from the earthy/grey/red palette.
+writeSolidPng('map_border', 'slate_blue', 70, 95, 135);
+writeSolidPng('map_border', 'slate_blue', 70, 95, 135, 'assets/textures/loaded');
+
 console.log('\nDone!');
