@@ -9,6 +9,7 @@ export function buildMapSkirtPrimitives(config) {
 
   const borderH = GEOMETRY.mapBorderHeight;
   const borderT = GEOMETRY.mapBorderThickness;
+  const borderI = GEOMETRY.mapBorderInset;
 
   const primitives = [];
 
@@ -52,13 +53,17 @@ export function buildMapSkirtPrimitives(config) {
   panel('skirt_E', mapWidth,  0,         skirtT,   mapDepth, true);
 
   // Raised perimeter border wall (parapet) — one box per side, extending upward
-  // from Y=0. Laid out as a mitred picture frame: N and S run the full width
-  // (corners included), W and E fill only the span between them. This leaves no
-  // overlap between the four boxes and no gap at the corners.
-  borderPanel('border_N', -borderT,  -borderT,  mapWidth + borderT * 2, borderT);
-  borderPanel('border_S', -borderT,  mapDepth,  mapWidth + borderT * 2, borderT);
-  borderPanel('border_W', -borderT,  0,         borderT,                mapDepth);
-  borderPanel('border_E', mapWidth,  0,         borderT,                mapDepth);
+  // from Y=0, standing on the play surface `borderI` cells inside the map edge
+  // so it cuts roads before they run off the map. Laid out as a mitred picture
+  // frame: N and S run the full inset width (corners included), W and E fill
+  // only the span between them. This leaves no overlap between the four boxes
+  // and no gap at the corners.
+  const insetW = mapWidth - borderI * 2;              // frame footprint width
+  const midD   = mapDepth - borderI * 2 - borderT * 2; // W/E span between N and S inner faces
+  borderPanel('border_N', borderI,                    borderI,                    insetW,  borderT);
+  borderPanel('border_S', borderI,                    mapDepth - borderI - borderT, insetW,  borderT);
+  borderPanel('border_W', borderI,                    borderI + borderT,          borderT, midD);
+  borderPanel('border_E', mapWidth - borderI - borderT, borderI + borderT,        borderT, midD);
 
   // Bottom cap — seals below the river floor
   primitives.push({
