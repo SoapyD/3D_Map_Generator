@@ -139,7 +139,7 @@ export const GEOMETRY = {
   // Raised perimeter border wall (parapet), stacked on the outer retaining rim
   mapBorderHeight:    2,      // parapet height above ground, inches
   mapBorderThickness: 1,      // parapet wall thickness, inches (matches retaining rim)
-  mapBorderInset:     1,      // cells the parapet is set inward from the map edge (0 = on the outermost cell); cuts roads before they run off the map
+  mapBorderInset:     0,      // cells the parapet is set inward from the map edge (0 = on the outermost cell); cuts roads before they run off the map
 };
 
 // --- Ladder Display ---
