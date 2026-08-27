@@ -70,6 +70,10 @@ export function tierOf(prim, config) {
     return clampTier(Math.floor((baseY + slab + EPS) / levelHeight), maxTier);
   }
 
-  // 4. Everything else (walls, roofs, rooftop cover) sits on a tier floor → round-band.
-  return clampTier(Math.round((baseY + slab) / levelHeight), maxTier);
+  // 4. Everything else (walls, roofs, rooftop cover) → floor-band to the floor at or below it.
+  // Walls are subdivided into 1"-tall rows that stack the full tierHeight above the floor (row r
+  // at y = i*levelHeight + r, for r in 0..tierHeight-1), so a tier owns its floor AND all the wall
+  // rows up to — but not including — the next floor: baseY in [i*levelHeight, (i+1)*levelHeight) → i.
+  // Round-banding here wrongly pushed the upper wall rows (r >= levelHeight/2) into the tier above.
+  return clampTier(Math.floor((baseY + slab + EPS) / levelHeight), maxTier);
 }

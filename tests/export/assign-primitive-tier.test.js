@@ -56,11 +56,22 @@ describe('tierOf — cross-tier connectors → lower/base tier (floor-band)', ()
   });
 });
 
-describe('tierOf — everything else (walls, roofs, rooftop cover) → round-band', () => {
-  it('bands walls by their Y (tier i wall at y = i*4)', () => {
+describe('tierOf — everything else (walls, roofs, rooftop cover) → floor-band', () => {
+  it('bands walls by their Y (tier i wall row 0 at y = i*4)', () => {
     expect(tierOf({ name: 'wall_0', y: 0 }, config)).toBe(0);
     expect(tierOf({ name: 'wall_5', y: 4 }, config)).toBe(1);
     expect(tierOf({ name: 'wall_9', y: 8 }, config)).toBe(2);
+  });
+  it('keeps ALL wall rows of a tier with that tier (floor + 3" of wall, not just row 0)', () => {
+    // Walls subdivide into 1"-tall rows stacking the full tierHeight above the floor. Every row
+    // (y = i*4, i*4+1, i*4+2) must stay on tier i — the old round-band pushed rows 1 & 2 up to i+1.
+    for (const r of [0, 1, 2]) {
+      expect(tierOf({ name: 'wall_r', y: 0 * 4 + r }, config)).toBe(0);
+      expect(tierOf({ name: 'wall_r', y: 1 * 4 + r }, config)).toBe(1);
+      expect(tierOf({ name: 'wall_r', y: 2 * 4 + r }, config)).toBe(2);
+    }
+    // The next floor's row 0 begins the next tier.
+    expect(tierOf({ name: 'wall_r', y: 3 * 4 }, config)).toBe(3);
   });
   it('bands roofs by Y', () => {
     expect(tierOf({ name: 'roof_2_0', y: 7 }, config)).toBe(2);

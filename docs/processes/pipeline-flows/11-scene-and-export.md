@@ -72,14 +72,16 @@ Bridge wall and battlement slabs (`_wall_`, `_batt_` in name) are excluded so on
 
 `--split-tiers` (or the in-memory `generateTiersToBuffers(seed, opts)`) additionally emits one OBJ + one collider OBJ **per vertical tier**, plus a manifest. This lets Tabletop Simulator load the map as N stacked, independently movable tier objects (the "elevator" / reveal feature) instead of one monolithic model that the camera collides against. Combined GLB/OBJ/collider are still written unconditionally — the split is purely additive.
 
-Because geometry is world-baked (each primitive carries absolute coordinates), every per-tier file self-aligns when all tiers are spawned at the same origin. All tiers share **one** diffuse atlas PNG: the atlas is built once from the full geometry (`buildObjAtlas`) and reused for every tier's OBJ (`emitPrimitivesToObj`), so UVs match a single `<baseName>.png`.
+All tiers share **one** diffuse atlas PNG: the atlas is built once from the full geometry (`buildObjAtlas`) and reused for every tier's OBJ (`emitPrimitivesToObj`), so UVs match a single `<baseName>.png`.
+
+**Alignment via corner posts.** The geometry is world-baked, but TTS does **not** self-align separately-imported tiers — it centres each `Custom_Model` on its **collider** bounding box, and each tier's raw geometry has a different centre (upper floors don't cover the whole footprint, so they'd land off-centre). So each tier gets **4 corner posts** (`cornerPostPrimitives`): one at each corner of the global map footprint, `1×1` in XZ and spanning **that tier's own height**, emitted into **both** the visual OBJ and the collider (name prefix `border_corner_` → collidable). This gives every tier an identical **XZ footprint** bounding box (→ TTS places them identically → they line up horizontally) with a **real per-tier height** (so the selection box isn't a whole-map block and units rest on the real floor). Vertical stacking is applied by the loader from each tier's manifest `center`. The posts sit at the map corners (skirt/border, off the play area), textured `map_border`, so they render as small posts (floating at the corners on the upper floors). Earlier iterations used an invisible degenerate-triangle "bounds cage" instead, but that cooked into a flickering invisible collider in Unity — real corner boxes are stable.
 
 Tier assignment — `tierOf(prim, config)` (`src/export/assign-primitive-tier.js`), total + disjoint (every primitive → exactly one tier in `[0, config.tiers]`; tier count is `config.tiers + 1`):
 
 1. **Floors** — authoritative tier from the `floor_f{n}_` name.
 2. **Ground terrain** (`street_`, `river_`, `skirt_`, `border_`, `deleted_`, `pavement_`, `building_footprint_`) → tier 0.
 3. **Cross-tier connectors** (any name containing `ladder`, plus `pillar_`, `bridge_`, `walkway_`, `junction_platform_`) → their **lower/base** tier by floor-banding `baseY` (v1: a raised upper tier detaches cosmetically at the top).
-4. **Everything else** (walls, roofs, rooftop cover) → round-banded by `baseY`, where `levelHeight = tierHeight + slabThickness`.
+4. **Everything else** (walls, roofs, rooftop cover) → **floor-banded** to the floor at or below `baseY` (`floor((baseY + slabThickness) / levelHeight)`, `levelHeight = tierHeight + slabThickness`). A tier owns its floor slab and all the wall rows above it up to — but not including — the next floor, so every 1"-tall wall row (`y = i*levelHeight + 0..tierHeight-1`) stays on tier `i`.
 
 Outputs (for each **non-empty** tier `t`; empty tiers are skipped but retained in the manifest with `empty: true`):
 
@@ -90,7 +92,7 @@ Outputs (for each **non-empty** tier `t`; empty tiers are skipped but retained i
 | Shared atlas PNG | `<baseName>.png` (one, shared by all tiers) |
 | Manifest | `<baseName>_tiers.json` — `{ version, seed, tierCount, levelHeight, tierHeight, slabThickness, units, tiers: [{ tier, obj, collision, primitiveCount, xMin, xMax, yMin, yMax, zMin, zMax, center: [cx,cy,cz], empty }] }` |
 
-Each tier entry carries its full world-space bounds and `center`. TTS anchors a Custom_Model by its bounds centre (not the OBJ origin), so a loader that spawns each tier separately must reposition every tier by its `center` offset to restore the world alignment the baked coordinates would otherwise give for free.
+Each tier entry carries its **XZ footprint bounds** (identical across tiers — the corner posts reach the map corners) and its **per-tier Y** range, giving a `center` whose XZ is the map centre and whose Y is the tier's own. A loader repositions each tier to its `center`: the XZ offset is the same for every tier (the corner posts already align them horizontally), and the Y offset stacks the tiers vertically.
 
 `levelHeight` in the manifest is the vertical distance between stacked tier floors — the elevator lift delta a TTS script applies.
 
@@ -114,7 +116,7 @@ A margin of 0.01 is used for floating-point safety. The previous 0.5 margin inco
 - [src/export/obj-geometry/wall-edge-covered.js](../../../../src/export/obj-geometry/wall-edge-covered.js) — end-cap suppression
 - [src/export/collision-exporter.js](../../../../src/export/collision-exporter.js)
 - [src/export/assign-primitive-tier.js](../../../../src/export/assign-primitive-tier.js) — `tierOf` / `tierCount` / `primBaseY` / `primTopY` (per-tier split)
-- [src/export/export-tiers.js](../../../../src/export/export-tiers.js) — `groupPrimitivesByTier` / `buildTierBuffers` / `exportTiers`
+- [src/export/export-tiers.js](../../../../src/export/export-tiers.js) — `groupPrimitivesByTier` / `buildTierBuffers` / `cornerPostPrimitives` (footprint corner posts) / `exportTiers`
 - [src/export/obj-geometry/build-obj-and-atlas.js](../../../../src/export/obj-geometry/build-obj-and-atlas.js) — `buildObjAtlas` (shared atlas) + `emitPrimitivesToObj` (per-tier OBJ)
 - [src/generate-tiers-buffers.js](../../../../src/generate-tiers-buffers.js) — in-memory `generateTiersToBuffers` (consumed by the wyrdwars maps API)
 - [src/generators/generate-textures.js](../../../../src/generators/generate-textures.js) — generates placeholder PNGs for `base` and `loaded` packs

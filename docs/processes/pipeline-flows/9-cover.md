@@ -1,6 +1,6 @@
 # Stage 9: Cover
 
-> Last verified: 2026-04-24
+> Last verified: 2026-08-27
 
 ## Overview
 
@@ -31,6 +31,7 @@ Iterates every cell from `cy = -ceil(slabThickness)` (ground floor) to `cy < max
 - **Keep** cells with value `CELL.FLOOR` (1), `CELL.ROOF` (40), or `CELL.STREET` (110).
 - **Reject** any cell where any of the 4 cardinal neighbours at `cy+1` (the air cell above) contains `CELL.PILLAR` — placing cover next to a support pillar is physically wrong.
 - **Reject** `CELL.STREET` cells that are adjacent (same cy) to `CELL.RIVER_BANK` — keeps cover away from river edges.
+- **Reject** ground-level (`FLOOR` / `STREET`) cells within the **perimeter border ring** (`inBorderRing`) so cover/crate pieces don't overlap the parapet border wall. The ring is `edgeMargin = ceil((GEOMETRY.mapBorderInset*cellSize + GEOMETRY.mapBorderThickness) / cellSize)` cells at each edge. Roof cover is exempt (it sits above the border). This constrains ONLY where cover is placed — the map's own floors/streets/walls may still run to the border.
 
 Survivors are split into three raw arrays: `rawFloor`, `rawRoof`, `rawStreet`.
 
