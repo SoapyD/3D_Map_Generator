@@ -86,6 +86,30 @@ export function appendCornerColliders(objString, gMin, gMax, tierYMin, tierYMax,
 }
 
 /**
+ * Build 4 corner-post PRIMITIVES for a tier — one at each corner of the global map footprint, spanning
+ * the tier's own height. Emitted into BOTH the visual OBJ (so they render) and the collider (the
+ * `border_` name prefix is collidable), they give every tier an identical XZ footprint bounding box
+ * (→ TTS aligns the tiers) with a real per-tier height, and are visible solid posts at the map corners.
+ * Textured with `map_border` (already in the atlas from the perimeter parapet).
+ */
+export function cornerPostPrimitives(gMin, gMax, tierYMin, tierYMax, tier, size = 1) {
+  const h = tierYMax - tierYMin;
+  const corners = [
+    [gMin[0], gMin[2]],
+    [gMax[0] - size, gMin[2]],
+    [gMin[0], gMax[2] - size],
+    [gMax[0] - size, gMax[2] - size],
+  ];
+  return corners.map(([x, z], i) => ({
+    type: 'slab',
+    name: `border_corner_t${tier}_${i}`,
+    x, y: tierYMin, z, w: size, h, d: size,
+    textureKey: 'map_border',
+    solid: true, shared: false,
+  }));
+}
+
+/**
  * Partition primitives into per-tier geometry objects. Total + disjoint: every primitive lands
  * in exactly one tier, so the union of buckets equals the whole primitive list.
  * @returns {Map<number, { version: number, primitives: object[] }>} keyed 0..config.tiers
@@ -148,26 +172,24 @@ export function buildTierBuffers(geometry, config, baseName = `mordheim_map_${co
       continue;
     }
 
-    // This tier's own vertical extent — the cage spans the global XZ footprint but only this height,
-    // so the tier's bounding box is full-footprint in X/Z and real-height in Y.
+    // This tier's own vertical extent — the corner posts span the global XZ footprint but only this
+    // height, so the tier's bounding box is full-footprint in X/Z and real-height in Y.
     let tierYMin = Infinity, tierYMax = -Infinity;
     for (const p of prims) {
       tierYMin = Math.min(tierYMin, primBaseY(p));
       tierYMax = Math.max(tierYMax, primTopY(p));
     }
-    const cageMin = [gMin[0], tierYMin, gMin[2]];
-    const cageMax = [gMax[0], tierYMax, gMax[2]];
 
-    const obj = appendBoundsCage(emitPrimitivesToObj(prims, config, atlasCtx, wallPrims), cageMin, cageMax);
-    // TTS aligns tiers by their COLLIDER bounding box, so the collider needs the same footprint box as
-    // the visual mesh. We give it 4 real corner-post colliders (appendCornerColliders) instead of the
-    // degenerate cage triangle: the triangle intermittently cooked into an invisible flickering wall,
-    // whereas real boxes cook cleanly. The posts sit at the map corners (skirt/border, off the play
-    // area) and are collider-only, so units never meet them.
-    const { objString: rawCollision, count } = buildCollisionObj(subset);
-    const collisionObj = count > 0
-      ? appendCornerColliders(rawCollision, gMin, gMax, tierYMin, tierYMax)
-      : null;
+    // 4 visible corner posts at the map footprint corners (this tier's height). Emitted into BOTH the
+    // visual OBJ and the collider, they give every tier an identical XZ footprint bounding box so TTS
+    // aligns the tiers (it centres by the collider box) — with real solid geometry, so no flickering
+    // degenerate-triangle collider. They sit at the map corners (skirt/border, off the play area).
+    const cornerPrims = cornerPostPrimitives(gMin, gMax, tierYMin, tierYMax, t);
+    const emitPrims = [...prims, ...cornerPrims];
+
+    const obj = emitPrimitivesToObj(emitPrims, config, atlasCtx, wallPrims);
+    const { objString: rawCollision, count } = buildCollisionObj({ version: subset.version, primitives: emitPrims });
+    const collisionObj = count > 0 ? rawCollision : null;
 
     const objFile = `${baseName}_tier${t}.obj`;
     const colFile = count > 0 ? `${baseName}_tier${t}_collision.obj` : null;
