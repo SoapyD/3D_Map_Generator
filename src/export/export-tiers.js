@@ -15,6 +15,31 @@ import { buildCollisionObj } from './collision-buffer.js';
 import { tierOf, tierCount, primBaseY, primTopY } from './assign-primitive-tier.js';
 
 /**
+ * Append an invisible "bounds cage" to an OBJ string: three collinear vertices at the global box's
+ * min corner, max corner, and their midpoint, joined by one zero-area (degenerate) face. The face
+ * never rasterises (zero area) and adds no collision surface (collinear), but the two corner vertices
+ * force the mesh's bounding box to span the whole map. Giving every tier the same cage makes all tiers
+ * share an identical bounding box, so TTS (which centres a Custom_Model on its bounds) places them
+ * identically and the world-baked geometry aligns with no per-tier repositioning.
+ * @param {number[]} gMin [x,y,z] global min corner
+ * @param {number[]} gMax [x,y,z] global max corner
+ */
+export function appendBoundsCage(objString, gMin, gMax) {
+  const vCount = (objString.match(/^v /gm) || []).length;
+  const mid = [(gMin[0] + gMax[0]) / 2, (gMin[1] + gMax[1]) / 2, (gMin[2] + gMax[2]) / 2];
+  const a = vCount + 1, b = vCount + 2, c = vCount + 3;
+  const f = (n) => n.toFixed(6);
+  return objString.replace(/\n*$/, '') + '\n' + [
+    '# bounds cage — invisible zero-area face forcing identical bounds across all tiers (TTS alignment)',
+    `v ${f(gMin[0])} ${f(gMin[1])} ${f(gMin[2])}`,
+    `v ${f(gMax[0])} ${f(gMax[1])} ${f(gMax[2])}`,
+    `v ${f(mid[0])} ${f(mid[1])} ${f(mid[2])}`,
+    `f ${a} ${b} ${c}`,
+    '',
+  ].join('\n');
+}
+
+/**
  * Partition primitives into per-tier geometry objects. Total + disjoint: every primitive lands
  * in exactly one tier, so the union of buckets equals the whole primitive list.
  * @returns {Map<number, { version: number, primitives: object[] }>} keyed 0..config.tiers
@@ -44,6 +69,19 @@ export function buildTierBuffers(geometry, config, baseName = `mordheim_map_${co
   const groups = groupPrimitivesByTier(geometry, config);
   const levelHeight = config.tierHeight + config.slabThickness;
 
+  // Global (whole-map) world-space bounds. Every per-tier OBJ + collider gets an invisible "bounds
+  // cage" spanning this box, so all tiers share an IDENTICAL bounding box. TTS anchors a Custom_Model
+  // by its bounds centre, so identical bounds mean every tier is placed identically and the
+  // world-baked geometry lines up with no per-tier realignment (see appendBoundsCage).
+  const gMin = [Infinity, Infinity, Infinity];
+  const gMax = [-Infinity, -Infinity, -Infinity];
+  for (const p of geometry.primitives) {
+    gMin[0] = Math.min(gMin[0], p.x); gMax[0] = Math.max(gMax[0], p.x + (p.w || 0));
+    gMin[2] = Math.min(gMin[2], p.z); gMax[2] = Math.max(gMax[2], p.z + (p.d || 0));
+    gMin[1] = Math.min(gMin[1], primBaseY(p)); gMax[1] = Math.max(gMax[1], primTopY(p));
+  }
+  const gCenter = [(gMin[0] + gMax[0]) / 2, (gMin[1] + gMax[1]) / 2, (gMin[2] + gMax[2]) / 2];
+
   const tiers = [];
   const manifestTiers = [];
 
@@ -62,28 +100,21 @@ export function buildTierBuffers(geometry, config, baseName = `mordheim_map_${co
       continue;
     }
 
-    const obj = emitPrimitivesToObj(prims, config, atlasCtx, wallPrims);
-    const { objString: collisionObj, count } = buildCollisionObj(subset);
-
-    // Full world-space bounds of this tier's geometry. The XZ centre lets a TTS loader realign the
-    // separately-imported tier objects (TTS anchors a Custom_Model by its bounds centre, not the OBJ
-    // origin, so each tier must be repositioned by its centre offset to restore world alignment).
-    let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity, zMin = Infinity, zMax = -Infinity;
-    for (const p of prims) {
-      xMin = Math.min(xMin, p.x); xMax = Math.max(xMax, p.x + (p.w || 0));
-      zMin = Math.min(zMin, p.z); zMax = Math.max(zMax, p.z + (p.d || 0));
-      yMin = Math.min(yMin, primBaseY(p)); yMax = Math.max(yMax, primTopY(p));
-    }
-    const center = [(xMin + xMax) / 2, (yMin + yMax) / 2, (zMin + zMax) / 2];
+    const obj = appendBoundsCage(emitPrimitivesToObj(prims, config, atlasCtx, wallPrims), gMin, gMax);
+    const { objString: rawCollision, count } = buildCollisionObj(subset);
+    const collisionObj = count > 0 ? appendBoundsCage(rawCollision, gMin, gMax) : null;
 
     const objFile = `${baseName}_tier${t}.obj`;
     const colFile = count > 0 ? `${baseName}_tier${t}_collision.obj` : null;
 
-    tiers.push({ tier: t, obj, collisionObj: count > 0 ? collisionObj : null });
+    tiers.push({ tier: t, obj, collisionObj });
+    // Bounds reported are the SHARED global box (every tier's real mesh bounds after caging), so a
+    // loader that aligns by manifest centre applies a zero shift — the cage already aligns them.
     manifestTiers.push({
       tier: t, obj: objFile, collision: colFile,
       primitiveCount: prims.length,
-      xMin, xMax, yMin, yMax, zMin, zMax, center,
+      xMin: gMin[0], xMax: gMax[0], yMin: gMin[1], yMax: gMax[1], zMin: gMin[2], zMax: gMax[2],
+      center: [...gCenter],
       empty: false,
     });
   }
