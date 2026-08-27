@@ -115,8 +115,13 @@ export function buildTierBuffers(geometry, config, baseName = `mordheim_map_${co
     const cageMax = [gMax[0], tierYMax, gMax[2]];
 
     const obj = appendBoundsCage(emitPrimitivesToObj(prims, config, atlasCtx, wallPrims), cageMin, cageMax);
+    // Collider is deliberately NOT caged: it's real box-per-surface geometry only. The cage's
+    // degenerate corner-to-corner triangle sits on Unity's collision-cooking threshold and would
+    // intermittently cook into an invisible collision sliver across the floor (units hitting phantom
+    // walls that "come and go"). Alignment needs only the VISUAL mesh's bounds (above), so the collider
+    // stays clean.
     const { objString: rawCollision, count } = buildCollisionObj(subset);
-    const collisionObj = count > 0 ? appendBoundsCage(rawCollision, cageMin, cageMax) : null;
+    const collisionObj = count > 0 ? rawCollision : null;
 
     const objFile = `${baseName}_tier${t}.obj`;
     const colFile = count > 0 ? `${baseName}_tier${t}_collision.obj` : null;
