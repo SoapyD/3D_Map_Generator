@@ -88,7 +88,9 @@ Outputs (for each **non-empty** tier `t`; empty tiers are skipped but retained i
 | Tier OBJ | `<baseName>_tier{t}.obj` |
 | Tier collider OBJ | `<baseName>_tier{t}_collision.obj` (omitted if the tier has no collidable surfaces) |
 | Shared atlas PNG | `<baseName>.png` (one, shared by all tiers) |
-| Manifest | `<baseName>_tiers.json` — `{ version, seed, tierCount, levelHeight, tierHeight, slabThickness, units, tiers: [{ tier, obj, collision, primitiveCount, yMin, yMax, empty }] }` |
+| Manifest | `<baseName>_tiers.json` — `{ version, seed, tierCount, levelHeight, tierHeight, slabThickness, units, tiers: [{ tier, obj, collision, primitiveCount, xMin, xMax, yMin, yMax, zMin, zMax, center: [cx,cy,cz], empty }] }` |
+
+Each tier entry carries its full world-space bounds and `center`. TTS anchors a Custom_Model by its bounds centre (not the OBJ origin), so a loader that spawns each tier separately must reposition every tier by its `center` offset to restore the world alignment the baked coordinates would otherwise give for free.
 
 `levelHeight` in the manifest is the vertical distance between stacked tier floors — the elevator lift delta a TTS script applies.
 

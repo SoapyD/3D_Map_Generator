@@ -55,7 +55,9 @@ export function buildTierBuffers(geometry, config, baseName = `mordheim_map_${co
       tiers.push({ tier: t, obj: null, collisionObj: null });
       manifestTiers.push({
         tier: t, obj: null, collision: null,
-        primitiveCount: 0, yMin: null, yMax: null, empty: true,
+        primitiveCount: 0,
+        xMin: null, xMax: null, yMin: null, yMax: null, zMin: null, zMax: null, center: null,
+        empty: true,
       });
       continue;
     }
@@ -63,11 +65,16 @@ export function buildTierBuffers(geometry, config, baseName = `mordheim_map_${co
     const obj = emitPrimitivesToObj(prims, config, atlasCtx, wallPrims);
     const { objString: collisionObj, count } = buildCollisionObj(subset);
 
-    let yMin = Infinity, yMax = -Infinity;
+    // Full world-space bounds of this tier's geometry. The XZ centre lets a TTS loader realign the
+    // separately-imported tier objects (TTS anchors a Custom_Model by its bounds centre, not the OBJ
+    // origin, so each tier must be repositioned by its centre offset to restore world alignment).
+    let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity, zMin = Infinity, zMax = -Infinity;
     for (const p of prims) {
-      yMin = Math.min(yMin, primBaseY(p));
-      yMax = Math.max(yMax, primTopY(p));
+      xMin = Math.min(xMin, p.x); xMax = Math.max(xMax, p.x + (p.w || 0));
+      zMin = Math.min(zMin, p.z); zMax = Math.max(zMax, p.z + (p.d || 0));
+      yMin = Math.min(yMin, primBaseY(p)); yMax = Math.max(yMax, primTopY(p));
     }
+    const center = [(xMin + xMax) / 2, (yMin + yMax) / 2, (zMin + zMax) / 2];
 
     const objFile = `${baseName}_tier${t}.obj`;
     const colFile = count > 0 ? `${baseName}_tier${t}_collision.obj` : null;
@@ -75,7 +82,9 @@ export function buildTierBuffers(geometry, config, baseName = `mordheim_map_${co
     tiers.push({ tier: t, obj, collisionObj: count > 0 ? collisionObj : null });
     manifestTiers.push({
       tier: t, obj: objFile, collision: colFile,
-      primitiveCount: prims.length, yMin, yMax, empty: false,
+      primitiveCount: prims.length,
+      xMin, xMax, yMin, yMax, zMin, zMax, center,
+      empty: false,
     });
   }
 
