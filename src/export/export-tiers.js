@@ -42,6 +42,50 @@ export function appendBoundsCage(objString, boxMin, boxMax) {
 }
 
 /**
+ * Append 4 small axis-aligned box COLLIDERS to a collider OBJ string, one at each corner of the global
+ * map footprint, spanning the tier's own height. TTS aligns the separately-imported tiers by their
+ * COLLIDER bounding box, so these posts give every tier an identical XZ footprint box (→ tiers line up)
+ * with a real per-tier height. Unlike the degenerate `appendBoundsCage` triangle, these are real solid
+ * boxes so Unity cooks them cleanly (no flickering "come-and-go" invisible wall). They sit at the very
+ * map corners (in the skirt/border, off the play area) and are collider-only, so units never meet them.
+ * @param {number[]} gMin [x,y,z] global min corner (X/Z used; tier Y is passed explicitly)
+ * @param {number[]} gMax [x,y,z] global max corner
+ */
+export function appendCornerColliders(objString, gMin, gMax, tierYMin, tierYMax, size = 1) {
+  const f = (n) => n.toFixed(6);
+  let vo = (objString.match(/^v /gm) || []).length + 1;
+  const lines = [''];
+  const corners = [
+    [gMin[0], gMin[2]],
+    [gMax[0] - size, gMin[2]],
+    [gMin[0], gMax[2] - size],
+    [gMax[0] - size, gMax[2] - size],
+  ];
+  corners.forEach(([x0, z0], i) => {
+    const x1 = x0 + size, z1 = z0 + size, y0 = tierYMin, y1 = tierYMax;
+    lines.push(`o tier_corner_${i}`);
+    lines.push(`v ${f(x0)} ${f(y0)} ${f(z0)}`); // 0 ---
+    lines.push(`v ${f(x1)} ${f(y0)} ${f(z0)}`); // 1 +--
+    lines.push(`v ${f(x1)} ${f(y0)} ${f(z1)}`); // 2 +-+
+    lines.push(`v ${f(x0)} ${f(y0)} ${f(z1)}`); // 3 --+
+    lines.push(`v ${f(x0)} ${f(y1)} ${f(z0)}`); // 4 -+-
+    lines.push(`v ${f(x1)} ${f(y1)} ${f(z0)}`); // 5 ++-
+    lines.push(`v ${f(x1)} ${f(y1)} ${f(z1)}`); // 6 +++
+    lines.push(`v ${f(x0)} ${f(y1)} ${f(z1)}`); // 7 -++
+    const v = vo;
+    lines.push(`f ${v} ${v + 1} ${v + 2}`, `f ${v} ${v + 2} ${v + 3}`);         // bottom
+    lines.push(`f ${v + 6} ${v + 5} ${v + 4}`, `f ${v + 7} ${v + 6} ${v + 4}`); // top
+    lines.push(`f ${v} ${v + 4} ${v + 5}`, `f ${v} ${v + 5} ${v + 1}`);         // front
+    lines.push(`f ${v + 2} ${v + 6} ${v + 7}`, `f ${v + 2} ${v + 7} ${v + 3}`); // back
+    lines.push(`f ${v + 3} ${v + 7} ${v + 4}`, `f ${v + 3} ${v + 4} ${v}`);     // left
+    lines.push(`f ${v + 1} ${v + 5} ${v + 6}`, `f ${v + 1} ${v + 6} ${v + 2}`); // right
+    lines.push('');
+    vo += 8;
+  });
+  return objString.replace(/\n*$/, '') + '\n' + lines.join('\n');
+}
+
+/**
  * Partition primitives into per-tier geometry objects. Total + disjoint: every primitive lands
  * in exactly one tier, so the union of buckets equals the whole primitive list.
  * @returns {Map<number, { version: number, primitives: object[] }>} keyed 0..config.tiers
@@ -115,13 +159,15 @@ export function buildTierBuffers(geometry, config, baseName = `mordheim_map_${co
     const cageMax = [gMax[0], tierYMax, gMax[2]];
 
     const obj = appendBoundsCage(emitPrimitivesToObj(prims, config, atlasCtx, wallPrims), cageMin, cageMax);
-    // Collider is deliberately NOT caged: it's real box-per-surface geometry only. The cage's
-    // degenerate corner-to-corner triangle sits on Unity's collision-cooking threshold and would
-    // intermittently cook into an invisible collision sliver across the floor (units hitting phantom
-    // walls that "come and go"). Alignment needs only the VISUAL mesh's bounds (above), so the collider
-    // stays clean.
+    // TTS aligns tiers by their COLLIDER bounding box, so the collider needs the same footprint box as
+    // the visual mesh. We give it 4 real corner-post colliders (appendCornerColliders) instead of the
+    // degenerate cage triangle: the triangle intermittently cooked into an invisible flickering wall,
+    // whereas real boxes cook cleanly. The posts sit at the map corners (skirt/border, off the play
+    // area) and are collider-only, so units never meet them.
     const { objString: rawCollision, count } = buildCollisionObj(subset);
-    const collisionObj = count > 0 ? rawCollision : null;
+    const collisionObj = count > 0
+      ? appendCornerColliders(rawCollision, gMin, gMax, tierYMin, tierYMax)
+      : null;
 
     const objFile = `${baseName}_tier${t}.obj`;
     const colFile = count > 0 ? `${baseName}_tier${t}_collision.obj` : null;
