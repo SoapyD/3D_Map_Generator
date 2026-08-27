@@ -1,4 +1,5 @@
 import { CELL } from '../collision/matrix.js';
+import { GEOMETRY } from '../../config.js';
 
 const CARDINALS = [[-1,0],[1,0],[0,-1],[0,1]];
 
@@ -185,6 +186,16 @@ export function generateCover(data, config, rng, matrix) {
   const buildings = data.buildings ?? [];
   const streets   = data.streets   ?? [];
 
+  // Keep GROUND-LEVEL cover/crate pieces off the perimeter border wall (parapet). This ONLY affects
+  // where cover objects are placed — the map's own floors/streets/walls may still run up to the border.
+  // The border occupies the outer `mapBorderInset*cellSize + mapBorderThickness` inches at each edge, so
+  // exclude that many cells from the placeable ring. Roof cover is elevated above the border, so it's
+  // unaffected.
+  const borderMarginInches = (GEOMETRY.mapBorderInset || 0) * cellSize + (GEOMETRY.mapBorderThickness || 0);
+  const edgeMargin = Math.ceil(borderMarginInches / cellSize);
+  const inBorderRing = (cx, cz) =>
+    cx < edgeMargin || cx >= W - edgeMargin || cz < edgeMargin || cz >= D - edgeMargin;
+
   const rawFloor  = [];
   const rawRoof   = [];
   const rawStreet = [];
@@ -197,6 +208,8 @@ export function generateCover(data, config, rng, matrix) {
         const isRoof   = v === CELL.ROOF;
         const isStreet = v === CELL.STREET;
         if (!isFloor && !isRoof && !isStreet) continue;
+        // Ground-level cover (floor + street scatter) must not overlap the border wall; roofs sit above it.
+        if ((isFloor || isStreet) && inBorderRing(cx, cz)) continue;
         if (aboveCellNextToPillar(cx, cy, cz, matrix)) continue;
         if (isStreet && adjacentToRiverBank(cx, cy, cz, matrix)) continue;
 
