@@ -1,6 +1,6 @@
 # Stage 11: Scene Build and Export
 
-> Last verified: 2026-04-24
+> Last verified: 2026-08-27
 
 ## Overview
 
@@ -68,6 +68,30 @@ Controlled by `config.flatLadders` (CLI flags `--flat-ladders` / `--3d-ladders`,
 
 Bridge wall and battlement slabs (`_wall_`, `_batt_` in name) are excluded so only the walkable deck surface is collidable.
 
+### Per-tier split export (`--split-tiers`, opt-in, additive)
+
+`--split-tiers` (or the in-memory `generateTiersToBuffers(seed, opts)`) additionally emits one OBJ + one collider OBJ **per vertical tier**, plus a manifest. This lets Tabletop Simulator load the map as N stacked, independently movable tier objects (the "elevator" / reveal feature) instead of one monolithic model that the camera collides against. Combined GLB/OBJ/collider are still written unconditionally — the split is purely additive.
+
+Because geometry is world-baked (each primitive carries absolute coordinates), every per-tier file self-aligns when all tiers are spawned at the same origin. All tiers share **one** diffuse atlas PNG: the atlas is built once from the full geometry (`buildObjAtlas`) and reused for every tier's OBJ (`emitPrimitivesToObj`), so UVs match a single `<baseName>.png`.
+
+Tier assignment — `tierOf(prim, config)` (`src/export/assign-primitive-tier.js`), total + disjoint (every primitive → exactly one tier in `[0, config.tiers]`; tier count is `config.tiers + 1`):
+
+1. **Floors** — authoritative tier from the `floor_f{n}_` name.
+2. **Ground terrain** (`street_`, `river_`, `skirt_`, `border_`, `deleted_`, `pavement_`, `building_footprint_`) → tier 0.
+3. **Cross-tier connectors** (any name containing `ladder`, plus `pillar_`, `bridge_`, `walkway_`, `junction_platform_`) → their **lower/base** tier by floor-banding `baseY` (v1: a raised upper tier detaches cosmetically at the top).
+4. **Everything else** (walls, roofs, rooftop cover) → round-banded by `baseY`, where `levelHeight = tierHeight + slabThickness`.
+
+Outputs (for each **non-empty** tier `t`; empty tiers are skipped but retained in the manifest with `empty: true`):
+
+| Output | File |
+|---|---|
+| Tier OBJ | `<baseName>_tier{t}.obj` |
+| Tier collider OBJ | `<baseName>_tier{t}_collision.obj` (omitted if the tier has no collidable surfaces) |
+| Shared atlas PNG | `<baseName>.png` (one, shared by all tiers) |
+| Manifest | `<baseName>_tiers.json` — `{ version, seed, tierCount, levelHeight, tierHeight, slabThickness, units, tiers: [{ tier, obj, collision, primitiveCount, yMin, yMax, empty }] }` |
+
+`levelHeight` in the manifest is the vertical distance between stacked tier floors — the elevator lift delta a TTS script applies.
+
 ### Wall end-cap coverage
 
 `wallEdgeCovered(wallPrim, side, allWallPrims)` decides whether to suppress a wall's end-cap face. N/S walls are trimmed at corners to yield to E/W walls — so the check must verify the covering wall spans the **full face extent**, not just the edge point:
@@ -87,10 +111,15 @@ A margin of 0.01 is used for floating-point safety. The previous 0.5 margin inco
 - [src/export/obj-geometry/emit-ladder.js](../../../../src/export/obj-geometry/emit-ladder.js) — flat vs 3D ladder dispatch
 - [src/export/obj-geometry/wall-edge-covered.js](../../../../src/export/obj-geometry/wall-edge-covered.js) — end-cap suppression
 - [src/export/collision-exporter.js](../../../../src/export/collision-exporter.js)
+- [src/export/assign-primitive-tier.js](../../../../src/export/assign-primitive-tier.js) — `tierOf` / `tierCount` / `primBaseY` / `primTopY` (per-tier split)
+- [src/export/export-tiers.js](../../../../src/export/export-tiers.js) — `groupPrimitivesByTier` / `buildTierBuffers` / `exportTiers`
+- [src/export/obj-geometry/build-obj-and-atlas.js](../../../../src/export/obj-geometry/build-obj-and-atlas.js) — `buildObjAtlas` (shared atlas) + `emitPrimitivesToObj` (per-tier OBJ)
+- [src/generate-tiers-buffers.js](../../../../src/generate-tiers-buffers.js) — in-memory `generateTiersToBuffers` (consumed by the wyrdwars maps API)
 - [src/generators/generate-textures.js](../../../../src/generators/generate-textures.js) — generates placeholder PNGs for `base` and `loaded` packs
 
 ## Edge Cases & Constraints
 
 - GLB and OBJ are always exported together — there is no flag to suppress either.
+- `--split-tiers` is additive and opt-in: it never replaces the combined outputs, and its per-tier OBJs reuse the single combined atlas PNG.
 - `--visualize` enables the debug recorder which captures per-stage snapshots consumed by the preview visualiser.
 - The `map_skirt` texture must exist in both `assets/textures/base/map_skirt/` and `assets/textures/loaded/map_skirt/`. Run `node src/generators/generate-textures.js` to regenerate if missing.

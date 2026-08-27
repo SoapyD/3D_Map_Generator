@@ -94,6 +94,13 @@ async function main() {
   console.log(`  Collision: ${collisionPath}`);
   console.log(`  Geometry: ${geometryPath}`);
 
+  if (config.splitTiers) {
+    const { exportTiers } = await import('./export/export-tiers.js');
+    const manifest = await exportTiers(geometry, config, dir, baseName);
+    const written = manifest.tiers.filter(t => !t.empty).length;
+    console.log(`  Split tiers: ${written}/${manifest.tierCount} tier OBJ+collider files + ${baseName}_tiers.json`);
+  }
+
   if (config.preview) {
     console.log('\nStarting preview server...');
     const { startPreview } = await import('./preview/server.js');

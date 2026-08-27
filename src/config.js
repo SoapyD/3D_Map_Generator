@@ -29,6 +29,7 @@ export const DEFAULTS = {
   visualize: false,
   debug: false,
   obj: false,
+  splitTiers: false,  // also emit one OBJ + collider per tier + a manifest (TTS elevator/reveal)
   outputDir: 'output',
   allRivers: false,   // treat every street corridor as a river
 };
@@ -200,6 +201,11 @@ export function parseArgs(argv) {
 
     if (arg === '--obj') {
       config.obj = true;
+      continue;
+    }
+
+    if (arg === '--split-tiers') {
+      config.splitTiers = true;
       continue;
     }
 
