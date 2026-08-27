@@ -20,6 +20,8 @@ import { buildGlbBuffer } from './export/glb-exporter.js';
 // separate collider mesh). Re-exported here so the package's single public entry (lib.js) exposes them.
 export { generateObjToBuffers } from './generate-obj-buffers.js';
 export { generateColliderToBuffer } from './generate-collider-buffer.js';
+// Per-tier split (manifest + shared atlas + per-tier OBJ/collider) for the TTS elevator/reveal feature.
+export { generateTiersToBuffers } from './generate-tiers-buffers.js';
 
 /**
  * Run the full generation pipeline for the given seed and return a GLB Buffer.

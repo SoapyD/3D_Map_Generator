@@ -36,6 +36,19 @@ import { resolveUV } from './resolve-uv.js';
 const PACKAGE_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 export function buildObjAndAtlas(geometry, config) {
+  const atlasCtx = buildObjAtlas(geometry, config);
+  const wallPrims = geometry.primitives.filter(p => p.type === 'wall');
+  const objString = emitPrimitivesToObj(geometry.primitives, config, atlasCtx, wallPrims);
+  return { objString, atlasPngBuffer: atlasCtx.atlasPngBuffer };
+}
+
+/**
+ * Build the shared texture atlas + UV lookup context from the FULL geometry.
+ * Split out so a per-tier export can build the atlas ONCE over the whole map and
+ * reuse it across every tier's OBJ, keeping a single shared diffuse PNG.
+ * @returns {{ atlasState, texturePools, gridSz, atlasSize, atlasPngBuffer }}
+ */
+export function buildObjAtlas(geometry, config) {
   const packDir = path.join(PACKAGE_ROOT, 'assets', 'textures', config.textureSet || 'base');
 
   // Load texture pools
@@ -86,16 +99,28 @@ export function buildObjAndAtlas(geometry, config) {
   const { atlas, gridSz, atlasSize } = buildAtlasImage(atlasState);
   const atlasPngBuffer = PNG.sync.write(atlas);
 
+  return { atlasState, texturePools, gridSz, atlasSize, atlasPngBuffer };
+}
+
+/**
+ * Emit an OBJ string for a set of primitives against a prebuilt atlas context.
+ * `wallPrimsForCoverage` should be the FULL map's wall primitives so wall-edge
+ * culling matches the combined export even when emitting a tier subset.
+ * @returns {string} objString
+ */
+export function emitPrimitivesToObj(primitives, config, atlasCtx, wallPrimsForCoverage) {
+  const { atlasState, texturePools, gridSz, atlasSize } = atlasCtx;
+
   // --- OBJ state (shared across all geometry helpers) ---
   const state = { objLines: [], vertOff: 1, uvOff: 1, normOff: 1 };
   state.objLines.push('# Mordheim Map Generator - subdivided');
   state.objLines.push('');
 
   // Collect wall primitives for edge coverage checks
-  const wallPrims = geometry.primitives.filter(p => p.type === 'wall');
+  const wallPrims = wallPrimsForCoverage;
 
   // --- Emit primitives ---
-  for (const prim of geometry.primitives) {
+  for (const prim of primitives) {
     const uv = resolveUV(atlasState, prim.textureKey, texturePools, gridSz, atlasSize);
 
     switch (prim.type) {
@@ -200,5 +225,5 @@ export function buildObjAndAtlas(geometry, config) {
     }
   }
 
-  return { objString: state.objLines.join('\n'), atlasPngBuffer };
+  return state.objLines.join('\n');
 }
