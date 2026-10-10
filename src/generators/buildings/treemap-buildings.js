@@ -2,11 +2,12 @@ import { createFoundationGrid } from './foundation-grid.js';
 import { placeInFoundation } from './place-in-foundation.js';
 import { cellCenterOut } from './spawn-patterns/cell-center-out.js';
 import { cellTopLeft } from './spawn-patterns/cell-top-left.js';
+import { BUILDINGS } from '../../config.js';
 
 const CELL_PATTERNS = [cellCenterOut, cellTopLeft];
 
 function placeRuinsFit(grid, baseKey, bi, rng, tiers, cellPattern) {
-  const first = rng.chance(0.5) ? `${baseKey}-h` : `${baseKey}-v`;
+  const first = rng.chance(BUILDINGS.ruinsHorizontalChance) ? `${baseKey}-h` : `${baseKey}-v`;
   const second = first.endsWith('-h') ? `${baseKey}-v` : `${baseKey}-h`;
   return placeInFoundation(grid, first, bi, rng, tiers, cellPattern)
       ?? placeInFoundation(grid, second, bi, rng, tiers, cellPattern);
@@ -18,13 +19,13 @@ export function treemapBuildings(blocks, rng, tiers) {
   for (let bi = 0; bi < blocks.length; bi++) {
     const block = blocks[bi];
     const grid = createFoundationGrid(block);
-    const cellPattern = CELL_PATTERNS[rng.chance(0.5) ? 0 : 1];
+    const cellPattern = CELL_PATTERNS[rng.chance(BUILDINGS.centerOutPatternChance) ? 0 : 1];
 
     // Always consume the same RNG calls per block for determinism
-    const tryLargeA = rng.chance(0.4);
-    const tryLargeB = rng.chance(0.4);
-    const mediumAttempts = Math.floor(grid.bbdW * grid.bbdD / 4);
-    const mediumChances = Array.from({ length: mediumAttempts }, () => rng.chance(0.5));
+    const tryLargeA = rng.chance(BUILDINGS.largeChance);
+    const tryLargeB = rng.chance(BUILDINGS.largeChance);
+    const mediumAttempts = Math.floor(grid.bbdW * grid.bbdD / BUILDINGS.mediumCellDivisor);
+    const mediumChances = Array.from({ length: mediumAttempts }, () => rng.chance(BUILDINGS.mediumChance));
 
     if (tryLargeA) {
       const b = placeInFoundation(grid, 'largeA', bi, rng, tiers, cellPattern);

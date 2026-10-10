@@ -114,6 +114,15 @@ export const STREETS = {
 // --- Cover --- (_old_system only)
 // export const COVER = { ... };  // see _old_system/config.js
 
+// --- Buildings (treemap placement) ---
+export const BUILDINGS = {
+  largeChance:            0.4, // chance per block to attempt each of largeA and largeB
+  mediumChance:           0.5, // chance per medium attempt
+  mediumCellDivisor:      4,   // medium attempts per block = floor(bbdW * bbdD / this)
+  ruinsHorizontalChance:  0.5, // ruins-medium: chance of trying -h before -v
+  centerOutPatternChance: 0.5, // chance a block uses the centre-out spawn pattern (else top-left)
+};
+
 // --- Grid ---
 export const GRID = {
   minBlockSize: 8,         // minimum block dimension in inches (2 × BBD)
@@ -170,6 +179,15 @@ export const LADDERS = {
   pathSpacing:          6,    // min world distance between ladders from different paths
   maxSideCount:         2,    // max ladders per facing direction per building
   fullHeightCullChance: 0.30, // chance to randomly trim a full-height ladder
+  thickness:            0.25, // ladder strip thickness (inches), flush against the wall face
+  pathMinSpacing:       3,    // min distance between ladders of extra paths on one building
+  ruinsSmallChance:     0.4,  // chance a ruins-small building gets any ladders at all
+  // Max ladder paths per building size (default 1 for unlisted sizes)
+  pathQuota: {
+    'ruins-small': 1, small: 1,
+    medium: 2, 'ruins-medium-h': 2, 'ruins-medium-v': 2,
+    largeA: 3, largeB: 3,
+  },
 };
 
 // --- Deletion Toggles --- (_old_system only)

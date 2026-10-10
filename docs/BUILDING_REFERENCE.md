@@ -47,8 +47,8 @@ From Stage 7 (path selection quota):
 | What | Where |
 |---|---|
 | Footprint sizes | `BUILDING_SIZES` in `src/generators/buildings/building-sizes.js` |
-| Block placement chances | `treemap-buildings.js` (hard-coded; not yet in `config.js`) |
+| Block placement chances | `BUILDINGS` in `src/config.js` |
 | Interior wall chance | `WALL.interiorWallChance` in `src/config.js` |
-| Ladder clearances and quotas | `LADDERS` in `src/config.js` |
+| Ladder clearances, quotas and spacing | `LADDERS` in `src/config.js` (`pathQuota` for per-size quotas) |
 | Floor damage per tier | `FLOOR` and `--damage-level` |
 | Wall damage | `WALL` row-removal ratios |

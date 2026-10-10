@@ -69,16 +69,16 @@ All tuneable values live here (project rule: no magic numbers in logic). Each se
 | `FLOOR` | Floor-plate damage: max consecutive intact floors and escalation chances for removing the 1st/2nd/3rd quadrant per tier. |
 | `CONNECTIVITY` | Bridges and walkways: length thresholds for bridge/pillar eligibility, pillar spacing/width, bridge variant percentages (short vs long, must sum to 100), river-crossing spacing and max length, bridge slab/wall thickness and battlement spacing/height. |
 | `STREETS` | River depth (cells below Y=0) and `riverWeights` — the none/one/two/all river-mode probabilities (must sum to 1). |
+| `BUILDINGS` | Treemap building placement chances: large (40%), medium (50%, with attempts per block set by `mediumCellDivisor`), ruins horizontal/vertical choice, and spawn-pattern choice. |
 | `GRID` | BSP grid: minimum block size (8" = 2 × BBD). |
 | `GEOMETRY` | Export geometry: GLB texture tile size, OBJ atlas tile/segment/padding pixel sizes, UV hash constants (per-object tiling offset, shared by GLB and OBJ), OBJ ladder pole/rung dimensions, courtyard slab, platform and walkway/river/street/pavement thicknesses, perimeter parapet height/thickness/inset. |
 | `LADDER_DISPLAY` | Which ladder representations render (box vs mesh) and the mesh pole/rung radii and spacing. |
-| `LADDERS` | Ladder placement rules: clearance from map edge, connections and other buildings, spacing between ladders, max per side, chance of trimming a full-height ladder. |
+| `LADDERS` | Ladder placement rules: clearance from map edge, connections and other buildings, spacing between ladders, max per side, chance of trimming a full-height ladder, ladder strip thickness, extra-path spacing, ruins-small ladder chance, and `pathQuota` (max ladder paths per building size). |
 | `parseArgs(argv)` | CLI parser. Starts from `DEFAULTS`, handles the boolean flags (`--preview`, `--visualize`, `--debug`, `--debug-connectivity`, `--debug-matrix`, `--obj`, `--split-tiers`, `--all-rivers`, `--3d-ladders`, `--flat-ladders`), `--size WxD`, and any `--key value` whose camelCased name exists in `DEFAULTS`. Unknown flags are silently ignored. |
 
 ### Known config issues
 
 - **`DEFAULTS.seed`** is derived from `Date.now()` when `--seed` is omitted (no `Math.random()` anywhere). It is evaluated at import time.
 - **`flatLadders`** lives only in `DEFAULTS`; exporters fall back to `DEFAULTS.flatLadders`.
-- **Building placement chances** (40% large, 50% medium, etc.) are still hard-coded in `src/generators/buildings/treemap-buildings.js`, not in `config.js`.
 - **`src/tools/*`** (building/bridge preview scripts) still import the removed `BUILDING` config section and will not run.
 - **Tests:** 12 of 16 test files fail because they import modules that no longer exist (e.g. `src/generators/grid.js`, `src/core/geometry.js`), and `tests/core/config.test.js` asserts on removed `BUILDING`/`COVER`/`DELETIONS` sections.
