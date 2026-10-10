@@ -2,8 +2,6 @@ import { bspSplit } from '../bsp-split.js';
 import { biasedCenter } from '../split-strategies/biased-center.js';
 import { GRID } from '../../../config.js';
 
-const MIN_BLOCK = GRID.minBlockSize;
-
 function snapToBBD(v, bbd) { return Math.round(v / bbd) * bbd; }
 
 /**
@@ -13,6 +11,7 @@ function snapToBBD(v, bbd) { return Math.round(v / bbd) * bbd; }
  * split positions: rng.float within a valid range, snapped to BBD.
  */
 export function generateCenterFirst(activeArea, rng, streetWidth, bbd) {
+  const MIN_BLOCK = GRID.minBlockSize; // read per call so profiles can override it
   const { x: ox, z: oz, w: aw, d: ad } = activeArea;
   const cx = ox + aw / 2;
   const cz = oz + ad / 2;

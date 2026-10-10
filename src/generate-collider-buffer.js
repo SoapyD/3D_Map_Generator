@@ -5,6 +5,7 @@
  */
 
 import { DEFAULTS } from './config.js';
+import { profileDefaults } from './profiles/profile-defaults.js';
 import { createRng } from './core/rng.js';
 import { runPipeline } from './pipeline.js';
 import { buildCollisionObj } from './export/collision-buffer.js';
@@ -15,7 +16,7 @@ import { buildCollisionObj } from './export/collision-buffer.js';
  * @returns {Promise<string>} the collider OBJ text
  */
 export async function generateColliderToBuffer(seed, opts = {}) {
-  const config = { ...DEFAULTS, ...opts, seed };
+  const config = { ...DEFAULTS, ...profileDefaults(opts.profile), ...opts, seed };
   const rng = createRng(config.seed);
   const { geometry } = runPipeline(config, rng);
   return buildCollisionObj(geometry).objString;

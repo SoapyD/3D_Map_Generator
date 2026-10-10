@@ -2,6 +2,8 @@
  * Centralised configuration — all tuneable parameters in one place.
  */
 
+import { profileDefaults } from './profiles/profile-defaults.js';
+
 // --- Global grid ---
 export const GLOBAL_GRID = {
   bbd: 4,         // Base Building Dimension in inches (2x2 footprint + 1 skirt each side)
@@ -34,6 +36,7 @@ export const DEFAULTS = {
   splitTiers: false,  // also emit one OBJ + collider per tier + a manifest (TTS elevator/reveal)
   outputDir: 'output',
   allRivers: false,   // treat every street corridor as a river
+  profile: null,      // --profile NAME: swap in a named config profile (see src/profiles/)
 };
 
 // --- Buildings --- (_old_system only)
@@ -73,6 +76,9 @@ export const FLOOR = {
 export const CONNECTIVITY = {
   bridgeMinLength:     6,  // min connection length (cells) eligible to become a bridge
   bridgeLongThreshold: 12, // connections this length or longer use long-bridge chances
+  // Max connection length as a fraction of the map's longer side (0.5 = half, 1 = the full map).
+  // Applies to ordinary connections; river crossings use riverCrossingMaxLength.
+  maxLengthMapFraction: 0.5,
   pillarMinLength:   8,    // min connection length (cells) to receive support pillars
   pillarSpacing:     6,    // cells between pillar pairs along travel axis
   pillarEdgeInset:   1,    // cells inset from each end before placing first pair
@@ -121,11 +127,32 @@ export const BUILDINGS = {
   mediumCellDivisor:      4,   // medium attempts per block = floor(bbdW * bbdD / this)
   ruinsHorizontalChance:  0.5, // ruins-medium: chance of trying -h before -v
   centerOutPatternChance: 0.5, // chance a block uses the centre-out spawn pattern (else top-left)
+  // 'fill' packs every block with as many buildings as fit; 'single' places exactly one per block.
+  mode: 'fill',
+  singleSizes: ['small', 'medium', 'largeA', 'largeB'], // 'single' mode: sizes tried until one fits
+  // 'single' mode try-order: 'random' shuffles singleSizes; 'largestFirst' tries the biggest footprint first
+  // (ties broken randomly), so a small ruin is only used where nothing bigger fits.
+  singleOrder: 'random',
+  // Blocks left without any building. Count is rng.int(min, max), capped so at least one block is built.
+  // { min: 0, max: 0 } disables this (and consumes no RNG, so default maps are unchanged).
+  emptyBlocks: { min: 0, max: 0 },
+};
+
+// --- Cover ---
+export const COVER = {
+  // Chance that each group of that kind receives cover at all (1 = always, 0 = none).
+  // At 1 no RNG is consumed, so default maps are unchanged.
+  shellChance:  1, // interior floors of buildings
+  roofChance:   1, // rooftops
+  streetChance: 1, // street corridors
 };
 
 // --- Grid ---
 export const GRID = {
   minBlockSize: 8,         // minimum block dimension in inches (2 × BBD)
+  // Block layout strategy: 'random' picks one per map (50/50); 'centerFirst' always puts a block at the
+  // centre and splits around it (reliably 4+ blocks even on small maps); 'bspTopLeft' splits from a corner.
+  strategy: 'random',
 };
 
 // --- Geometry ---
@@ -195,7 +222,10 @@ export const LADDERS = {
 
 // --- CLI parser ---
 export function parseArgs(argv) {
-  const config = { ...DEFAULTS };
+  // --profile is read first so its defaults form the base; explicit flags below still win.
+  const profileIdx = argv.indexOf('--profile');
+  const profileName = profileIdx >= 0 ? argv[profileIdx + 1] : null;
+  const config = { ...DEFAULTS, ...profileDefaults(profileName) };
 
   for (let i = 2; i < argv.length; i++) {
     const arg = argv[i];

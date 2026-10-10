@@ -24,6 +24,7 @@ What each documentation file is for, and what each section of `src/config.js` co
 | `glossary.md` | Terms used in `src/generators` (primitive, slab, wall, cell, tier, etc.) and function names. |
 | `collision_matrix.md` | The shared 1" cell grid every stage reads/writes, cell types, and write history. |
 | `debug_tooling.md` | `--preview`, `--visualize`, `--debug-connectivity`, `--debug-matrix`, `--debug` flags and what they emit. |
+| `profiles.md` | Swappable config profiles (`--profile withering`) and the generator options they use. |
 | `docs_and_config_guide.md` | This file. |
 
 ### `docs/processes/` — per-stage flow docs (the most reliable source for "how does stage X work")
@@ -67,18 +68,19 @@ All tuneable values live here (project rule: no magic numbers in logic). Each se
 | `DEFAULTS` | Default CLI values: seed (random if unset), map size (48x48), tier count (4), tier height (3"), slab thickness (1"), `damageLevel` (0–1 ruin level), connection filter strategy and `filterN`, texture set, ladder style, and output flags (`preview`, `visualize`, `debug`, `obj`, `splitTiers`, `allRivers`, `outputDir`). |
 | `WALL` | Wall thickness, toggles for segment cull / windows / blob damage / door cuts, damage column size (`quadSize`), per-row (base/mid/top) removal ratios for exterior and interior walls, interior wall chance by building size, blob damage size range. |
 | `FLOOR` | Floor-plate damage: max consecutive intact floors and escalation chances for removing the 1st/2nd/3rd quadrant per tier. |
-| `CONNECTIVITY` | Bridges and walkways: length thresholds for bridge/pillar eligibility, pillar spacing/width, bridge variant percentages (short vs long, must sum to 100), river-crossing spacing and max length, bridge slab/wall thickness and battlement spacing/height. |
+| `CONNECTIVITY` | Bridges and walkways: `maxLengthMapFraction` (longest connection as a fraction of the map's longer side; 0.5 = half), length thresholds for bridge/pillar eligibility, pillar spacing/width, bridge variant percentages (short vs long, must sum to 100), river-crossing spacing and max length, bridge slab/wall thickness and battlement spacing/height. |
 | `STREETS` | River depth (cells below Y=0) and `riverWeights` — the none/one/two/all river-mode probabilities (must sum to 1). |
-| `BUILDINGS` | Treemap building placement chances: large (40%), medium (50%, with attempts per block set by `mediumCellDivisor`), ruins horizontal/vertical choice, and spawn-pattern choice. |
-| `GRID` | BSP grid: minimum block size (8" = 2 × BBD). |
+| `BUILDINGS` | Treemap building placement chances: large (40%), medium (50%, with attempts per block set by `mediumCellDivisor`), ruins horizontal/vertical choice, and spawn-pattern choice. Also `mode` (`fill`/`single`), `singleSizes` and `emptyBlocks` (see `profiles.md`). |
+| `COVER` | Per-group chance (interior / roof / street) that a group receives cover; 1 = always. The cover piece sizes and counts themselves are still hard-coded in `generators/cover/index.js`. |
+| `GRID` | BSP grid: minimum block size (8" = 2 × BBD) and `strategy` (`random`, `centerFirst`, `bspTopLeft`). |
 | `GEOMETRY` | Export geometry: GLB texture tile size, OBJ atlas tile/segment/padding pixel sizes, UV hash constants (per-object tiling offset, shared by GLB and OBJ), OBJ ladder pole/rung dimensions, courtyard slab, platform and walkway/river/street/pavement thicknesses, perimeter parapet height/thickness/inset. |
 | `LADDER_DISPLAY` | Which ladder representations render (box vs mesh) and the mesh pole/rung radii and spacing. |
 | `LADDERS` | Ladder placement rules: clearance from map edge, connections and other buildings, spacing between ladders, max per side, chance of trimming a full-height ladder, ladder strip thickness, extra-path spacing, ruins-small ladder chance, and `pathQuota` (max ladder paths per building size). |
-| `parseArgs(argv)` | CLI parser. Starts from `DEFAULTS`, handles the boolean flags (`--preview`, `--visualize`, `--debug`, `--debug-connectivity`, `--debug-matrix`, `--obj`, `--split-tiers`, `--all-rivers`, `--3d-ladders`, `--flat-ladders`), `--size WxD`, and any `--key value` whose camelCased name exists in `DEFAULTS`. Unknown flags are silently ignored. |
+| `parseArgs(argv)` | CLI parser. Starts from `DEFAULTS`, handles the boolean flags (`--preview`, `--visualize`, `--debug`, `--debug-connectivity`, `--debug-matrix`, `--obj`, `--split-tiers`, `--all-rivers`, `--3d-ladders`, `--flat-ladders`), `--profile NAME` (applies that profile's defaults first), `--size WxD`, and any `--key value` whose camelCased name exists in `DEFAULTS`. Unknown flags are silently ignored. |
 
 ### Known config issues
 
 - **`DEFAULTS.seed`** is derived from `Date.now()` when `--seed` is omitted (no `Math.random()` anywhere). It is evaluated at import time.
 - **`flatLadders`** lives only in `DEFAULTS`; exporters fall back to `DEFAULTS.flatLadders`.
 - **`src/tools/*`** (building/bridge preview scripts) still import the removed `BUILDING` config section and will not run.
-- **Tests:** 12 of 16 test files fail because they import modules that no longer exist (e.g. `src/generators/grid.js`, `src/core/geometry.js`), and `tests/core/config.test.js` asserts on removed `BUILDING`/`COVER`/`DELETIONS` sections.
+- **Tests:** the suite was repaired on 2026-10-10 and passes (one expected fail: seed 100 exceeds the 25k vertex limit in a single OBJ).

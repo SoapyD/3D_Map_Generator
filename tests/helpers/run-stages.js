@@ -19,11 +19,13 @@ import { generateLadders } from '../../src/generators/ladders/index.js';
 import { generateWalls } from '../../src/generators/walls/index.js';
 import { generateCover } from '../../src/generators/cover/index.js';
 import { buildGeometry } from '../../src/generators/geometry/index.js';
+import { applyProfile } from '../../src/profiles/apply-profile.js';
+import { profileDefaults } from '../../src/profiles/profile-defaults.js';
 
 const cache = new Map();
 
 export function makeConfig(seed, overrides = {}) {
-  return { ...DEFAULTS, ...overrides, seed };
+  return { ...DEFAULTS, ...profileDefaults(overrides.profile), ...overrides, seed };
 }
 
 /** Run a callback with console.log silenced (generators are chatty). */
@@ -46,6 +48,8 @@ export function runStages(seed, overrides = {}) {
   const result = quiet(() => {
     const config = makeConfig(seed, overrides);
     const rng = createRng(config.seed);
+    const restoreProfile = applyProfile(config); // no-op unless overrides.profile is set
+    try {
 
     const grid = generateGrid(config, rng);
     const matrix = createCollisionMatrix(grid.activeArea, config.tiers, config.tierHeight, config.slabThickness);
@@ -69,6 +73,9 @@ export function runStages(seed, overrides = {}) {
     const geometry = buildGeometry(cover, config);
 
     return { config, matrix, grid, buildings, floors, roofs, streets, connectivity, ladders, walls, cover, geometry };
+    } finally {
+      restoreProfile();
+    }
   });
 
   cache.set(key, result);

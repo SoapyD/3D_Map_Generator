@@ -1,4 +1,5 @@
 import { CELL } from '../collision/matrix.js';
+import { CONNECTIVITY } from '../../config.js';
 
 const OPPOSITE = { N: 'S', S: 'N', E: 'W', W: 'E' };
 const STEP = {
@@ -40,7 +41,7 @@ function makeDebugRect(from, to, axis) {
  */
 export function pairAnchors(anchors, matrix, config) {
   const maxLength = config.maxConnectionLength
-    ?? Math.floor(Math.max(matrix.W, matrix.D) / 2);
+    ?? Math.floor(Math.max(matrix.W, matrix.D) * CONNECTIVITY.maxLengthMapFraction);
 
   // Build cell → anchor lookup keyed by "cx,cy,cz"
   const cellMap = new Map();

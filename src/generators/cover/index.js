@@ -1,5 +1,5 @@
 import { CELL } from '../collision/matrix.js';
-import { GEOMETRY } from '../../config.js';
+import { GEOMETRY, COVER } from '../../config.js';
 
 const CARDINALS = [[-1,0],[1,0],[0,-1],[0,1]];
 
@@ -178,6 +178,11 @@ function streetPieceList(area, rng) {
   );
 }
 
+// Skip a group with probability 1 - chance. At chance >= 1 no RNG is consumed.
+function groupGetsCover(chance, rng) {
+  return chance >= 1 || rng.chance(chance);
+}
+
 // --- Main ---
 
 export function generateCover(data, config, rng, matrix) {
@@ -232,16 +237,19 @@ export function generateCover(data, config, rng, matrix) {
   for (const group of shells) {
     const b = buildings[group.buildingIndex];
     if (!b) continue;
+    if (!groupGetsCover(COVER.shellChance, rng)) continue;
     placeInGroup(group, group.cells[0].cy, shellPieceList(b.size, rng), rng, ox, oz, cellSize);
   }
 
   for (const group of roofs) {
     const b = buildings[group.buildingIndex];
     if (!b) continue;
+    if (!groupGetsCover(COVER.roofChance, rng)) continue;
     placeInGroup(group, group.cells[0].cy, shellPieceList(b.size, rng), rng, ox, oz, cellSize);
   }
 
   for (const group of streetGroups) {
+    if (!groupGetsCover(COVER.streetChance, rng)) continue;
     const area = group.rect.w * group.rect.d;
     placeInGroup(group, group.cells[0].cy, streetPieceList(area, rng), rng, ox, oz, cellSize);
   }

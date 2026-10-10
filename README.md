@@ -25,6 +25,7 @@ Outputs:
 | `--debug` | Use flat debug colours instead of textures | off |
 | `--preview` | Start basic browser preview (model + grid toggle) on localhost:3010 | off |
 | `--visualize` | Start the full visualizer on localhost:3010 — layer/grid toggles, prior-step playback, debug overlays | off |
+| `--profile NAME` | Swap in a named config profile, e.g. `withering` (small 3-level test ground). See `docs/architecture/profiles.md` | none |
 | `--texture-set NAME` | Texture pack folder name in assets/textures/ | base |
 
 ## Examples

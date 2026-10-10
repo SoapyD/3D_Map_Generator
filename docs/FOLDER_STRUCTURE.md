@@ -31,6 +31,7 @@
 │   ├── generators/                # One folder per stage (grid is under foundations/),
 │   │                              #   plus collision/ (matrix), selectors/, utils/,
 │   │                              #   scene/, geometry/ and _old_system/ (legacy)
+│   ├── profiles/                  # Swappable config profiles (withering, …)
 │   ├── export/                    # GLB, OBJ + atlas, collision and per-tier exporters
 │   ├── preview/                   # server.js, viewer.html, debug-recorder.js
 │   └── tools/                     # Standalone building/bridge preview scripts
