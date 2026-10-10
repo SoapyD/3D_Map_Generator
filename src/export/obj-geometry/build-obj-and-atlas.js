@@ -18,7 +18,7 @@ import { addSharedWall } from './add-shared-wall.js';
 import { wallEdgeCovered } from './wall-edge-covered.js';
 import { addFloorEdgesFromGaps } from './add-floor-edges-from-gaps.js';
 import { emitLadder } from './emit-ladder.js';
-import { GEOMETRY } from '../../config.js';
+import { GEOMETRY, DEFAULTS } from '../../config.js';
 import { loadTexPool } from './load-tex-pool.js';
 import { createAtlasState } from './create-atlas-state.js';
 import { addTexture } from './add-texture.js';
@@ -219,7 +219,7 @@ export function emitPrimitivesToObj(primitives, config, atlasCtx, wallPrimsForCo
       }
 
       case 'ladder': {
-        emitLadder(state, prim, uv, config.flatLadders ?? GEOMETRY.flatLadders);
+        emitLadder(state, prim, uv, config.flatLadders ?? DEFAULTS.flatLadders);
         break;
       }
     }

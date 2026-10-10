@@ -11,7 +11,7 @@ export const GLOBAL_GRID = {
 
 // --- CLI defaults ---
 export const DEFAULTS = {
-  seed: Math.floor(Math.random() * 100000),
+  seed: Date.now() % 100000, // time-derived when --seed is omitted; keeps Math.random() out of the codebase
   mapWidth: 48,       // inches
   mapDepth: 48,       // inches
   tiers: 4,           // number of elevated tiers (+ base tier 0)
@@ -24,10 +24,12 @@ export const DEFAULTS = {
   filterStrategy: 'longestAndShortest', // one of: longestAndShortest, longest, shortest, random
   filterN: 2,             // max connections kept per building per tier (each end for longestAndShortest)
   textureSet: 'base',
-  flatLadders: true,
+  flatLadders: true,  // true = flat front-facing quads, false = 3D boxes (single source of truth)
   preview: false,
   visualize: false,
   debug: false,
+  debugConnectivity: false, // --debug-connectivity: write connectivity debug JSON
+  debugMatrix: false,       // --debug-matrix: serialise collision-matrix write history
   obj: false,
   splitTiers: false,  // also emit one OBJ + collider per tier + a manifest (TTS elevator/reveal)
   outputDir: 'output',
@@ -43,7 +45,7 @@ export const WALL = {
   applySegmentCull: true,   // cull walls to at most 2 sides per building per floor
   applyWindows: true,        // cut window openings in wall segments
   applyBlobDamage: true,     // apply random blob damage to wall segments
-  applyDoorCuts: true,       // skip cells marked CELL.DOOR during wall matrix writes              // outer face flush with cell edge, body extends inward
+  applyDoorCuts: true,       // skip cells marked CELL.DOOR during wall matrix writes
   quadSize: 1.5,                    // inches per damage column (Phase 2)
   externalRow2RemovalRatio: 0.4,    // Phase 2: max fraction of row 2 (top) removed on exterior walls
   externalRow2RemovalMin: 0.2,      // Phase 2: min fraction of row 2 removed on exterior walls
@@ -99,6 +101,14 @@ export const CONNECTIVITY = {
 // --- Streets / Rivers ---
 export const STREETS = {
   riverDepth: 3,   // cells below Y=0 occupied by river volume (must be <= BELOW_GROUND)
+  // Weighted river mode selection — probabilities must sum to 1.
+  // Override with --all-rivers flag to force all-rivers mode.
+  riverWeights: [
+    { mode: 'none', p: 0.600 },
+    { mode: 'one',  p: 0.200 },
+    { mode: 'two',  p: 0.125 },
+    { mode: 'all',  p: 0.075 },
+  ],
 };
 
 // --- Cover --- (_old_system only)
@@ -125,7 +135,6 @@ export const GEOMETRY = {
   ladderRungDepth: 0.18,
   ladderRungSpacing: 0.75,
   ladderRungInset: 0.05,
-  flatLadders: true,        // true = flat front-facing quads, false = 3D boxes
   // Courtyard slab
   courtyardY: 0.55,          // Y position of courtyard slab
   courtyardThickness: 0.1,   // thickness of courtyard slab
