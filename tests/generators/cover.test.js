@@ -1,173 +1,117 @@
 import { describe, it, expect } from 'vitest';
-import { generateCover } from '../../src/generators/cover.js';
-import { generateConnectivity } from '../../src/generators/connectivity-main.js';
-import { generateWalls } from '../../src/generators/walls.js';
-import { generateFloors } from '../../src/generators/floors.js';
-import { generateBuildings } from '../../src/generators/buildings.js';
-import { generateGrid } from '../../src/generators/grid.js';
-import { createRng } from '../../src/core/rng.js';
-import { DELETIONS } from '../../src/config.js';
+import { runStages } from '../helpers/run-stages.js';
 
-const baseConfig = {
-  mapWidth: 48,
-  mapDepth: 48,
-  streetWidth: 3.5,
-  tiers: 4,
-  tierHeight: 3,
-  slabThickness: 0.5,
-  wallThickness: 0.25,
-};
+const SEEDS = [42, 100, 7];
+const COVER_HEIGHTS = [1, 2]; // short / tall pieces (docs/processes/pipeline-flows/9-cover.md)
 
-function runPipeline() {
-  const rng = createRng(42);
-  const gridData = generateGrid(baseConfig, rng);
-  const buildingData = generateBuildings(gridData, baseConfig, rng);
-  const floorData = generateFloors(buildingData, baseConfig, rng);
-  const wallData = generateWalls(floorData, baseConfig, rng);
-  const connData = generateConnectivity(wallData, baseConfig, rng);
-  return generateCover(connData, baseConfig, rng);
+function overlapsXZ(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.z < b.z + b.d && a.z + a.d > b.z;
 }
 
 describe('generateCover', () => {
-  it('returns cover arrays', () => {
-    const result = runPipeline();
-    expect(Array.isArray(result.cover)).toBe(true);
-    expect(Array.isArray(result.interiorCover)).toBe(true);
-    expect(Array.isArray(result.streetScatter)).toBe(true);
+  it('returns cover, streetScatter and freeSpace', () => {
+    const { cover } = runStages(42);
+    expect(cover.cover.length).toBeGreaterThan(0);
+    expect(cover.streetScatter.length).toBeGreaterThan(0);
+    expect(cover.freeSpace).toMatchObject({ shells: expect.anything(), roofs: expect.anything(), streets: expect.anything() });
   });
 
-  it('cover pieces have required properties', () => {
-    const result = runPipeline();
-    for (const c of result.cover) {
-      expect(c).toHaveProperty('x');
-      expect(c).toHaveProperty('z');
-      expect(c).toHaveProperty('w');
-      expect(c).toHaveProperty('d');
-      expect(c).toHaveProperty('height');
-      expect(c).toHaveProperty('y');
+  it('cover pieces have numeric position and size', () => {
+    for (const c of [...runStages(42).cover.cover, ...runStages(42).cover.streetScatter]) {
+      for (const key of ['x', 'y', 'z', 'w', 'd', 'height']) expect(typeof c[key], key).toBe('number');
     }
   });
 
-  it('cover pieces are within map bounds', () => {
-    const result = runPipeline();
-    const all = [...result.cover, ...result.interiorCover, ...result.streetScatter];
-    for (const c of all) {
-      expect(c.x).toBeGreaterThanOrEqual(-1);
-      expect(c.z).toBeGreaterThanOrEqual(-1);
-      expect(c.x + c.w).toBeLessThanOrEqual(baseConfig.mapWidth + 1);
-      expect(c.z + c.d).toBeLessThanOrEqual(baseConfig.mapDepth + 1);
+  it('cover pieces are within the active area', () => {
+    for (const seed of SEEDS) {
+      const { cover, grid } = runStages(seed);
+      const a = grid.activeArea;
+      for (const c of [...cover.cover, ...cover.streetScatter]) {
+        expect(c.x).toBeGreaterThanOrEqual(a.x);
+        expect(c.z).toBeGreaterThanOrEqual(a.z);
+        expect(c.x + c.w).toBeLessThanOrEqual(a.x + a.w);
+        expect(c.z + c.d).toBeLessThanOrEqual(a.z + a.d);
+      }
     }
   });
 
-  it('cover pieces have valid height types', () => {
-    const result = runPipeline();
-    const all = [...result.cover, ...result.interiorCover, ...result.streetScatter];
-    for (const c of all) {
-      expect([0.75, 1.5]).toContain(c.height);
+  it('cover heights are only the configured piece heights (1 or 2)', () => {
+    for (const seed of SEEDS) {
+      const { cover } = runStages(seed);
+      for (const c of [...cover.cover, ...cover.streetScatter]) {
+        expect(COVER_HEIGHTS).toContain(c.height);
+      }
     }
   });
 
-  it('no cover overlaps ladders', () => {
-    const result = runPipeline();
-    const allLadders = [
-      ...(result.connections?.ladders || []),
-      ...(result.connections?.groundLadders || []),
-      ...(result.connections?.orangeLadders || []),
-      ...(result.connections?.interiorLadders || []),
-    ];
-    // Ground-level cover should not overlap ladders
-    const groundCover = result.cover.filter(c => c.y < 1);
-    for (const c of groundCover) {
-      for (const l of allLadders) {
-        const overlaps = c.x < l.x + l.w && c.x + c.w > l.x &&
-                         c.z < l.z + l.d && c.z + c.d > l.z;
-        if (overlaps) {
-          // This should not happen for ground cover placed via makeCoverPiece
-          // Some cover is generated in courtyard footprints with ladder check
+  it('cover footprints are 2x2, 2x3 or 3x2', () => {
+    for (const seed of SEEDS) {
+      const { cover } = runStages(seed);
+      for (const c of [...cover.cover, ...cover.streetScatter]) {
+        expect(['2x2', '2x3', '3x2']).toContain(`${c.w}x${c.d}`);
+      }
+    }
+  });
+
+  it('street scatter sits on the ground (y = 0)', () => {
+    for (const seed of SEEDS) {
+      for (const c of runStages(seed).cover.streetScatter) expect(c.y).toBe(0);
+    }
+  });
+
+  it('street scatter lies inside a street corridor', () => {
+    for (const seed of SEEDS) {
+      const { cover, streets } = runStages(seed);
+      for (const c of cover.streetScatter) {
+        const hit = streets.streets.some(s => c.x >= s.x && c.z >= s.z && c.x + c.w <= s.x + s.w && c.z + c.d <= s.z + s.d);
+        expect(hit, `seed ${seed} scatter at ${c.x},${c.z}`).toBe(true);
+      }
+    }
+  });
+
+  it('cover rests on a tier surface (y is a multiple of the tier stride)', () => {
+    const { cover, config } = runStages(42);
+    const stride = config.tierHeight + config.slabThickness;
+    for (const c of cover.cover) expect(c.y % stride).toBe(0);
+  });
+
+  it('cover on the same level never overlaps other cover', () => {
+    for (const seed of SEEDS) {
+      const all = [...runStages(seed).cover.cover, ...runStages(seed).cover.streetScatter];
+      for (let i = 0; i < all.length; i++) {
+        for (let j = i + 1; j < all.length; j++) {
+          if (all[i].y !== all[j].y) continue;
+          expect(overlapsXZ(all[i], all[j]), `seed ${seed}: ${i} vs ${j}`).toBe(false);
         }
       }
     }
   });
 
-  it('street scatter has up to 20 pieces', () => {
-    const result = runPipeline();
-    expect(result.streetScatter.length).toBeLessThanOrEqual(20);
-  });
-
-  it('street scatter pieces are on ground level', () => {
-    const result = runPipeline();
-    for (const s of result.streetScatter) {
-      expect(s.y).toBeCloseTo(0.65);
-      expect(s.streetScatter).toBe(true);
-    }
-  });
-
-  it('deleted footprints are tracked', () => {
-    const result = runPipeline();
-    expect(result).toHaveProperty('deletedFootprints');
-    expect(Array.isArray(result.deletedFootprints)).toBe(true);
-  });
-
-  it('is deterministic', () => {
-    const a = runPipeline();
-    const b = runPipeline();
-    expect(a.cover.length).toBe(b.cover.length);
-    expect(a.interiorCover.length).toBe(b.interiorCover.length);
-    expect(a.streetScatter.length).toBe(b.streetScatter.length);
-  });
-
-  it('skips courtyard wall cull when courtyardWallCull is false', () => {
-    const orig = DELETIONS.courtyardWallCull;
-    try {
-      DELETIONS.courtyardWallCull = false;
-      const result = runPipeline();
-      // With cull disabled, more footprints survive (or at least same)
-      expect(Array.isArray(result.deletedFootprints)).toBe(true);
-      expect(Array.isArray(result.cover)).toBe(true);
-    } finally {
-      DELETIONS.courtyardWallCull = orig;
-    }
-  });
-
-  it('makeCoverPiece returns null when piece does not fit (small rect)', () => {
-    // Exercise the null return from makeCoverPiece (lines 260-268 filter + line 293).
-    // We test indirectly: a very tiny deleted building footprint should produce no cover
-    // because the cover dimensions (2-4") won't fit in a ~1" rect.
-    const rng = createRng(42);
-    const gridData = generateGrid(baseConfig, rng);
-    const buildingData = generateBuildings(gridData, baseConfig, rng);
-    const floorData = generateFloors(buildingData, baseConfig, rng);
-    const wallData = generateWalls(floorData, baseConfig, rng);
-    const connData = generateConnectivity(wallData, baseConfig, rng);
-
-    // Inject a very small deleted building footprint
-    connData.deletedBuildings = [{ x: 5, z: 5, w: 1, d: 1 }];
-
-    const origCull = DELETIONS.courtyardWallCull;
-    try {
-      DELETIONS.courtyardWallCull = false; // so the small footprint survives
-      const result = generateCover(connData, baseConfig, rng);
-      // The small footprint after expansion is only 2.5x2.5, cover pieces are 1.5 + 2-4"
-      // Most won't fit, so cover from that footprint should be 0 or very few
-      expect(Array.isArray(result.cover)).toBe(true);
-    } finally {
-      DELETIONS.courtyardWallCull = origCull;
-    }
-  });
-
-  it('filters ground-level cover that intersects walls', () => {
-    // Lines 258-268: ground-level cover touching walls is removed
-    const result = runPipeline();
-    // All surviving ground-level cover should not overlap any wall
-    const groundCover = result.cover.filter(c => c.y <= baseConfig.slabThickness + 0.1);
-    for (const c of groundCover) {
-      for (const wall of result.walls) {
-        const wallX1 = wall.axis === 'x' ? wall.x + wall.length : wall.x + wall.thickness;
-        const wallZ1 = wall.axis === 'z' ? wall.z + wall.length : wall.z + wall.thickness;
-        const overlaps = c.x < wallX1 && c.x + c.w > wall.x &&
-                         c.z < wallZ1 && c.z + c.d > wall.z;
-        expect(overlaps).toBe(false);
+  it('no cover overlaps a kept ladder segment', () => {
+    for (const seed of SEEDS) {
+      const { cover, ladders } = runStages(seed);
+      const segs = ladders.ladderPaths.flatMap(p => p.segments).filter(s => s.keptTopY > s.keptBottomY);
+      for (const c of [...cover.cover, ...cover.streetScatter]) {
+        for (const s of segs) {
+          const verticalOverlap = c.y < s.keptTopY && c.y + c.height > s.keptBottomY;
+          expect(overlapsXZ(c, s) && verticalOverlap, `seed ${seed}: cover ${c.x},${c.z} vs ladder ${s.x},${s.z}`).toBe(false);
+        }
       }
     }
+  });
+
+  it('cover geometry primitives use the cover_ and street_scatter_ name prefixes', () => {
+    const { geometry, cover } = runStages(42);
+    const names = geometry.primitives.filter(p => p.type === 'slab').map(p => p.name);
+    expect(names.filter(n => n.startsWith('cover_')).length).toBe(cover.cover.length);
+    expect(names.filter(n => n.startsWith('street_scatter_')).length).toBe(cover.streetScatter.length);
+  });
+
+  it('is deterministic for the same seed (separate generation runs)', () => {
+    const a = runStages(42);
+    const b = runStages(42, { textureSet: 'base' });
+    expect(a).not.toBe(b);
+    expect(a.cover.cover).toEqual(b.cover.cover);
+    expect(a.cover.streetScatter).toEqual(b.cover.streetScatter);
   });
 });
