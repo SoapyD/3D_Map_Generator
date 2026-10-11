@@ -5,6 +5,7 @@
  */
 
 import { DEFAULTS } from './config.js';
+import { profileDefaults } from './profiles/profile-defaults.js';
 import { createRng } from './core/rng.js';
 import { runPipeline } from './pipeline.js';
 import { buildObjAndAtlas } from './export/obj-geometry/build-obj-and-atlas.js';
@@ -15,7 +16,7 @@ import { buildObjAndAtlas } from './export/obj-geometry/build-obj-and-atlas.js';
  * @returns {Promise<{ objString: string, atlasPngBuffer: Buffer }>}
  */
 export async function generateObjToBuffers(seed, opts = {}) {
-  const config = { ...DEFAULTS, ...opts, seed };
+  const config = { ...DEFAULTS, ...profileDefaults(opts.profile), ...opts, seed };
   const rng = createRng(config.seed);
   const { geometry } = runPipeline(config, rng);
   return buildObjAndAtlas(geometry, config);

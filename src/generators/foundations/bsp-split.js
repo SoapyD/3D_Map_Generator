@@ -1,12 +1,11 @@
 import { GRID } from '../../config.js';
 
-const MIN_BLOCK_SIZE = GRID.minBlockSize;
-
 function snapToBBD(value, bbd) {
   return Math.round(value / bbd) * bbd;
 }
 
 export function bspSplit(region, rng, streetWidth, bbd, leaves, strategy) {
+  const MIN_BLOCK_SIZE = GRID.minBlockSize; // read per call so profiles can override it
   const canSplitX = region.w > MIN_BLOCK_SIZE * 2 + streetWidth;
   const canSplitZ = region.d > MIN_BLOCK_SIZE * 2 + streetWidth;
 

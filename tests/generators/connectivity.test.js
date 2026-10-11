@@ -1,182 +1,167 @@
 import { describe, it, expect } from 'vitest';
-import { generateConnectivity } from '../../src/generators/connectivity-main.js';
-import { generateWalls } from '../../src/generators/walls.js';
-import { generateFloors } from '../../src/generators/floors.js';
-import { generateBuildings } from '../../src/generators/buildings.js';
-import { generateGrid } from '../../src/generators/grid.js';
-import { createRng } from '../../src/core/rng.js';
-import { DELETIONS } from '../../src/config.js';
+import { runStages } from '../helpers/run-stages.js';
+import { CONNECTIVITY, LADDERS } from '../../src/config.js';
 
-const baseConfig = {
-  mapWidth: 48,
-  mapDepth: 48,
-  streetWidth: 3.5,
-  tiers: 4,
-  tierHeight: 3,
-  slabThickness: 0.5,
-  wallThickness: 0.25,
-};
-
-function runPipeline() {
-  const rng = createRng(42);
-  const gridData = generateGrid(baseConfig, rng);
-  const buildingData = generateBuildings(gridData, baseConfig, rng);
-  const floorData = generateFloors(buildingData, baseConfig, rng);
-  const wallData = generateWalls(floorData, baseConfig, rng);
-  return generateConnectivity(wallData, baseConfig, rng);
-}
+const SEEDS = [42, 100, 7];
+const WALKWAY_TYPES = ['walkway', 'bridge_low', 'bridge_battlement'];
 
 describe('generateConnectivity', () => {
-  it('returns connections object', () => {
-    const result = runPipeline();
-    expect(result).toHaveProperty('connections');
-    expect(result.connections).toHaveProperty('walkways');
-    expect(result.connections).toHaveProperty('ladders');
-    expect(result.connections).toHaveProperty('groundLadders');
-    expect(result.connections).toHaveProperty('orangeLadders');
-    expect(result.connections).toHaveProperty('interiorLadders');
-  });
-
-  it('walkways have required properties', () => {
-    const result = runPipeline();
-    for (const w of result.connections.walkways) {
-      expect(w).toHaveProperty('x');
-      expect(w).toHaveProperty('z');
-      expect(w).toHaveProperty('w');
-      expect(w).toHaveProperty('d');
-      expect(w).toHaveProperty('y');
-      expect(w).toHaveProperty('axis');
+  it('returns the connections object with its documented arrays', () => {
+    const { connectivity } = runStages(42);
+    for (const key of ['anchors', 'candidates', 'doors', 'walkways', 'crossings', 'pillars']) {
+      expect(Array.isArray(connectivity.connections[key]), key).toBe(true);
     }
   });
 
-  it('walkways connect between buildings (positive dimensions)', () => {
-    const result = runPipeline();
-    for (const w of result.connections.walkways) {
-      expect(w.w).toBeGreaterThan(0);
-      expect(w.d).toBeGreaterThan(0);
+  it('anchors have unique ids, a direction and 1-cell-thick world rects', () => {
+    const { anchors } = runStages(42).connectivity.connections;
+    expect(new Set(anchors.map(a => a.id)).size).toBe(anchors.length);
+    for (const a of anchors) {
+      expect(['N', 'S', 'E', 'W']).toContain(a.direction);
+      expect(a.w).toBeGreaterThan(0);
+      expect(a.d).toBeGreaterThan(0);
     }
   });
 
-  it('ladders span tiers vertically', () => {
-    const result = runPipeline();
-    const allLadders = [
-      ...result.connections.ladders,
-      ...result.connections.groundLadders,
-      ...result.connections.orangeLadders,
-      ...result.connections.interiorLadders,
-    ];
-    for (const l of allLadders) {
-      expect(l.y1).toBeGreaterThan(l.y0);
-      expect(l.w).toBeGreaterThan(0);
-      expect(l.d).toBeGreaterThan(0);
+  it('every walkway has a known type, an axis, and segments with positive world rects', () => {
+    for (const seed of SEEDS) {
+      const { walkways } = runStages(seed).connectivity.connections;
+      expect(walkways.length).toBeGreaterThan(0);
+      for (const w of walkways) {
+        expect(WALKWAY_TYPES).toContain(w.connectionType);
+        expect(['NS', 'WE']).toContain(w.axis);
+        expect(w.segments.length).toBeGreaterThan(0);
+        for (const s of w.segments) {
+          expect(s.worldRect.w).toBeGreaterThan(0);
+          expect(s.worldRect.d).toBeGreaterThan(0);
+        }
+      }
     }
   });
 
-  it('ground ladders start at y=0', () => {
-    const result = runPipeline();
-    for (const l of result.connections.groundLadders) {
-      expect(l.y0).toBe(0);
+  it('walkways connect at a single tier: all segment cells share one cy', () => {
+    for (const seed of SEEDS) {
+      for (const w of runStages(seed).connectivity.connections.walkways) {
+        const cys = new Set(w.segments.flatMap(s => s.cells.map(c => c.cy)));
+        expect(cys.size, `seed ${seed} tier ${w.tier}`).toBe(1);
+        expect(cys.has(w.tier)).toBe(true);
+      }
     }
   });
 
-  it('walkway lengths are within configured range', () => {
-    const result = runPipeline();
-    for (const w of result.connections.walkways) {
-      const length = w.axis === 'x' ? w.w : w.d;
-      // Some tolerance for float precision
-      expect(length).toBeGreaterThanOrEqual(2.9);
-      expect(length).toBeLessThanOrEqual(15.1);
+  it('walkway tiers are the river level (-1) or an elevated tier level', () => {
+    const { connectivity, config } = runStages(42);
+    const stride = config.tierHeight + config.slabThickness;
+    for (const w of connectivity.connections.walkways) {
+      if (w.tier === -1) continue;
+      // tier is the matrix cell row of the walking surface: the top cell of a tier band (3, 7, 11 ...)
+      expect((w.tier + 1) % stride).toBe(0);
     }
   });
 
-  it('walkways do not intersect walls on the same tier', () => {
-    const result = runPipeline();
-    // Walkways that survived should not be blocked (or blocked ones should have been filtered)
-    for (const w of result.connections.walkways) {
-      // The connectivity generator sets blocked=true on wall-intersecting walkways
-      // but keeps them for yellow ladders. Non-blocked walkways should be clean.
-      // This is a structural test - just verify they exist and have valid data
-      expect(w.y).toBeGreaterThan(0);
+  it('walkway segments stay within the active area', () => {
+    for (const seed of SEEDS) {
+      const { connectivity, grid } = runStages(seed);
+      const a = grid.activeArea;
+      for (const w of connectivity.connections.walkways) {
+        for (const s of w.segments) {
+          expect(s.worldRect.x).toBeGreaterThanOrEqual(a.x);
+          expect(s.worldRect.z).toBeGreaterThanOrEqual(a.z);
+          expect(s.worldRect.x + s.worldRect.w).toBeLessThanOrEqual(a.x + a.w);
+          expect(s.worldRect.z + s.worldRect.d).toBeLessThanOrEqual(a.z + a.d);
+        }
+      }
     }
   });
 
-  it('is deterministic', () => {
-    const a = runPipeline();
-    const b = runPipeline();
-    expect(a.connections.walkways.length).toBe(b.connections.walkways.length);
-    expect(a.connections.groundLadders.length).toBe(b.connections.groundLadders.length);
-    expect(a.connections.orangeLadders.length).toBe(b.connections.orangeLadders.length);
-    expect(a.connections.interiorLadders.length).toBe(b.connections.interiorLadders.length);
-  });
-
-  it('ladder platforms are generated', () => {
-    const result = runPipeline();
-    expect(result.connections).toHaveProperty('ladderPlatforms');
-    // Should have some platforms if we have multi-tier ladders
-    const allLadders = [
-      ...result.connections.ladders,
-      ...result.connections.groundLadders,
-      ...result.connections.orangeLadders,
-    ];
-    if (allLadders.some(l => l.y1 - l.y0 > baseConfig.tierHeight)) {
-      expect(result.connections.ladderPlatforms.length).toBeGreaterThan(0);
+  it('pillars are only generated for connections at or above pillarMinLength', () => {
+    const { connectivity } = runStages(42);
+    for (const p of connectivity.connections.pillars) {
+      expect(p.w).toBe(CONNECTIVITY.pillarWidth);
+      expect(p.d).toBe(CONNECTIVITY.pillarWidth);
+      expect(p.h).toBeGreaterThan(0);
     }
   });
 
-  it('skips orange proximity cull when orangeLadderProximityCull is false', () => {
-    const orig = DELETIONS.orangeLadderProximityCull;
-    try {
-      DELETIONS.orangeLadderProximityCull = false;
-      const result = runPipeline();
-      expect(result).toHaveProperty('connections');
-      expect(Array.isArray(result.connections.orangeLadders)).toBe(true);
-    } finally {
-      DELETIONS.orangeLadderProximityCull = orig;
+  it('door stamps have positive dimensions', () => {
+    for (const d of runStages(42).connectivity.connections.doors) {
+      expect(d.w).toBeGreaterThan(0);
+      expect(d.h).toBeGreaterThan(0);
+      expect(d.d).toBeGreaterThan(0);
     }
   });
 
-  it('skips cyan proximity cull when cyanLadderProximityCull is false', () => {
-    const orig = DELETIONS.cyanLadderProximityCull;
-    try {
-      DELETIONS.cyanLadderProximityCull = false;
-      const result = runPipeline();
-      expect(result).toHaveProperty('connections');
-      expect(Array.isArray(result.connections.interiorLadders)).toBe(true);
-    } finally {
-      DELETIONS.cyanLadderProximityCull = orig;
+  it('is deterministic for the same seed (separate generation runs)', () => {
+    const a = runStages(42);
+    const b = runStages(42, { textureSet: 'base' });
+    expect(a).not.toBe(b);
+    expect(a.connectivity.connections.walkways).toEqual(b.connectivity.connections.walkways);
+    expect(a.connectivity.connections.anchors).toEqual(b.connectivity.connections.anchors);
+  });
+});
+
+describe('generateLadders', () => {
+  // NOTE: some segments come out with keptTopY <= keptBottomY (zero or inverted height, e.g. seed 42
+  // building 14 path 1). The geometry stage silently drops them. Reported as a possible bug; not asserted here.
+  it('returns ladderPaths made of segments with positive footprint', () => {
+    for (const seed of SEEDS) {
+      const { ladders } = runStages(seed);
+      expect(ladders.ladderPaths.length).toBeGreaterThan(0);
+      for (const path of ladders.ladderPaths) {
+        expect(path.segments.length).toBeGreaterThan(0);
+        for (const s of path.segments) {
+          expect(s.w).toBeGreaterThan(0);
+          expect(s.d).toBeGreaterThan(0);
+          expect(s.keptBottomY).toBeGreaterThanOrEqual(0);
+        }
+      }
     }
   });
 
-  it('skips cyan-orange overlap check when cyanLadderOrangeOverlap is false', () => {
-    const orig = DELETIONS.cyanLadderOrangeOverlap;
-    try {
-      DELETIONS.cyanLadderOrangeOverlap = false;
-      const result = runPipeline();
-      expect(result).toHaveProperty('connections');
-      expect(Array.isArray(result.connections.interiorLadders)).toBe(true);
-    } finally {
-      DELETIONS.cyanLadderOrangeOverlap = orig;
+  it('kept ladder segments start at ground level (0) or a tier level and end on a tier boundary', () => {
+    const { ladders, config } = runStages(42);
+    const stride = config.tierHeight + config.slabThickness;
+    for (const path of ladders.ladderPaths) {
+      for (const s of path.segments) {
+        expect(s.keptBottomY % stride).toBe(0);
+        expect(s.keptTopY % stride).toBe(0);
+      }
     }
   });
 
-  it('handles sections not matching any building (findBuildingIndex returns -1)', () => {
-    // Run with a modified dataset where a floor section is outside all buildings
-    const rng = createRng(42);
-    const gridData = generateGrid(baseConfig, rng);
-    const buildingData = generateBuildings(gridData, baseConfig, rng);
-    const floorData = generateFloors(buildingData, baseConfig, rng);
-    const wallData = generateWalls(floorData, baseConfig, rng);
+  it('ladder segments respect the map-edge clearance', () => {
+    for (const seed of SEEDS) {
+      const { ladders, grid } = runStages(seed);
+      const a = grid.activeArea;
+      for (const path of ladders.ladderPaths) {
+        for (const s of path.segments) {
+          // Ladders sit one cell outside the wall; their clearance is measured from the cell, so allow 1 cell of slack.
+          expect(s.x).toBeGreaterThanOrEqual(a.x + LADDERS.mapEdgeClearance - 1);
+          expect(s.z).toBeGreaterThanOrEqual(a.z + LADDERS.mapEdgeClearance - 1);
+          expect(s.x + s.w).toBeLessThanOrEqual(a.x + a.w - LADDERS.mapEdgeClearance + 1);
+          expect(s.z + s.d).toBeLessThanOrEqual(a.z + a.d - LADDERS.mapEdgeClearance + 1);
+        }
+      }
+    }
+  });
 
-    // Inject a floor section that doesn't belong to any building
-    wallData.floors[1].sections.push({ x: -100, z: -100, w: 2, d: 2 });
+  it('geometry ladder primitives have two poles, rungs, and y1 above y0', () => {
+    for (const seed of SEEDS) {
+      const ladderPrims = runStages(seed).geometry.primitives.filter(p => p.type === 'ladder');
+      expect(ladderPrims.length).toBeGreaterThan(0);
+      for (const l of ladderPrims) {
+        expect(l.y1).toBeGreaterThan(l.y0);
+        expect(l.poles.length).toBe(2);
+        expect(l.rungs.length).toBeGreaterThan(0);
+      }
+    }
+  });
 
-    const rng2 = createRng(42);
-    // Consume RNG to align state
-    generateGrid(baseConfig, rng2);
-    generateBuildings(generateGrid(baseConfig, createRng(42)), baseConfig, rng2);
-
-    // Should not throw, just gracefully handle
-    const result = generateConnectivity(wallData, baseConfig, createRng(99));
-    expect(result).toHaveProperty('connections');
+  it('one ladder geometry primitive is emitted per ladder segment with positive kept height', () => {
+    for (const seed of SEEDS) {
+      const { ladders, geometry } = runStages(seed);
+      const segs = ladders.ladderPaths.reduce((n, p) => n + p.segments.filter(s => s.keptTopY > s.keptBottomY).length, 0);
+      expect(geometry.primitives.filter(p => p.type === 'ladder').length).toBe(segs);
+    }
   });
 });

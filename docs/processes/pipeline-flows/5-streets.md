@@ -1,6 +1,6 @@
 # Stage 5: Streets, Rivers & Pavements
 
-> Last verified: 2026-04-23
+> Last verified: 2026-10-10
 
 ## Overview
 
@@ -28,14 +28,14 @@ matrix: CollisionMatrix
 
 ### River mode selection
 
-A weighted RNG roll picks the generation mode before any A\* runs:
+A weighted RNG roll picks the generation mode before any A\* runs. Weights live in `STREETS.riverWeights` in `src/config.js`:
 
 | Mode | Weight | Description |
 |---|---|---|
-| `none` | 80% | No rivers |
-| `one` | 10% | One A\* river path |
-| `two` | 7.5% | Two A\* river paths (unique source-mouth pairs) |
-| `all` | 2.5% | Every street corridor becomes a river |
+| `none` | 60% | No rivers |
+| `one` | 20% | One A\* river path |
+| `two` | 12.5% | Two A\* river paths (unique source-mouth pairs) |
+| `all` | 7.5% | Every street corridor becomes a river |
 
 `--all-rivers` CLI flag overrides the roll and forces `all` mode.
 

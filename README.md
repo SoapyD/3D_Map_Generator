@@ -25,6 +25,7 @@ Outputs:
 | `--debug` | Use flat debug colours instead of textures | off |
 | `--preview` | Start basic browser preview (model + grid toggle) on localhost:3010 | off |
 | `--visualize` | Start the full visualizer on localhost:3010 — layer/grid toggles, prior-step playback, debug overlays | off |
+| `--profile NAME` | Swap in a named config profile, e.g. `withering` (small 3-level test ground). See `docs/architecture/profiles.md` | none |
 | `--texture-set NAME` | Texture pack folder name in assets/textures/ | base |
 
 ## Examples
@@ -45,6 +46,8 @@ node src/index.js --seed 42 --visualize
 # Use custom texture pack
 node src/index.js --seed 42 --texture-set my_textures
 ```
+
+Run the `withering` profile through npm: `npm run generate -- --profile withering --seed 3` (also works with `npm run preview`). `npm run visualize` fixes the size at 48x48, which overrides a profile's size, so for the viewer use `node src/index.js --profile withering --seed 3 --visualize`.
 
 ## Importing into Tabletop Simulator
 

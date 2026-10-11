@@ -17,7 +17,9 @@ data: {
 }
 config: {
   anchorPeriod: number,            // P — grid counter period (default 4)
-  maxConnectionLength: number,     // cap on walkway span in cells
+  // (no maxConnectionLength is passed for ordinary connections: the cap is
+  //  floor(max(matrix.W, matrix.D) * CONNECTIVITY.maxLengthMapFraction) cells; 0.5 by default,
+  //  1 in the withering profile. River crossings use riverCrossingMaxLength.)
   filterStrategy: string,          // 'longestAndShortest' | 'longest' | 'shortest' | 'random'
   filterN: number,                 // quota per building per tier
   bridgeMinLength: number,         // min length (cells) eligible for bridge type (default 6)

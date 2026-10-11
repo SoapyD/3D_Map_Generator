@@ -2,6 +2,8 @@
  * Centralised configuration — all tuneable parameters in one place.
  */
 
+import { profileDefaults } from './profiles/profile-defaults.js';
+
 // --- Global grid ---
 export const GLOBAL_GRID = {
   bbd: 4,         // Base Building Dimension in inches (2x2 footprint + 1 skirt each side)
@@ -11,7 +13,7 @@ export const GLOBAL_GRID = {
 
 // --- CLI defaults ---
 export const DEFAULTS = {
-  seed: Math.floor(Math.random() * 100000),
+  seed: Date.now() % 100000, // time-derived when --seed is omitted; keeps Math.random() out of the codebase
   mapWidth: 48,       // inches
   mapDepth: 48,       // inches
   tiers: 4,           // number of elevated tiers (+ base tier 0)
@@ -24,14 +26,17 @@ export const DEFAULTS = {
   filterStrategy: 'longestAndShortest', // one of: longestAndShortest, longest, shortest, random
   filterN: 2,             // max connections kept per building per tier (each end for longestAndShortest)
   textureSet: 'base',
-  flatLadders: true,
+  flatLadders: true,  // true = flat front-facing quads, false = 3D boxes (single source of truth)
   preview: false,
   visualize: false,
   debug: false,
+  debugConnectivity: false, // --debug-connectivity: write connectivity debug JSON
+  debugMatrix: false,       // --debug-matrix: serialise collision-matrix write history
   obj: false,
   splitTiers: false,  // also emit one OBJ + collider per tier + a manifest (TTS elevator/reveal)
   outputDir: 'output',
   allRivers: false,   // treat every street corridor as a river
+  profile: null,      // --profile NAME: swap in a named config profile (see src/profiles/)
 };
 
 // --- Buildings --- (_old_system only)
@@ -43,7 +48,7 @@ export const WALL = {
   applySegmentCull: true,   // cull walls to at most 2 sides per building per floor
   applyWindows: true,        // cut window openings in wall segments
   applyBlobDamage: true,     // apply random blob damage to wall segments
-  applyDoorCuts: true,       // skip cells marked CELL.DOOR during wall matrix writes              // outer face flush with cell edge, body extends inward
+  applyDoorCuts: true,       // skip cells marked CELL.DOOR during wall matrix writes
   quadSize: 1.5,                    // inches per damage column (Phase 2)
   externalRow2RemovalRatio: 0.4,    // Phase 2: max fraction of row 2 (top) removed on exterior walls
   externalRow2RemovalMin: 0.2,      // Phase 2: min fraction of row 2 removed on exterior walls
@@ -71,6 +76,9 @@ export const FLOOR = {
 export const CONNECTIVITY = {
   bridgeMinLength:     6,  // min connection length (cells) eligible to become a bridge
   bridgeLongThreshold: 12, // connections this length or longer use long-bridge chances
+  // Max connection length as a fraction of the map's longer side (0.5 = half, 1 = the full map).
+  // Applies to ordinary connections; river crossings use riverCrossingMaxLength.
+  maxLengthMapFraction: 0.5,
   pillarMinLength:   8,    // min connection length (cells) to receive support pillars
   pillarSpacing:     6,    // cells between pillar pairs along travel axis
   pillarEdgeInset:   1,    // cells inset from each end before placing first pair
@@ -99,14 +107,52 @@ export const CONNECTIVITY = {
 // --- Streets / Rivers ---
 export const STREETS = {
   riverDepth: 3,   // cells below Y=0 occupied by river volume (must be <= BELOW_GROUND)
+  // Weighted river mode selection — probabilities must sum to 1.
+  // Override with --all-rivers flag to force all-rivers mode.
+  riverWeights: [
+    { mode: 'none', p: 0.600 },
+    { mode: 'one',  p: 0.200 },
+    { mode: 'two',  p: 0.125 },
+    { mode: 'all',  p: 0.075 },
+  ],
 };
 
 // --- Cover --- (_old_system only)
 // export const COVER = { ... };  // see _old_system/config.js
 
+// --- Buildings (treemap placement) ---
+export const BUILDINGS = {
+  largeChance:            0.4, // chance per block to attempt each of largeA and largeB
+  mediumChance:           0.5, // chance per medium attempt
+  mediumCellDivisor:      4,   // medium attempts per block = floor(bbdW * bbdD / this)
+  ruinsHorizontalChance:  0.5, // ruins-medium: chance of trying -h before -v
+  centerOutPatternChance: 0.5, // chance a block uses the centre-out spawn pattern (else top-left)
+  // 'fill' packs every block with as many buildings as fit; 'single' places exactly one per block.
+  mode: 'fill',
+  singleSizes: ['small', 'medium', 'largeA', 'largeB'], // 'single' mode: sizes tried until one fits
+  // 'single' mode try-order: 'random' shuffles singleSizes; 'largestFirst' tries the biggest footprint first
+  // (ties broken randomly), so a small ruin is only used where nothing bigger fits.
+  singleOrder: 'random',
+  // Blocks left without any building. Count is rng.int(min, max), capped so at least one block is built.
+  // { min: 0, max: 0 } disables this (and consumes no RNG, so default maps are unchanged).
+  emptyBlocks: { min: 0, max: 0 },
+};
+
+// --- Cover ---
+export const COVER = {
+  // Chance that each group of that kind receives cover at all (1 = always, 0 = none).
+  // At 1 no RNG is consumed, so default maps are unchanged.
+  shellChance:  1, // interior floors of buildings
+  roofChance:   1, // rooftops
+  streetChance: 1, // street corridors
+};
+
 // --- Grid ---
 export const GRID = {
   minBlockSize: 8,         // minimum block dimension in inches (2 × BBD)
+  // Block layout strategy: 'random' picks one per map (50/50); 'centerFirst' always puts a block at the
+  // centre and splits around it (reliably 4+ blocks even on small maps); 'bspTopLeft' splits from a corner.
+  strategy: 'random',
 };
 
 // --- Geometry ---
@@ -125,7 +171,6 @@ export const GEOMETRY = {
   ladderRungDepth: 0.18,
   ladderRungSpacing: 0.75,
   ladderRungInset: 0.05,
-  flatLadders: true,        // true = flat front-facing quads, false = 3D boxes
   // Courtyard slab
   courtyardY: 0.55,          // Y position of courtyard slab
   courtyardThickness: 0.1,   // thickness of courtyard slab
@@ -161,6 +206,15 @@ export const LADDERS = {
   pathSpacing:          6,    // min world distance between ladders from different paths
   maxSideCount:         2,    // max ladders per facing direction per building
   fullHeightCullChance: 0.30, // chance to randomly trim a full-height ladder
+  thickness:            0.25, // ladder strip thickness (inches), flush against the wall face
+  pathMinSpacing:       3,    // min distance between ladders of extra paths on one building
+  ruinsSmallChance:     0.4,  // chance a ruins-small building gets any ladders at all
+  // Max ladder paths per building size (default 1 for unlisted sizes)
+  pathQuota: {
+    'ruins-small': 1, small: 1,
+    medium: 2, 'ruins-medium-h': 2, 'ruins-medium-v': 2,
+    largeA: 3, largeB: 3,
+  },
 };
 
 // --- Deletion Toggles --- (_old_system only)
@@ -168,7 +222,10 @@ export const LADDERS = {
 
 // --- CLI parser ---
 export function parseArgs(argv) {
-  const config = { ...DEFAULTS };
+  // --profile is read first so its defaults form the base; explicit flags below still win.
+  const profileIdx = argv.indexOf('--profile');
+  const profileName = profileIdx >= 0 ? argv[profileIdx + 1] : null;
+  const config = { ...DEFAULTS, ...profileDefaults(profileName) };
 
   for (let i = 2; i < argv.length; i++) {
     const arg = argv[i];

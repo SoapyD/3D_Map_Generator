@@ -48,7 +48,6 @@ Procedural generator for ruined city maps optimized for Mordheim gameplay. Outpu
 ### Config
 - All tuneable values live in `src/config.js`
 - No magic numbers in logic — extract to config
-- Deletion toggles in `DELETIONS` section for debugging
 - `--debug` flag uses flat colours instead of textures
 
 ### Code Quality
@@ -75,18 +74,14 @@ Procedural generator for ruined city maps optimized for Mordheim gameplay. Outpu
 - **Always check `.claude/agents/` for an applicable agent before starting a task.** If one exists, use it. If none fits, do the work directly.
 - **If the user repeats a process that doesn't have an agent, suggest creating one.** Ask the user if they'd like an agent built for it — don't just create one silently.
 - **Use the agent-builder agent** to create new agents, ensuring they follow project conventions and don't duplicate existing ones.
-- Available agents: `code-auditor`, `release-validator`, `status-tracker`, `task-runner`, `test-builder`, `agent-builder`
+- Available agents: `code-auditor`, `release-validator`, `status-tracker`, `task-runner`, `test-builder`, `agent-builder`, `pr-shipper`
 
 ## Reference Documents
 
-- `docs/GENERATION_PIPELINE.md` — detailed pipeline docs
+- `docs/architecture/docs_and_config_guide.md` — what each doc and each `src/config.js` section is for (start here)
+- `docs/GENERATION_PIPELINE.md` — stage order and links to the per-stage flow docs
+- `docs/processes/pipeline-flows/` — one flow doc per stage (1-grid … 11-scene-and-export)
 - `docs/PROJECT_OVERVIEW.md` — problem statement, design principles
-- `docs/BUILDING_REFERENCE.md` — all building types, shapes, config keys, and diagrams
-- `docs/plans/VERTEX_LIMIT_PLAN.md` — vertex budget strategy
-- `docs/plans/PACKAGE_INTEGRATION_PLAN.md` — wyrdwars integration plan
-- `docs/plans/BUILDING_ADDITIONS_PLAN.md` — towers, bridges, shapes, interior walls, preview tool
-- `docs/plans/WATERWAYS_PLAN.md` — canal waterways with edge variants and bridges
-- `docs/plans/archive/WALKWAY_IMPROVEMENTS_PLAN.md` — completed walkway/bridge improvements (gap detection, branching, pillars)
-- `docs/plans/FUTURE_FEATURES.md` — feature roadmap
-- `docs/plans/archive/VERTEX_OPTIMISATION_PLAN.md` — completed vertex optimisation
-- `docs/plans/archive/BUILDING_ADDITIONS_PLAN.md` — completed building additions
+- `docs/BUILDING_REFERENCE.md` — building size classes and placement
+- `docs/issues.md` — known open issues
+- `docs/plans/` — active plans; completed plans are in `docs/plans/archive/` (e.g. `VERTEX_LIMIT_PLAN_2026_03_30.md`, `VERTEX_OPTIMISATION_PLAN_2026_03_29.md`, `WATERWAYS_PLAN_2026_03_30.md`, `WALKWAY_IMPROVEMENTS_PLAN_2026_03_30.md`, `BUILDING_ADDITIONS_PLAN_2026_03_30.md`, `PACKAGE_INTEGRATION_PLAN_2026_03_28.md`, `FUTURE_FEATURES_2026_03_30.md`)

@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { rectsOverlap, getWallBounds, rectCollidesWithWall, getQuadrantRect } from '../../src/core/spatial.js';
+import { rectsOverlap } from '../../src/core/rects-overlap.js';
+import { getWallBounds } from '../../src/core/get-wall-bounds.js';
+import { rectCollidesWithWall } from '../../src/core/rect-collides-with-wall.js';
+import { getQuadrantRect } from '../../src/core/get-quadrant-rect.js';
 
 describe('rectsOverlap', () => {
   it('returns true for overlapping rects', () => {

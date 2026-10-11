@@ -1,4 +1,4 @@
-import { GEOMETRY } from '../../config.js';
+import { GEOMETRY, DEFAULTS } from '../../config.js';
 import { addVerticalQuad } from './add-vertical-quad.js';
 import { addLadderBox } from './add-ladder-box.js';
 
@@ -12,7 +12,7 @@ const RUNG_INSET = GEOMETRY.ladderRungInset;
 /**
  * Emit OBJ ladder from primitive placement data.
  */
-export function emitLadder(state, prim, uv, flat = GEOMETRY.flatLadders) {
+export function emitLadder(state, prim, uv, flat = DEFAULTS.flatLadders) {
   const height = prim.y1 - prim.y0;
   if (height <= 0) return;
 

@@ -1,6 +1,7 @@
 # Known Issues
 
-## Ground ladder inside diagonal building
-- **Seed:** 42, **Size:** 48x48 (`node src/index.js --seed 42 --size 48x48 --debug`)
-- **Object:** `ground_ladder_4` (red/external ladder)
-- **Problem:** The ladder and its associated platforms are being generated inside a diagonal building rather than on the outside wall. Needs investigation into how ground ladder placement interacts with diagonal building geometry.
+No open issues.
+
+## Resolved
+
+- **Ground ladder inside diagonal building** (seed 42, 48x48, `ground_ladder_4`) — obsolete as of 2026-10-10. It came from the old connectivity system (`conn.groundLadders`) and the diagonal building shapes, both of which are no longer part of the live pipeline. Current ladders come from `generate-ladders.js` (`ladder_path_*` primitives) and seed 42 produces no `ground_ladder_*` objects.

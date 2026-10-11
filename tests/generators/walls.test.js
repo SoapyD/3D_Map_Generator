@@ -1,103 +1,98 @@
 import { describe, it, expect } from 'vitest';
-import { generateWalls } from '../../src/generators/walls.js';
-import { generateFloors } from '../../src/generators/floors.js';
-import { generateBuildings } from '../../src/generators/buildings.js';
-import { generateGrid } from '../../src/generators/grid.js';
-import { createRng } from '../../src/core/rng.js';
+import { runStages } from '../helpers/run-stages.js';
+import { WALL } from '../../src/config.js';
 
-const baseConfig = {
-  mapWidth: 48,
-  mapDepth: 48,
-  streetWidth: 3.5,
-  tiers: 4,
-  tierHeight: 3,
-  slabThickness: 0.5,
-  wallThickness: 0.25,
-};
-
-function runPipeline() {
-  const rng = createRng(42);
-  const gridData = generateGrid(baseConfig, rng);
-  const buildingData = generateBuildings(gridData, baseConfig, rng);
-  const floorData = generateFloors(buildingData, baseConfig, rng);
-  return generateWalls(floorData, baseConfig, rng);
-}
+const SEEDS = [42, 100, 7];
+const EPS = 1e-6;
 
 describe('generateWalls', () => {
-  it('returns walls array', () => {
-    const result = runPipeline();
-    expect(Array.isArray(result.walls)).toBe(true);
-    expect(result.walls.length).toBeGreaterThan(0);
+  it('returns walls and internalWalls arrays', () => {
+    const { walls } = runStages(42);
+    expect(walls.walls.length).toBeGreaterThan(0);
+    expect(Array.isArray(walls.internalWalls)).toBe(true);
   });
 
   it('all walls have required properties', () => {
-    const result = runPipeline();
-    for (const wall of result.walls) {
-      expect(wall).toHaveProperty('x');
-      expect(wall).toHaveProperty('z');
-      expect(wall).toHaveProperty('length');
-      expect(wall).toHaveProperty('height');
-      expect(wall).toHaveProperty('baseY');
-      expect(wall).toHaveProperty('thickness');
-      expect(wall).toHaveProperty('axis');
+    for (const w of runStages(42).walls.walls) {
+      for (const key of ['x', 'y', 'z', 'w', 'h', 'd', 'floorY']) {
+        expect(typeof w[key], `wall.${key}`).toBe('number');
+      }
+      expect(['N', 'S', 'E', 'W']).toContain(w.direction);
     }
   });
 
-  it('walls have valid axis values', () => {
-    const result = runPipeline();
-    for (const wall of result.walls) {
-      expect(['x', 'z']).toContain(wall.axis);
+  it('walls have positive dimensions and constant thickness', () => {
+    for (const seed of SEEDS) {
+      for (const w of [...runStages(seed).walls.walls, ...runStages(seed).walls.internalWalls]) {
+        expect(w.w).toBeGreaterThan(0);
+        expect(w.h).toBeGreaterThan(0);
+        expect(w.d).toBeGreaterThan(0);
+        expect(Math.min(w.w, w.d)).toBeCloseTo(WALL.wallThickness);
+      }
     }
   });
 
-  it('walls have positive dimensions', () => {
-    const result = runPipeline();
-    for (const wall of result.walls) {
-      expect(wall.length).toBeGreaterThan(0);
-      expect(wall.height).toBeGreaterThan(0);
-      expect(wall.thickness).toBeGreaterThan(0);
+  it('N/S walls run along X and E/W walls run along Z', () => {
+    for (const w of runStages(42).walls.walls) {
+      if (w.direction === 'N' || w.direction === 'S') expect(w.d).toBeCloseTo(WALL.wallThickness);
+      else expect(w.w).toBeCloseTo(WALL.wallThickness);
     }
   });
 
-  it('wall baseY aligns with tier heights', () => {
-    const result = runPipeline();
-    for (const wall of result.walls) {
-      // baseY should be tier * tierHeight + slabThickness
-      const expectedY = wall.baseY;
-      // Check it is a valid tier-based Y
-      const tier = Math.round((expectedY - baseConfig.slabThickness) / baseConfig.tierHeight);
-      const reconstructedY = tier * baseConfig.tierHeight + baseConfig.slabThickness;
-      // After damage, segments may have offset baseY within a wall
-      // But the base tier Y should be close to a tier boundary
-      const baseTierY = Math.floor(expectedY / (baseConfig.tierHeight / 2)) * (baseConfig.tierHeight / 2);
-      expect(wall.baseY).toBeGreaterThanOrEqual(0);
+  it('wall cells are 1 inch tall and stack within a building\'s tier band', () => {
+    const { walls, config } = runStages(42);
+    const stride = config.tierHeight + config.slabThickness;
+    for (const w of walls.walls) {
+      expect(w.h).toBe(1);
+      // Each wall row lies within the 3" room band above its floor slab.
+      const offset = w.y - (w.floorY + config.slabThickness);
+      expect(offset).toBeGreaterThanOrEqual(0);
+      expect(offset).toBeLessThan(config.tierHeight);
+      expect((w.floorY + config.slabThickness) % stride).toBe(0);
     }
   });
 
-  it('wall segments from damage have correct thickness', () => {
-    const result = runPipeline();
-    for (const wall of result.walls) {
-      expect(wall.thickness).toBeCloseTo(baseConfig.wallThickness);
+  it('walls sit on a building edge (within the building footprint plus wall thickness)', () => {
+    for (const seed of SEEDS) {
+      const { walls, buildings } = runStages(seed);
+      for (const w of walls.walls) {
+        const hit = buildings.buildings.some(b =>
+          w.x >= b.x - WALL.wallThickness - EPS && w.z >= b.z - WALL.wallThickness - EPS &&
+          w.x + w.w <= b.x + b.w + WALL.wallThickness + EPS && w.z + w.d <= b.z + b.d + WALL.wallThickness + EPS);
+        expect(hit, `seed ${seed} wall at ${w.x},${w.z}`).toBe(true);
+      }
     }
   });
 
-  it('walls are on building edges', () => {
-    const result = runPipeline();
-    // Walls should be near building boundaries
-    for (const wall of result.walls) {
-      const nearBuilding = result.buildings.some(b => {
-        const margin = 1;
-        return wall.x >= b.x - margin && wall.z >= b.z - margin &&
-               (wall.axis === 'x' ? wall.x + wall.length : wall.x + wall.thickness) <= b.x + b.w + margin &&
-               (wall.axis === 'z' ? wall.z + wall.length : wall.z + wall.thickness) <= b.z + b.d + margin;
-      });
-      expect(nearBuilding).toBe(true);
+  it('internal walls lie inside a building footprint', () => {
+    for (const seed of SEEDS) {
+      const { walls, buildings } = runStages(seed);
+      for (const w of walls.internalWalls) {
+        const hit = buildings.buildings.some(b =>
+          w.x >= b.x - EPS && w.z >= b.z - EPS && w.x + w.w <= b.x + b.w + EPS && w.z + w.d <= b.z + b.d + EPS);
+        expect(hit, `seed ${seed} internal wall at ${w.x},${w.z}`).toBe(true);
+      }
     }
   });
 
-  it('is deterministic', () => {
-    const a = runPipeline();
-    const b = runPipeline();
-    expect(a.walls.length).toBe(b.walls.length);
+  it('walls are not placed above a building\'s highest tier', () => {
+    const { walls, buildings, config } = runStages(42);
+    const stride = config.tierHeight + config.slabThickness;
+    const top = Math.max(...buildings.buildings.map(b => b.maxTier)) * stride;
+    for (const w of walls.walls) expect(w.y + w.h).toBeLessThanOrEqual(top);
+  });
+
+  it('is deterministic for the same seed (separate generation runs)', () => {
+    const a = runStages(42);
+    const b = runStages(42, { textureSet: 'base' });
+    expect(a).not.toBe(b);
+    expect(a.walls.walls).toEqual(b.walls.walls);
+    expect(a.walls.internalWalls).toEqual(b.walls.internalWalls);
+  });
+
+  it('seed 42 produces 485 wall segments and 9 internal walls', () => {
+    const { walls } = runStages(42);
+    expect(walls.walls.length).toBe(485);
+    expect(walls.internalWalls.length).toBe(9);
   });
 });

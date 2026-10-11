@@ -6,18 +6,9 @@ import { writeStreets } from './write-streets.js';
 import { writePavements } from './write-pavements.js';
 import { STREETS } from '../../config.js';
 
-// Weighted river mode selection — probabilities must sum to 1.
-// Override with --all-rivers flag to force all-rivers mode.
-const RIVER_WEIGHTS = [
-  { mode: 'none', p: 0.600 },
-  { mode: 'one',  p: 0.200 },
-  { mode: 'two',  p: 0.125 },
-  { mode: 'all',  p: 0.075 },
-];
-
 function pickRiverMode(rng) {
   let roll = rng.random(), cum = 0;
-  for (const { mode, p } of RIVER_WEIGHTS) {
+  for (const { mode, p } of STREETS.riverWeights) {
     cum += p;
     if (roll < cum) return mode;
   }

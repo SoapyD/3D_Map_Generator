@@ -18,7 +18,7 @@ Always do these, in order:
 3. `docs/PROJECT_OVERVIEW.md` — problem statement and design principles
 4. `docs/GENERATION_PIPELINE.md` — detailed pipeline documentation
 5. Scan `docs/processes/pipeline-flows/*.md` (NOT the `archive/` subfolder) — the per-stage flow docs (1-grid through 11-scene-and-export). Read the ones relevant to active work.
-6. Scan `docs/architecture/*.md` — `design_philosophy.md`, `collision_matrix.md`, `debug_tooling.md`, `glossary.md`. Read those relevant to the active work.
+6. Scan `docs/architecture/*.md` — `design_philosophy.md`, `collision_matrix.md`, `debug_tooling.md`, `glossary.md`. Read those relevant to the active work. Always read `docs/architecture/docs_and_config_guide.md` — it maps what each doc and each `src/config.js` section is for, and flags which docs are stale.
 7. All `.md` files in `docs/plans/` that are NOT inside `docs/plans/archive/` — these are the active plans and determine what the next plan should be. If `docs/plans/` contains only the `archive/` subfolder, note that there are no active plans.
 8. `docs/status/PROJECT_STATUS.md` if it exists — project-level feature and vertex-budget status.
 
