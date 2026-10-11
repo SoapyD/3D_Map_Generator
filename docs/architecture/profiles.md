@@ -14,6 +14,23 @@ A **profile** is a named, swappable set of config overrides. It lets one codebas
 
 No profile = exactly the original behaviour. An unknown name fails with the list of valid names.
 
+### Running a profile through npm scripts
+
+`npm run generate` and `npm run preview` forward extra arguments to the CLI, so `--profile` works with them:
+
+```
+npm run generate -- --profile withering --seed 3
+npm run preview -- --profile withering --seed 3
+```
+
+`npm run visualize` hard-codes `--seed 42 --size 48x48`. Explicit flags win over profile defaults, so that script overrides the profile's map size. To view a profile, run the CLI directly:
+
+```
+node src/index.js --profile withering --seed 3 --visualize
+```
+
+There are no per-profile npm scripts yet.
+
 ## How it works
 
 - A profile (`src/profiles/<name>.js`) has two parts:

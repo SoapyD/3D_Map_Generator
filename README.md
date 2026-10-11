@@ -47,6 +47,8 @@ node src/index.js --seed 42 --visualize
 node src/index.js --seed 42 --texture-set my_textures
 ```
 
+Run the `withering` profile through npm: `npm run generate -- --profile withering --seed 3` (also works with `npm run preview`). `npm run visualize` fixes the size at 48x48, which overrides a profile's size, so for the viewer use `node src/index.js --profile withering --seed 3 --visualize`.
+
 ## Importing into Tabletop Simulator
 
 1. Upload the `.obj` and `.png` files somewhere accessible via URL (Steam Cloud, Imgur, etc.)
