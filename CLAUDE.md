@@ -74,7 +74,7 @@ Procedural generator for ruined city maps optimized for Mordheim gameplay. Outpu
 - **Always check `.claude/agents/` for an applicable agent before starting a task.** If one exists, use it. If none fits, do the work directly.
 - **If the user repeats a process that doesn't have an agent, suggest creating one.** Ask the user if they'd like an agent built for it — don't just create one silently.
 - **Use the agent-builder agent** to create new agents, ensuring they follow project conventions and don't duplicate existing ones.
-- Available agents: `code-auditor`, `release-validator`, `status-tracker`, `task-runner`, `test-builder`, `agent-builder`
+- Available agents: `code-auditor`, `release-validator`, `status-tracker`, `task-runner`, `test-builder`, `agent-builder`, `pr-shipper`
 
 ## Reference Documents
 
