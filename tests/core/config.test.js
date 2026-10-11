@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseArgs, BUILDING, WALL, FLOOR, CONNECTIVITY, COVER, GEOMETRY, LADDER_DISPLAY, DELETIONS } from '../../src/config.js';
+import { parseArgs, DEFAULTS, GLOBAL_GRID, WALL, FLOOR, CONNECTIVITY, STREETS, GRID, GEOMETRY, LADDERS } from '../../src/config.js';
 
 describe('parseArgs', () => {
   it('returns default config with no args', () => {
@@ -8,8 +8,9 @@ describe('parseArgs', () => {
     expect(config.mapDepth).toBe(48);
     expect(config.tiers).toBe(4);
     expect(config.tierHeight).toBe(3);
-    expect(config.slabThickness).toBe(0.5);
-    expect(config.wallThickness).toBe(0.25);
+    expect(config.slabThickness).toBe(1);
+    expect(config.damageLevel).toBe(0.5);
+    expect(config.streetWidth).toBe(GLOBAL_GRID.streetWidth);
     expect(config.preview).toBe(false);
     expect(config.debug).toBe(false);
     expect(config.obj).toBe(false);
@@ -92,27 +93,56 @@ describe('parseArgs', () => {
 });
 
 describe('exported config constants', () => {
-  it('BUILDING has valid footprint ranges', () => {
-    expect(BUILDING.footprints.small.min).toBeLessThan(BUILDING.footprints.small.max);
-    expect(BUILDING.footprints.medium.min).toBeLessThan(BUILDING.footprints.medium.max);
-    expect(BUILDING.footprints.large.min).toBeLessThan(BUILDING.footprints.large.max);
+  it('DEFAULTS.seed is a finite integer (time-derived)', () => {
+    expect(Number.isInteger(DEFAULTS.seed)).toBe(true);
   });
 
-  it('WALL has valid ratios', () => {
-    expect(WALL.upperRemovalRatio).toBeGreaterThan(0);
-    expect(WALL.upperRemovalRatio).toBeLessThanOrEqual(1);
-    expect(WALL.lowerRemovalRatio).toBeGreaterThan(0);
-    expect(WALL.lowerRemovalRatio).toBeLessThanOrEqual(1);
+  it('GLOBAL_GRID street width is exactly one BBD', () => {
+    expect(GLOBAL_GRID.streetWidth).toBe(GLOBAL_GRID.bbd);
   });
 
-  it('COVER types have chances summing to 1', () => {
-    const total = COVER.types.reduce((s, t) => s + t.chance, 0);
+  it('GRID minBlockSize is two BBD', () => {
+    expect(GRID.minBlockSize).toBe(2 * GLOBAL_GRID.bbd);
+  });
+
+  it('WALL removal ratios are within (0, 1] and min <= max', () => {
+    for (const row of [0, 1, 2]) {
+      const max = WALL[`externalRow${row}RemovalRatio`];
+      const min = WALL[`externalRow${row}RemovalMin`];
+      expect(max).toBeGreaterThan(0);
+      expect(max).toBeLessThanOrEqual(1);
+      expect(min).toBeGreaterThanOrEqual(0);
+      expect(min).toBeLessThanOrEqual(max);
+    }
+    expect(WALL.blobMin).toBeLessThanOrEqual(WALL.blobMax);
+  });
+
+  it('FLOOR escalation chances are probabilities', () => {
+    for (const key of ['tier1EscalateChance', 'tier2EscalateChance', 'tier3EscalateChance']) {
+      expect(FLOOR[key]).toBeGreaterThan(0);
+      expect(FLOOR[key]).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('CONNECTIVITY bridge variant chances each sum to 100', () => {
+    const sum = (o) => Object.values(o).reduce((a, b) => a + b, 0);
+    expect(sum(CONNECTIVITY.bridgeVariants)).toBe(100);
+    expect(sum(CONNECTIVITY.bridgeVariantsLong)).toBe(100);
+  });
+
+  it('STREETS riverWeights sum to 1', () => {
+    const total = STREETS.riverWeights.reduce((s, r) => s + r.p, 0);
     expect(total).toBeCloseTo(1);
   });
 
-  it('DELETIONS has boolean values', () => {
-    for (const [key, value] of Object.entries(DELETIONS)) {
-      expect(typeof value).toBe('boolean');
+  it('LADDERS fullHeightCullChance is a probability', () => {
+    expect(LADDERS.fullHeightCullChance).toBeGreaterThanOrEqual(0);
+    expect(LADDERS.fullHeightCullChance).toBeLessThanOrEqual(1);
+  });
+
+  it('GEOMETRY thicknesses are positive', () => {
+    for (const key of ['walkwayThickness', 'riverThickness', 'streetThickness', 'pavementThickness']) {
+      expect(GEOMETRY[key]).toBeGreaterThan(0);
     }
   });
 });

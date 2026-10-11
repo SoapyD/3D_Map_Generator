@@ -23,6 +23,7 @@ import { generateLadders } from './generators/ladders/index.js';
 import { generateWalls } from './generators/walls/index.js';
 import { generateCover } from './generators/cover/index.js';
 import { buildGeometry } from './generators/geometry/index.js';
+import { applyProfile } from './profiles/apply-profile.js';
 
 /**
  * Run the full procedural pipeline for an already-resolved config.
@@ -34,7 +35,16 @@ import { buildGeometry } from './generators/geometry/index.js';
  * @param {boolean} [opts.log]          - print per-stage banners (CLI only)
  * @returns {{ geometry: object, matrix: object }}
  */
-export function runPipeline(config, rng, { recorder = null, log = false } = {}) {
+export function runPipeline(config, rng, options = {}) {
+  const restoreProfile = applyProfile(config);
+  try {
+    return runStages(config, rng, options);
+  } finally {
+    restoreProfile();
+  }
+}
+
+function runStages(config, rng, { recorder = null, log = false } = {}) {
   const say = log ? (m) => console.log(m) : () => {};
 
   // Stage 1: Grid partitioning

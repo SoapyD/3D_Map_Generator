@@ -1,165 +1,92 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { generateBuildings } from '../../src/generators/buildings.js';
-import { generateGrid } from '../../src/generators/grid.js';
-import { createRng } from '../../src/core/rng.js';
-import { BUILDING, DELETIONS } from '../../src/config.js';
+import { describe, it, expect } from 'vitest';
+import { runStages } from '../helpers/run-stages.js';
+import { BUILDING_SIZES } from '../../src/generators/buildings/building-sizes.js';
+import { rectsOverlap } from '../../src/core/rects-overlap.js';
 
-const baseConfig = {
-  mapWidth: 48,
-  mapDepth: 48,
-  streetWidth: 3.5,
-  tiers: 4,
-};
-
-function makeGridData() {
-  return generateGrid(baseConfig, createRng(42));
-}
+const SEEDS = [42, 100, 7];
 
 describe('generateBuildings', () => {
-  it('returns buildings array', () => {
-    const rng = createRng(42);
-    const gridData = makeGridData();
-    // Need fresh RNG after grid
-    const rng2 = createRng(42);
-    generateGrid(baseConfig, rng2); // consume same RNG state
-    const result = generateBuildings(gridData, baseConfig, rng2);
-    expect(Array.isArray(result.buildings)).toBe(true);
-    expect(result.buildings.length).toBeGreaterThan(0);
+  it('returns a buildings array and carries grid fields forward', () => {
+    const { buildings } = runStages(42);
+    expect(buildings.buildings.length).toBeGreaterThan(0);
+    expect(buildings.blocks).toBeDefined();
+    expect(buildings.activeArea).toBeDefined();
   });
 
-  it('all buildings have required properties', () => {
-    const rng = createRng(42);
-    const gridData = generateGrid(baseConfig, rng);
-    const result = generateBuildings(gridData, baseConfig, rng);
-    for (const b of result.buildings) {
-      expect(b).toHaveProperty('x');
-      expect(b).toHaveProperty('z');
-      expect(b).toHaveProperty('w');
-      expect(b).toHaveProperty('d');
-      expect(b).toHaveProperty('maxTier');
-      expect(b).toHaveProperty('size');
+  it('every building has required properties and positive dimensions', () => {
+    for (const seed of SEEDS) {
+      for (const b of runStages(seed).buildings.buildings) {
+        expect(b).toMatchObject({ x: expect.any(Number), z: expect.any(Number), size: expect.any(String), maxTier: expect.any(Number) });
+        expect(b.w).toBeGreaterThan(0);
+        expect(b.d).toBeGreaterThan(0);
+      }
     }
   });
 
-  it('buildings have valid sizes', () => {
-    const rng = createRng(42);
-    const gridData = generateGrid(baseConfig, rng);
-    const result = generateBuildings(gridData, baseConfig, rng);
-    const validSizes = ['small', 'medium', 'large', 'tower'];
-    for (const b of result.buildings) {
-      expect(validSizes).toContain(b.size);
+  it('building size names are known and footprints match BUILDING_SIZES', () => {
+    for (const seed of SEEDS) {
+      for (const b of runStages(seed).buildings.buildings) {
+        const def = BUILDING_SIZES[b.size];
+        expect(def, `unknown size ${b.size}`).toBeDefined();
+        expect(b.w).toBe(def.footprintW);
+        expect(b.d).toBe(def.footprintD);
+      }
     }
   });
 
-  it('small buildings have dimensions within configured range', () => {
-    const rng = createRng(42);
-    const gridData = generateGrid(baseConfig, rng);
-    const result = generateBuildings(gridData, baseConfig, rng);
-    const small = result.buildings.filter(b => b.size === 'small');
-    for (const b of small) {
-      expect(b.w).toBeGreaterThanOrEqual(BUILDING.footprints.small.min);
-      expect(b.w).toBeLessThanOrEqual(BUILDING.footprints.small.max);
-      expect(b.d).toBeGreaterThanOrEqual(BUILDING.footprints.small.min);
-      expect(b.d).toBeLessThanOrEqual(BUILDING.footprints.small.max);
+  it('maxTier is between 2 and config.tiers', () => {
+    for (const seed of SEEDS) {
+      const { buildings, config } = runStages(seed);
+      for (const b of buildings.buildings) {
+        expect(b.maxTier).toBeGreaterThanOrEqual(2);
+        expect(b.maxTier).toBeLessThanOrEqual(config.tiers);
+      }
     }
   });
 
-  it('maxTier is within configured tiers', () => {
-    const rng = createRng(42);
-    const gridData = generateGrid(baseConfig, rng);
-    const result = generateBuildings(gridData, baseConfig, rng);
-    for (const b of result.buildings) {
-      expect(b.maxTier).toBeGreaterThanOrEqual(1);
-      expect(b.maxTier).toBeLessThanOrEqual(baseConfig.tiers + 1); // big buildings can go to 5
+  it('each building sits inside the block it references', () => {
+    for (const seed of SEEDS) {
+      const { buildings } = runStages(seed);
+      for (const b of buildings.buildings) {
+        const block = buildings.blocks[b.blockIndex];
+        expect(b.x).toBeGreaterThanOrEqual(block.x);
+        expect(b.z).toBeGreaterThanOrEqual(block.z);
+        expect(b.x + b.w).toBeLessThanOrEqual(block.x + block.w);
+        expect(b.z + b.d).toBeLessThanOrEqual(block.z + block.d);
+      }
+    }
+  });
+
+  it('buildings do not overlap each other', () => {
+    for (const seed of SEEDS) {
+      const list = runStages(seed).buildings.buildings;
+      for (let i = 0; i < list.length; i++) {
+        for (let j = i + 1; j < list.length; j++) {
+          expect(rectsOverlap(list[i], list[j]), `seed ${seed}: ${i} vs ${j}`).toBe(false);
+        }
+      }
     }
   });
 
   it('buildings are within map bounds', () => {
-    const rng = createRng(42);
-    const gridData = generateGrid(baseConfig, rng);
-    const result = generateBuildings(gridData, baseConfig, rng);
-    for (const b of result.buildings) {
-      expect(b.x).toBeGreaterThanOrEqual(-1); // margin allowance
-      expect(b.z).toBeGreaterThanOrEqual(-1);
-      expect(b.x + b.w).toBeLessThanOrEqual(baseConfig.mapWidth + 1);
-      expect(b.z + b.d).toBeLessThanOrEqual(baseConfig.mapDepth + 1);
+    const { buildings, config } = runStages(42);
+    for (const b of buildings.buildings) {
+      expect(b.x).toBeGreaterThanOrEqual(0);
+      expect(b.z).toBeGreaterThanOrEqual(0);
+      expect(b.x + b.w).toBeLessThanOrEqual(config.mapWidth);
+      expect(b.z + b.d).toBeLessThanOrEqual(config.mapDepth);
     }
   });
 
-  it('includes at least one big building (medium or large)', () => {
-    const rng = createRng(42);
-    const gridData = generateGrid(baseConfig, rng);
-    const result = generateBuildings(gridData, baseConfig, rng);
-    const bigBuildings = result.buildings.filter(b => b.size === 'medium' || b.size === 'large');
-    expect(bigBuildings.length).toBeGreaterThanOrEqual(1);
+  it('is deterministic for the same seed (separate generation runs)', () => {
+    // Different cache key (extra option that does not affect generation) forces a fresh run.
+    const a = runStages(42);
+    const b = runStages(42, { textureSet: 'base' });
+    expect(a).not.toBe(b);
+    expect(a.buildings.buildings).toEqual(b.buildings.buildings);
   });
 
-  it('tracks deleted buildings', () => {
-    const rng = createRng(42);
-    const gridData = generateGrid(baseConfig, rng);
-    const result = generateBuildings(gridData, baseConfig, rng);
-    expect(result).toHaveProperty('deletedBuildings');
-    expect(Array.isArray(result.deletedBuildings)).toBe(true);
-  });
-
-  it('is deterministic with same seed', () => {
-    const run = () => {
-      const rng = createRng(42);
-      const gridData = generateGrid(baseConfig, rng);
-      return generateBuildings(gridData, baseConfig, rng);
-    };
-    const a = run();
-    const b = run();
-    expect(a.buildings.length).toBe(b.buildings.length);
-  });
-
-  it('skips displacement when buildingDisplaceByLarge is false', () => {
-    const origDisplace = DELETIONS.buildingDisplaceByLarge;
-    const origCull = DELETIONS.buildingRandomCull;
-    try {
-      DELETIONS.buildingDisplaceByLarge = false;
-      DELETIONS.buildingRandomCull = true;
-      const rng = createRng(42);
-      const gridData = generateGrid(baseConfig, rng);
-      const result = generateBuildings(gridData, baseConfig, rng);
-      // With displacement disabled, only random cull produces deleted buildings
-      expect(Array.isArray(result.deletedBuildings)).toBe(true);
-      expect(result.buildings.length).toBeGreaterThan(0);
-    } finally {
-      DELETIONS.buildingDisplaceByLarge = origDisplace;
-      DELETIONS.buildingRandomCull = origCull;
-    }
-  });
-
-  it('skips random cull when buildingRandomCull is false', () => {
-    const origCull = DELETIONS.buildingRandomCull;
-    try {
-      DELETIONS.buildingRandomCull = false;
-      const rng = createRng(42);
-      const gridData = generateGrid(baseConfig, rng);
-      const result = generateBuildings(gridData, baseConfig, rng);
-      // With random cull disabled, more buildings survive
-      expect(result.buildings.length).toBeGreaterThan(0);
-      // deletedBuildings should only be the displacement ones
-      expect(Array.isArray(result.deletedBuildings)).toBe(true);
-    } finally {
-      DELETIONS.buildingRandomCull = origCull;
-    }
-  });
-
-  it('exercises all big building layout variants across seeds', () => {
-    // The layout is rng.int(0,4) so we need different seeds to hit all 5 layouts.
-    // We run enough seeds to cover layouts 0-4 (including cases 2,3,4 on lines 134-143).
-    const layoutCounts = new Map();
-    for (let seed = 0; seed < 50; seed++) {
-      const rng = createRng(seed);
-      const gridData = generateGrid(baseConfig, rng);
-      const result = generateBuildings(gridData, baseConfig, rng);
-      const bigBuildings = result.buildings.filter(b => b.size === 'medium' || b.size === 'large');
-      const count = bigBuildings.length;
-      layoutCounts.set(count, (layoutCounts.get(count) || 0) + 1);
-    }
-    // Should see varying counts of big buildings (1, 2, 3, 4)
-    expect(layoutCounts.size).toBeGreaterThanOrEqual(3);
+  it('seed 42 produces 24 buildings', () => {
+    expect(runStages(42).buildings.buildings.length).toBe(24);
   });
 });

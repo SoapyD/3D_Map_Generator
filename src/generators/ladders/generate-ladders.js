@@ -288,7 +288,7 @@ function phase2Ladders(candidates, buildings, config, rng, matrix) {
     // the wall face is at the cell's max edge, shift by (1 - thickness).
     const needsXOff = direction === 'W';
     const needsZOff = direction === 'N';
-    const THICKNESS = 0.25;
+    const THICKNESS = LADDERS.thickness;
 
     ladders.push({
       id:            `ladder_${buildingIndex}_${id++}`,
@@ -475,13 +475,6 @@ function phase4Select(pathsByBuilding, buildings, rng) {
 
 // ─── Debug path builder ───────────────────────────────────────────────────────
 
-const PATH_QUOTA = {
-  'ruins-small': 1, 'small': 1,
-  'medium': 2, 'ruins-medium-h': 2, 'ruins-medium-v': 2,
-  'largeA': 3, 'largeB': 3,
-};
-const PATH_MIN_SPACING = 3;
-
 function buildDebugPaths(ladderGroups, buildings, config, rng, matrix) {
   const { tierHeight, slabThickness } = config;
   const tierH = tierHeight + slabThickness;
@@ -499,10 +492,10 @@ function buildDebugPaths(ladderGroups, buildings, config, rng, matrix) {
     const building      = buildings[bi];
 
     // Small ruins only have a 40% chance of generating any ladders at all
-    if (building.size === 'ruins-small' && !rng.chance(0.4)) continue;
+    if (building.size === 'ruins-small' && !rng.chance(LADDERS.ruinsSmallChance)) continue;
 
     const roofTier      = building.maxTier - 1;
-    const quota         = PATH_QUOTA[building.size] ?? 1;
+    const quota         = LADDERS.pathQuota[building.size] ?? 1;
     const placedLadders = []; // all ladders picked across all paths this building
 
     for (let pathIdx = 0; pathIdx < quota; pathIdx++) {
@@ -517,7 +510,7 @@ function buildDebugPaths(ladderGroups, buildings, config, rng, matrix) {
 
         // Additional paths: require spacing from all already-placed ladders
         if (pathIdx > 0) {
-          pool = pool.filter(l => placedLadders.every(p => ladderDist(l, p) >= PATH_MIN_SPACING));
+          pool = pool.filter(l => placedLadders.every(p => ladderDist(l, p) >= LADDERS.pathMinSpacing));
           if (pool.length === 0) {
             // No viable ladder at this tier — skip up one and try again
             currentTier++;

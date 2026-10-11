@@ -11,6 +11,7 @@
  */
 
 import { DEFAULTS } from './config.js';
+import { profileDefaults } from './profiles/profile-defaults.js';
 import { createRng } from './core/rng.js';
 import { runPipeline } from './pipeline.js';
 import { buildScene } from './generators/scene/index.js';
@@ -31,7 +32,7 @@ export { generateTiersToBuffers } from './generate-tiers-buffers.js';
  * @returns {Promise<Buffer>}
  */
 export async function generateToBuffer(seed, opts = {}) {
-  const config = { ...DEFAULTS, ...opts, seed };
+  const config = { ...DEFAULTS, ...profileDefaults(opts.profile), ...opts, seed };
   const rng = createRng(config.seed);
 
   const { geometry } = runPipeline(config, rng);

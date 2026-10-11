@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { createSlab, createFloorSlab, createWallSlab, createLadderMesh } from '../../src/core/geometry.js';
+import { createSlab } from '../../src/core/geometry-misc.js';
+import { createFloorSlab } from '../../src/core/geometry-rects.js';
+import { createWallSlab } from '../../src/core/geometry-edges.js';
+import { createLadderMesh } from '../../src/core/create-ladder-mesh.js';
 import * as THREE from 'three';
 
 const mat = new THREE.MeshStandardMaterial({ color: 0x888888 });
