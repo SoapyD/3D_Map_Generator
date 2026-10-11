@@ -2,6 +2,7 @@
  * Build roof primitives (flat and pyramid) from pipeline data.
  */
 
+import { floorThickness } from '../../core/levels.js';
 import { getTexGroup } from '../geometry-helpers/index.js';
 import { floorTextureKey } from '../floor-texture-key.js';
 
@@ -20,7 +21,8 @@ export function buildRoofPrimitives(roofEntries, buildings, config) {
     const roof = roofEntries[ri];
     const roofTexKey = `roof:${getTexGroup(roof.buildingIndex, buildings)}`;
     const ceilingTexKey = floorTextureKey(roof.buildingIndex, buildings);
-    const ry = roof.yCollisionLevel;
+    const ry = roof.geomY; // bottom of the thin slab; its top is flush with the matrix cell top (roof.surfaceY)
+    const rh = floorThickness(config);
 
     for (let si = 0; si < roof.rects.length; si++) {
       const rs = roof.rects[si];
@@ -28,20 +30,20 @@ export function buildRoofPrimitives(roofEntries, buildings, config) {
 
       primitives.push({
         type: 'slab', name,
-        x: rs.x, y: ry, z: rs.z, w: rs.w, h: config.slabThickness, d: rs.d,
+        x: rs.x, y: ry, z: rs.z, w: rs.w, h: rh, d: rs.d,
         textureKey: roofTexKey,
         emitTop: true, emitBottom: false, simpleBottom: false, rotateUV: false,
         shared: true,
       });
       primitives.push({
         type: 'ceiling', name: `roof_ceil_${ri}_${si}`,
-        x: rs.x, y: ry, z: rs.z, w: rs.w, h: config.slabThickness, d: rs.d,
+        x: rs.x, y: ry, z: rs.z, w: rs.w, h: rh, d: rs.d,
         textureKey: ceilingTexKey,
         shared: true,
       });
       primitives.push({
         type: 'edges', name,
-        x: rs.x, y: ry, z: rs.z, w: rs.w, h: config.slabThickness, d: rs.d,
+        x: rs.x, y: ry, z: rs.z, w: rs.w, h: rh, d: rs.d,
         textureKey: roofTexKey,
       });
     }

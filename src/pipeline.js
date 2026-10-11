@@ -56,8 +56,7 @@ function runStages(config, rng, { recorder = null, log = false } = {}) {
   const matrix = createCollisionMatrix(
     gridData.activeArea,
     config.tiers,
-    config.tierHeight,
-    config.slabThickness,
+    config,
   );
 
   // Ground-slab placeholders at Y=-slabThickness. Buildings overwrite their

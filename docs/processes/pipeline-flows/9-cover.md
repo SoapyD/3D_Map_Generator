@@ -37,7 +37,7 @@ Survivors are split into three raw arrays: `rawFloor`, `rawRoof`, `rawStreet`.
 
 ### Phase 2 — Grouping
 
-- **Shells** (`rawFloor`): each cell is mapped to `{ buildingIndex, tier }`. `buildingIndex` = first building whose world footprint contains the cell's (wx, wz). `tier` = `round((cy + slabThickness) / levelHeight)`. Produces one group per building-per-tier, sorted by building then tier.
+- **Shells** (`rawFloor`): each cell is mapped to `{ buildingIndex, tier }`. `buildingIndex` = first building whose world footprint contains the cell's (wx, wz). `tier` = `floorIndexFromCy(cy)` = `round((cy + slabThickness) / tierHeight)`. Produces one group per building-per-tier, sorted by building then tier.
 - **Roofs** (`rawRoof`): one group per building, keyed by building footprint containment.
 - **Streets** (`rawStreet`): each cell is matched to the `data.streets` rect it falls inside. One group per matched corridor, each with a cycling debug colour.
 

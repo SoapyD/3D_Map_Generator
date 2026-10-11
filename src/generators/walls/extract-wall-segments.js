@@ -1,5 +1,6 @@
 import { CELL, STAGE } from '../collision/matrix.js';
 import { WALL } from '../../config.js';
+import { wallBaseY, nextFloorCellY, wallGeomHeight, wallMatrixRows } from '../../core/levels.js';
 
 const skipDoor = (matrix, cx, cy, cz) =>
   WALL.applyDoorCuts && matrix.getCell(cx, cy + 1, cz) === CELL.DOOR;
@@ -114,8 +115,8 @@ function buildRuns(cells, fixedAxis, sortAxis) {
 
 export function extractWallSegments(data, config, matrix) {
   const { wallThickness } = WALL;
-  const { tierHeight, slabThickness } = config;
-  const levelHeight = tierHeight + slabThickness;
+  const geomHeight = wallGeomHeight(config);
+  const matrixRows = wallMatrixRows(config);
   const { cellSize, ox, oz } = matrix;
   const s = cellSize;
   const t = wallThickness;
@@ -126,7 +127,7 @@ export function extractWallSegments(data, config, matrix) {
 
   // --- Main direction loop ---
   for (const cy of yLevels) {
-    const wallWorldY = cy + slabThickness;
+    const wallWorldY = wallBaseY(cy, config);
 
     for (const { labels, extWallCell, intWallCell, dir, fixedAxis, sortAxis, dcx, dcz } of DIRECTIONS) {
       const extCells = [];
@@ -135,7 +136,7 @@ export function extractWallSegments(data, config, matrix) {
       for (let cz = 0; cz < matrix.D; cz++) {
         for (let cx = 0; cx < matrix.W; cx++) {
           if (!labels.has(matrix.getCell(cx, cy, cz))) continue;
-          if (!isSlabCell(matrix.getCell(cx, cy + levelHeight, cz))) continue;
+          if (!isSlabCell(matrix.getCell(cx, nextFloorCellY(cy, config), cz))) continue;
           if (skipDoor(matrix, cx, cy, cz)) continue;
           const neighbour = matrix.getCell(cx + dcx, cy, cz + dcz);
           if (neighbour === CELL.SHELL) {
@@ -181,7 +182,7 @@ export function extractWallSegments(data, config, matrix) {
           d = runLength * s;
         }
 
-        walls.push({ direction: dir, floorY: cy, x, y: wallWorldY, z, w, h: tierHeight, d });
+        walls.push({ direction: dir, floorY: cy, x, y: wallWorldY, z, w, h: geomHeight, d });
       }
 
       // Interior runs — no truncation, no geometry, write internal wall marker to matrix
@@ -200,22 +201,22 @@ export function extractWallSegments(data, config, matrix) {
         }
 
         matrix.setWriteContext(STAGE.WALLS_INT, internalWalls.length);
-        internalWalls.push({ direction: dir, floorY: cy, x, y: wallWorldY, z, w, h: tierHeight, d });
-        matrix.fillBox(x, wallWorldY, z, w, tierHeight, d, intWallCell);
+        internalWalls.push({ direction: dir, floorY: cy, x, y: wallWorldY, z, w, h: geomHeight, d });
+        matrix.fillBox(x, wallWorldY, z, w, matrixRows, d, intWallCell);
       }
     }
   }
 
   // --- END and ISLAND cells: individual per-face wall boxes ---
   for (const cy of yLevels) {
-    const wallWorldY = cy + slabThickness;
+    const wallWorldY = wallBaseY(cy, config);
 
     for (let cz = 0; cz < matrix.D; cz++) {
       for (let cx = 0; cx < matrix.W; cx++) {
         const v = matrix.getCell(cx, cy, cz);
         const faces = END_FACES[v];
         if (!faces) continue;
-        if (!isSlabCell(matrix.getCell(cx, cy + levelHeight, cz))) continue;
+        if (!isSlabCell(matrix.getCell(cx, nextFloorCellY(cy, config), cz))) continue;
         if (matrix.getCell(cx, cy + 1, cz) === CELL.DOOR) continue;
 
         const hasE = faces.includes('E') && matrix.getCell(cx + 1, cy, cz) !== CELL.SHELL;
@@ -242,10 +243,10 @@ export function extractWallSegments(data, config, matrix) {
 
           if (isInternal) {
             matrix.setWriteContext(STAGE.WALLS_INT, internalWalls.length);
-            internalWalls.push({ direction: face, floorY: cy, x, y: wallWorldY, z, w, h: tierHeight, d });
-            matrix.fillBox(x, wallWorldY, z, w, tierHeight, d, FACE_INT_WALL[face]);
+            internalWalls.push({ direction: face, floorY: cy, x, y: wallWorldY, z, w, h: geomHeight, d });
+            matrix.fillBox(x, wallWorldY, z, w, matrixRows, d, FACE_INT_WALL[face]);
           } else {
-            walls.push({ direction: face, floorY: cy, x, y: wallWorldY, z, w, h: tierHeight, d });
+            walls.push({ direction: face, floorY: cy, x, y: wallWorldY, z, w, h: geomHeight, d });
           }
         }
       }

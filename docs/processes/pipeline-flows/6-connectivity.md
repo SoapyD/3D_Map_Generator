@@ -126,7 +126,7 @@ Regular candidates (non-river) are then processed normally:
 ### Phase 4 — Stamp, rasterise, and pillar
 
 **Door stamping (`stampDoors`)**:
-For each surviving connection, derive trigger cells from anchor cells by stepping one cell back toward the floor edge. Stamp `CELL.DOOR` (value 90) at each trigger cell from `cy+1` to `cy+3` (2 cells wide × 3 cells tall). Deduplication prevents double-stamping when two connections share an anchor.
+For each surviving connection, derive trigger cells from anchor cells by stepping one cell back toward the floor edge. Stamp `CELL.DOOR` (value 90) at each trigger cell from `cy+1` to `cy+wallMatrixRows` (2 cells wide × 2 cells tall by default; never the next tier's slab cell at `cy+tierHeight`). Deduplication prevents double-stamping when two connections share an anchor.
 
 **Rasterisation (`rasteriseConnections`)**:
 1. Assign connection type per survivor: `walkway` (ground-level or short), `bridge_low`, or `bridge_battlement` based on length band and a weighted RNG roll against `CONNECTIVITY.bridgeVariants` / `bridgeVariantsLong`.

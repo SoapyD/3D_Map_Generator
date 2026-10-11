@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { runStages } from '../helpers/run-stages.js';
 import { WALL } from '../../src/config.js';
+import { levelHeight, wallGeomHeight, floorThickness } from '../../src/core/levels.js';
 
 const SEEDS = [42, 100, 7];
 const EPS = 1e-6;
@@ -39,16 +40,37 @@ describe('generateWalls', () => {
     }
   });
 
-  it('wall cells are 1 inch tall and stack within a building\'s tier band', () => {
+  it('wall rows are at most 1 inch tall and stack within the tier band above their floor', () => {
     const { walls, config } = runStages(42);
-    const stride = config.tierHeight + config.slabThickness;
+    const stride = levelHeight(config);
     for (const w of walls.walls) {
-      expect(w.h).toBe(1);
-      // Each wall row lies within the 3" room band above its floor slab.
+      expect(w.h).toBeGreaterThan(0);
+      expect(w.h).toBeLessThanOrEqual(1);
+      // Each wall row lies within the room band above its floor surface.
       const offset = w.y - (w.floorY + config.slabThickness);
       expect(offset).toBeGreaterThanOrEqual(0);
-      expect(offset).toBeLessThan(config.tierHeight);
+      expect(offset).toBeLessThan(wallGeomHeight(config));
       expect((w.floorY + config.slabThickness) % stride).toBe(0);
+    }
+  });
+
+  it('wall tops meet the underside of the slab above: no gap and no overlap', () => {
+    for (const seed of SEEDS) {
+      const { walls, config } = runStages(seed);
+      const nextSlabBottom = (w) => w.floorY + levelHeight(config) + config.slabThickness - floorThickness(config);
+      const topByFloor = new Map();
+      for (const w of walls.walls) {
+        topByFloor.set(w.floorY, Math.max(topByFloor.get(w.floorY) ?? -Infinity, w.y + w.h));
+      }
+      // No wall row pokes through the slab above...
+      for (const w of walls.walls) {
+        expect(w.y + w.h, `seed ${seed} wall at ${w.x},${w.z}`).toBeLessThanOrEqual(nextSlabBottom(w) + EPS);
+      }
+      // ...and the highest row on each floor reaches it exactly (no gap).
+      for (const [floorY, top] of topByFloor) {
+        const probe = walls.walls.find(w => w.floorY === floorY);
+        expect(top, `seed ${seed} floorY ${floorY}`).toBeCloseTo(nextSlabBottom(probe));
+      }
     }
   });
 
@@ -77,7 +99,7 @@ describe('generateWalls', () => {
 
   it('walls are not placed above a building\'s highest tier', () => {
     const { walls, buildings, config } = runStages(42);
-    const stride = config.tierHeight + config.slabThickness;
+    const stride = levelHeight(config);
     const top = Math.max(...buildings.buildings.map(b => b.maxTier)) * stride;
     for (const w of walls.walls) expect(w.y + w.h).toBeLessThanOrEqual(top);
   });

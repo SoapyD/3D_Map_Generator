@@ -10,7 +10,7 @@ Consumes `data.roofSlabs` (the topmost slab per building, pre-computed with quad
 
 ```js
 data: {
-  roofSlabs: [{ buildingId, buildingIndex, floorIndex, yCollisionLevel, rects, removedQuadrants }],
+  roofSlabs: [{ buildingId, buildingIndex, floorIndex, yCollisionLevel, surfaceY, geomY, rects, removedQuadrants }],
   // all prior fields carried forward
 }
 config: {
@@ -24,7 +24,7 @@ matrix: CollisionMatrix
 1. For each slab in `data.roofSlabs`:
    - `matrix.setWriteContext(STAGE.ROOFS, roofs.length)`
    - Write each rect: `matrix.fillBox(rect.x, slab.yCollisionLevel, rect.z, rect.w, slabThickness, rect.d, CELL.ROOF)`.
-   - Push a roof record to `roofs[]` (same shape as the slab, minus the raw slab fields).
+   - Push a roof record to `roofs[]` (same shape as the slab, minus the raw slab fields; keeps `floorIndex`, `yCollisionLevel`, `surfaceY`, `geomY`). The rendered roof slab is thin like floors: `geomY` with height `FLOOR_SLAB.thickness`, flush with the top of its matrix cell.
 2. Call `labelRoofCells(roofData, matrix)`:
    - Scans all roof-level Y values.
    - Overwrites `CELL.ROOF` cells with directional labels wherever an edge is exposed:

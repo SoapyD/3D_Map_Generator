@@ -21,7 +21,10 @@ export function generateRoofs(data, config, matrix) {
     roofs.push({
       buildingId:    slab.buildingId,
       buildingIndex: slab.buildingIndex,
+      floorIndex:    slab.floorIndex,
       yCollisionLevel: slab.yCollisionLevel,
+      surfaceY:      slab.surfaceY,
+      geomY:         slab.geomY,
       rects:         slab.rects,
       removedQuadrants: slab.removedQuadrants,
     });

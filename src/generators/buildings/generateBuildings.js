@@ -9,6 +9,7 @@
  */
 
 import { CELL, STAGE } from '../collision/matrix.js';
+import { shellHeight } from '../../core/levels.js';
 import { treemapBuildings } from './treemap-buildings.js';
 // import { placeSmallBuildings } from './placeSmallBuildings.js';  // old system — random float-positioned buildings
 // import { getLayoutSpecs } from './getLayoutSpecs.js';            // old system — big building layout strategies
@@ -23,17 +24,17 @@ import { treemapBuildings } from './treemap-buildings.js';
  * @returns {{ buildings: Array, blocks: Array }}
  */
 export function generateBuildings(gridData, config, rng, matrix) {
-  const { tiers, tierHeight } = config;
+  const { tiers } = config;
 
   const buildings = treemapBuildings(gridData.blocks, rng, tiers);
 
   // Write building shells into the collision matrix.
-  // Shells start at Y=-slabThickness (bottom of ground floor slab) so walls begin at Y=0.
-  const levelHeight = tierHeight + config.slabThickness;
+  // Shells start at the ground slab cell (Y=-slabThickness) so walls begin at Y=0, and run up to
+  // and including the topmost (roof) slab cell — see shellHeight() in src/core/levels.js.
   for (let i = 0; i < buildings.length; i++) {
     const b = buildings[i];
     matrix.setWriteContext(STAGE.BUILDINGS, i);
-    matrix.fillBox(b.x, -config.slabThickness, b.z, b.w, b.maxTier * levelHeight - config.tierHeight, b.d, CELL.SHELL);
+    matrix.fillBox(b.x, -config.slabThickness, b.z, b.w, shellHeight(b.maxTier, config), b.d, CELL.SHELL);
   }
 
   return { ...gridData, buildings };

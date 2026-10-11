@@ -38,7 +38,7 @@ For each tier level `i`:
    - `ruins-small`: single-quadrant decomposition via `ruinsToSections`.
    - Other ruins: full building rect (no quadrant damage).
    - Normal buildings: `quadrantsToSections` maps present quadrants → rect list.
-4. Compute `yCollisionLevel = i * (tierHeight + slabThickness) - slabThickness`.
+4. Compute `yCollisionLevel = floorCellY(i) = i * tierHeight - slabThickness` (the 1" matrix cell), plus `surfaceY = floorSurfaceY(i) = i * tierHeight` (walking surface) and `geomY = floorGeomY(i)` (bottom of the rendered `FLOOR_SLAB.thickness` slab, flush with the cell top). Geometry renders the slab at `geomY` with height `FLOOR_SLAB.thickness`.
 5. Push a floor record. If this is the **last** tier (`floorIndex === maxTier - 1`), push to `roofSlabs` instead of `floors`.
 
 **Writing to matrix:**

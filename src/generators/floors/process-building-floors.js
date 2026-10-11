@@ -1,4 +1,5 @@
 import { FLOOR } from '../../config.js';
+import { floorCellY, floorSurfaceY, floorGeomY } from '../../core/levels.js';
 import { pickAdjacentToRemoved } from '../selectors/index.js';
 import { quadrantsToSections } from './quadrants-to-sections.js';
 import { ruinsToSections } from './ruins-small-to-sections.js';
@@ -6,13 +7,12 @@ import { ruinsToSections } from './ruins-small-to-sections.js';
 /**
  * Generates floor plates for a single building shell.
  *
- * Produces one slab per tier, placed at Y = floorIndex * (tierHeight + slabThickness) - slabThickness.
+ * Produces one slab per tier; its matrix cell is floorCellY(floorIndex) (see src/core/levels.js).
  * Ground slab (i=0) sits at Y=-1; ground-floor walls therefore start at Y=0.
  * Quadrant removal escalates upward: higher floors lose more area, biased by damageLevel.
  */
 export function processBuildingFloors(building, buildingIndex, config, rng) {
-  const { tierHeight, slabThickness, damageLevel } = config;
-  const levelHeight = tierHeight + slabThickness;
+  const { damageLevel } = config;
   const removed = new Set();
   let intactCount = 0;
   const floors = [];
@@ -53,13 +53,15 @@ export function processBuildingFloors(building, buildingIndex, config, rng) {
     } else {
       rects = quadrantsToSections(building, present);
     }
-    const yCollisionLevel = i * levelHeight - slabThickness;
+    const yCollisionLevel = floorCellY(i, config);
 
     floors.push({
       buildingId: `b${buildingIndex}`,
       buildingIndex,
       floorIndex: i,
       yCollisionLevel,
+      surfaceY: floorSurfaceY(i, config), // walking surface (top of the slab)
+      geomY: floorGeomY(i, config),       // bottom face of the rendered (thin) slab
       rects,
       removedQuadrants: [...removed],
       materialKey: 'stone_floor',

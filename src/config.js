@@ -17,8 +17,8 @@ export const DEFAULTS = {
   mapWidth: 48,       // inches
   mapDepth: 48,       // inches
   tiers: 4,           // number of elevated tiers (+ base tier 0)
-  tierHeight: 3,      // room height per tier (inches)
-  slabThickness: 1,   // floor slab thickness (inches)
+  tierHeight: 3,      // floor-surface to floor-surface pitch per tier (inches); clear headroom = tierHeight - FLOOR_SLAB.thickness
+  slabThickness: 1,   // collision-matrix cell reserved for a slab (inches) — NOT the rendered slab thickness (see FLOOR_SLAB)
   // wallThickness: 0.25,  // _old_system: wall slab thickness
   streetWidth: GLOBAL_GRID.streetWidth, // derived from GLOBAL_GRID — do not change independently
   damageLevel: 0.5,   // ruin level 0–1, controls floor quadrant removal escalation
@@ -72,6 +72,18 @@ export const FLOOR = {
   tier3EscalateChance: 0.5,  // chance to remove third adjacent quadrant
 };
 
+// --- Floor / roof slabs ---
+// Each tier's floor is the very top of the tier below: the slab is rendered flush with the top of
+// its 1" matrix cell (DEFAULTS.slabThickness) and is only this thick. Matches the wall thickness so
+// a tier costs tierHeight of vertical space, not tierHeight + a full cell. See src/core/levels.js.
+export const FLOOR_SLAB = {
+  thickness: WALL.wallThickness,
+  // Split-tier banding looks this far above a primitive's base Y when choosing its tier, so connectors
+  // whose slab hangs below the floor surface (bridge decks are 0.5" thick) stay on the tier they serve.
+  // Must be >= the thickest connector slab and < 1 (the next wall row up must not band to the tier above).
+  bandLookahead: 0.5,
+};
+
 // --- Connectivity ---
 export const CONNECTIVITY = {
   bridgeMinLength:     6,  // min connection length (cells) eligible to become a bridge
@@ -97,7 +109,7 @@ export const CONNECTIVITY = {
   riverCrossingPeriod:     2,     // anchor spacing along bank edge (cells)
   riverCrossingMaxLength:  5,     // max ray-cast length for river crossing candidates
   riverCrossingSpacing:    3,     // min cells between a river crossing and any same-axis connection
-  bridgeThickness:         0.5,   // slab thickness; top face flush with cell top
+  bridgeThickness:         FLOOR_SLAB.thickness, // deck thickness = floor slab thickness; top face flush with cell top
   bridgeWallHeight:        1,     // base wall height (inches, = 1 cell)
   bridgeWallThickness:     0.25,
   bridgeBattlementPeriod:  3,     // every N units a tall post appears

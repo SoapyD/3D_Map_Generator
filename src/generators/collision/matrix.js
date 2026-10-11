@@ -1,4 +1,5 @@
 import { GLOBAL_GRID } from '../../config.js';
+import { matrixHeight } from '../../core/levels.js';
 
 // 255 = empty/unoccupied (Uint8Array default is 0, so we fill explicitly)
 export const CELL = {
@@ -78,11 +79,11 @@ const STAGE_NAMES = {
 // Number of cells reserved below world Y=0 (for rivers, sewers, tunnels).
 export const BELOW_GROUND = 12;
 
-export function createCollisionMatrix(activeArea, maxTiers, tierHeight, slabThickness = 1) {
+export function createCollisionMatrix(activeArea, maxTiers, config) {
   const { cellSize } = GLOBAL_GRID;
   const W   = Math.ceil(activeArea.w / cellSize);
   const D   = Math.ceil(activeArea.d / cellSize);
-  const maxY = (maxTiers + 1) * (tierHeight + slabThickness); // +1 tier headroom (above-ground only)
+  const maxY = matrixHeight(maxTiers, config); // +1 tier headroom (above-ground only)
   const totalY = maxY + BELOW_GROUND;
   const ox = activeArea.x;
   const oz = activeArea.z;
