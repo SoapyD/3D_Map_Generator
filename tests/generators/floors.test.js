@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { runStages } from '../helpers/run-stages.js';
+import { levelHeight, floorCellY, floorSurfaceY, floorThickness } from '../../src/core/levels.js';
 
 const SEEDS = [42, 100, 7];
 
@@ -33,11 +34,23 @@ describe('generateFloors', () => {
     }
   });
 
-  it('floor slabs sit on tier boundaries (stride = tierHeight + slabThickness)', () => {
+  it('floor slabs sit on tier boundaries (stride = tierHeight)', () => {
     const { floors, config } = runStages(42);
-    const stride = config.tierHeight + config.slabThickness;
+    const stride = levelHeight(config);
     for (const f of floors.floors) {
       expect((f.yCollisionLevel + config.slabThickness) % stride).toBe(0);
+      expect(f.yCollisionLevel).toBe(floorCellY(f.floorIndex, config));
+    }
+  });
+
+  it('floor slabs are thin and flush with the top of their matrix cell', () => {
+    const { floors, roofs, config } = runStages(42);
+    for (const f of [...floors.floors, ...roofs.roofs]) {
+      const idx = f.floorIndex ?? Math.round((f.yCollisionLevel + config.slabThickness) / levelHeight(config));
+      expect(f.surfaceY).toBe(floorSurfaceY(idx, config));
+      expect(f.surfaceY).toBe(f.yCollisionLevel + config.slabThickness);
+      expect(f.geomY + floorThickness(config)).toBeCloseTo(f.surfaceY);
+      expect(floorThickness(config)).toBeLessThan(config.slabThickness);
     }
   });
 

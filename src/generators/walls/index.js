@@ -5,6 +5,7 @@ import { applyBlobDamage }     from './apply-blob-damage.js';
 import { mergeWallCells }      from './merge-wall-cells.js';
 import { CELL, STAGE } from '../collision/matrix.js';
 import { WALL } from '../../config.js';
+import { nextFloorCellY } from '../../core/levels.js';
 
 const WALL_CELL = { N: CELL.WALL_N, S: CELL.WALL_S, E: CELL.WALL_E, W: CELL.WALL_W };
 
@@ -78,13 +79,19 @@ export function generateWalls(data, config, rng, matrix) {
     if (WALL.applyBlobDamage) applyBlobDamage(grid, rng);
     if (WALL.applyWindows) applyWindowPlan(grid, wall, plan, data.buildings[bi]);
 
+    // Matrix writes stop below the next tier's slab cell: wall geometry may reach up into that
+    // cell (thin slabs), but the cell belongs to the floor and must keep its FLOOR label.
+    const matrixTopY = nextFloorCellY(wall.floorY, config);
+
     for (const seg of mergeWallCells(grid, wall)) {
       matrix.setWriteContext(STAGE.WALLS, walls.length);
       walls.push(seg);
+      const matrixH = Math.min(seg.y + seg.h, matrixTopY) - seg.y;
+      if (matrixH <= 0) continue;
       if (WALL.applyDoorCuts) {
-        matrix.fillBoxUnless(seg.x, seg.y, seg.z, seg.w, seg.h, seg.d, WALL_CELL[wall.direction], CELL.DOOR);
+        matrix.fillBoxUnless(seg.x, seg.y, seg.z, seg.w, matrixH, seg.d, WALL_CELL[wall.direction], CELL.DOOR);
       } else {
-        matrix.fillBox(seg.x, seg.y, seg.z, seg.w, seg.h, seg.d, WALL_CELL[wall.direction]);
+        matrix.fillBox(seg.x, seg.y, seg.z, seg.w, matrixH, seg.d, WALL_CELL[wall.direction]);
       }
     }
   }

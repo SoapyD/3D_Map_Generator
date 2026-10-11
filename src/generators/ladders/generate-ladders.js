@@ -9,6 +9,7 @@
 
 import { CELL } from '../collision/matrix.js';
 import { LADDERS } from '../../config.js';
+import { floorIndexFromCy, floorCellY, slabCellHeight, levelHeight, wallMatrixRows } from '../../core/levels.js';
 
 // ─── Direction helpers ────────────────────────────────────────────────────────
 
@@ -87,14 +88,7 @@ reg(CELL.IROOF_ISLAND, ['N', 'S', 'E', 'W'], false, true);
 
 // ─── Tier / Y helpers ─────────────────────────────────────────────────────────
 
-function floorIndex(cy, tierHeight, slabThickness) {
-  return Math.round((cy + slabThickness) / (tierHeight + slabThickness));
-}
-
-// World Y of the bottom face of a floor slab at the given tier index.
-function slabY(tier, tierHeight, slabThickness) {
-  return tier * (tierHeight + slabThickness) - slabThickness;
-}
+// Tier/Y maths lives in src/core/levels.js (floorIndexFromCy, floorCellY, floorSurfaceY, ...).
 
 // ─── Building lookup ──────────────────────────────────────────────────────────
 
@@ -130,7 +124,7 @@ function hasAdjacentBuilding(lcx, cy, lcz, direction, range, matrix) {
 }
 
 function phase1Candidates(matrix, buildings, config) {
-  const { tierHeight, slabThickness, mapWidth, mapDepth } = config;
+  const { mapWidth, mapDepth } = config;
   const mapEdge   = LADDERS.mapEdgeClearance;
   const connClear = LADDERS.connectionClearance;
   const bldgClear = LADDERS.buildingClearance;
@@ -152,7 +146,7 @@ function phase1Candidates(matrix, buildings, config) {
         if (bi < 0) continue;
 
         const { x: edgeWx, z: edgeWz } = matrix.cellToWorld(cx, cy, cz);
-        const tier = floorIndex(cy, tierHeight, slabThickness);
+        const tier = floorIndexFromCy(cy, config);
 
         const failsMapEdge    = edgeWx < mapEdge || edgeWx > mapWidth - mapEdge ||
                                 edgeWz < mapEdge || edgeWz > mapDepth - mapEdge;
@@ -192,7 +186,7 @@ function phase1Candidates(matrix, buildings, config) {
 
 // ─── Phase 2 — Column grouping ───────────────────────────────────────────────
 
-function cullFullHeight(startTier, endTier, rng, tierHeight, slabThickness) {
+function cullFullHeight(startTier, endTier, rng, config) {
   const tiers = endTier - startTier;
   if (tiers <= 1) return null;
 
@@ -214,15 +208,14 @@ function cullFullHeight(startTier, endTier, rng, tierHeight, slabThickness) {
   const newEnd   = endTier   - topRemove;
   if (newEnd - newStart < 1) return null;
 
-  const newBottomY = newStart === 0 ? 0 : slabY(newStart, tierHeight, slabThickness);
-  // topY = one cell above the slab at tier (newEnd − 1)
-  const newTopY = slabY(newEnd - 1, tierHeight, slabThickness) + 1;
+  const newBottomY = newStart === 0 ? 0 : floorCellY(newStart, config);
+  // topY = one cell above the slab cell at tier (newEnd − 1)
+  const newTopY = floorCellY(newEnd - 1, config) + slabCellHeight(config);
 
   return { startTier: newStart, endTier: newEnd, bottomY: newBottomY, topY: newTopY };
 }
 
 function phase2Ladders(candidates, buildings, config, rng, matrix) {
-  const { tierHeight, slabThickness } = config;
 
   // Group by ladder cell position + direction + building
   const groups = new Map();
@@ -245,8 +238,8 @@ function phase2Ladders(candidates, buildings, config, rng, matrix) {
     const cullReasons = [...new Set(group.flatMap(c => c.cullReasons))];
     const lowestCy   = group[0].cy;
     const highestCy  = group[group.length - 1].cy;
-    const lowestTier = floorIndex(lowestCy,  tierHeight, slabThickness);
-    const highestTier= floorIndex(highestCy, tierHeight, slabThickness);
+    const lowestTier = floorIndexFromCy(lowestCy, config);
+    const highestTier= floorIndexFromCy(highestCy, config);
 
     // Walk down to find where the ladder base sits.
     // External: walk the node column (open air → reaches ground).
@@ -269,7 +262,7 @@ function phase2Ladders(candidates, buildings, config, rng, matrix) {
 
     let bottomY   = bottomCy;
     let topY      = highestCy + 1;
-    const startTier = floorIndex(bottomCy, tierHeight, slabThickness);
+    const startTier = floorIndexFromCy(bottomCy, config);
     const endTier   = highestTier + 1;
 
     const height0 = topY - bottomY;
@@ -476,8 +469,8 @@ function phase4Select(pathsByBuilding, buildings, rng) {
 // ─── Debug path builder ───────────────────────────────────────────────────────
 
 function buildDebugPaths(ladderGroups, buildings, config, rng, matrix) {
-  const { tierHeight, slabThickness } = config;
-  const tierH = tierHeight + slabThickness;
+  const tierH = levelHeight(config);
+  const doorRows = wallMatrixRows(config);
 
   const byBuilding = new Map();
   for (const l of ladderGroups) {
@@ -543,9 +536,10 @@ function buildDebugPaths(ladderGroups, buildings, config, rng, matrix) {
         for (let floorIdx = startFloor; floorIdx <= endFloor; floorIdx++) {
           const baseCy = floorIdx * tierH;
           for (const [ddcx, ddcz] of spread) {
-            matrix.setCell(picked.cx + ddcx, baseCy,     picked.cz + ddcz, CELL.DOOR);
-            matrix.setCell(picked.cx + ddcx, baseCy + 1, picked.cz + ddcz, CELL.DOOR);
-            matrix.setCell(picked.cx + ddcx, baseCy + 2, picked.cz + ddcz, CELL.DOOR);
+            // One DOOR cell per wall row; never the slab cell above the last row.
+            for (let row = 0; row < doorRows; row++) {
+              matrix.setCell(picked.cx + ddcx, baseCy + row, picked.cz + ddcz, CELL.DOOR);
+            }
           }
         }
 

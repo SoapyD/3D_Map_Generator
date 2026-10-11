@@ -29,7 +29,7 @@ matrix: CollisionMatrix
 
 **1. Extract wall segments (`extractWallSegments`)**
 
-Reads the matrix and the `floors[]` data to derive raw wall candidates. For each floor slab's exposed-edge cells (labelled `FLOOR_N/S/E/W` etc.), a wall segment is produced: a box starting at `Y = floor.yCollisionLevel + slabThickness` and rising for `tierHeight` cells, facing the exposed direction.
+Reads the matrix and the `floors[]` data to derive raw wall candidates. For each floor slab's exposed-edge cells (labelled `FLOOR_N/S/E/W` etc.), a wall segment is produced: a box starting at the floor surface (`Y = floor.yCollisionLevel + slabThickness`) and rising `wallGeomHeight` (`tierHeight - FLOOR_SLAB.thickness` = 2.75") so its top meets the underside of the slab above. Matrix writes cover only `wallMatrixRows` (`tierHeight - 1` = 2) rows; the next slab cell keeps its floor label.
 
 **2. Optional: cull to max sides (`cullToMaxSides`)** — controlled by `WALL.applySegmentCull`
 
@@ -51,7 +51,7 @@ Per building, produce a window placement plan for N-S walls and a separate plan 
 
 For each surviving wall segment:
 
-a. `subdivideWall(wall)` — divides the wall rectangle into a 2D grid of cells (each cell = 1 inch wide × 1 inch tall).
+a. `subdivideWall(wall)` — divides the wall rectangle into a 2D grid of cells (each cell = 1 inch wide × up to 1 inch tall; a 2.75" wall gives rows of 1, 1 and 0.75 — the short top row is geometry only and is never written to the matrix).
 
 b. `applyBlobDamage(grid, rng)` — if `WALL.applyBlobDamage`, randomly zeros out contiguous blobs of cells to simulate crumbling sections.
 

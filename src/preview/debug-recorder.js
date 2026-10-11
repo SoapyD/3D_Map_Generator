@@ -9,7 +9,8 @@
  * No Three.js dependency.
  */
 
-import { GEOMETRY } from '../config.js';
+import { GEOMETRY, CONNECTIVITY } from '../config.js';
+import { levelHeight, floorThickness } from '../core/levels.js';
 
 // Distinct colour for the raised map border wall (matches the debug material).
 const BORDER_COLOR = '#dd22cc';
@@ -195,9 +196,8 @@ function buildingElements(data, color, config) {
   const all = data.buildings;
   for (let i = 0; i < all.length; i++) {
     const b = all[i];
-    const levelHeight = config.tierHeight + config.slabThickness;
     // Shell starts at Y=-slabThickness; height stops below roof slab so it protrudes above
-    const h = (b.maxTier - 1) * levelHeight;
+    const h = (b.maxTier - 1) * levelHeight(config);
     elements.push({
       label: `Buildings — ${i + 1}/${all.length}`,
       rects: [box('building', b.x, -config.slabThickness, b.z, b.w, h, b.d, color)],
@@ -219,7 +219,7 @@ function floorElements(data, color, config) {
     if (!byBuilding.has(f.buildingIndex)) byBuilding.set(f.buildingIndex, []);
     for (const r of f.rects) {
       byBuilding.get(f.buildingIndex).push(
-        box('floor', r.x, f.yCollisionLevel, r.z, r.w, config.slabThickness, r.d, color)
+        box('floor', r.x, f.geomY, r.z, r.w, floorThickness(config), r.d, color)
       );
     }
   }
@@ -236,7 +236,7 @@ function roofElements(data, color, config) {
   const total = data.roofs.length;
   return data.roofs.map((r, i) => ({
     label: `Roofs — building ${i + 1}/${total}`,
-    rects: r.rects.map(rect => box('roof', rect.x, r.yCollisionLevel, rect.z, rect.w, config.slabThickness, rect.d, color)),
+    rects: r.rects.map(rect => box('roof', rect.x, r.geomY, rect.z, rect.w, floorThickness(config), rect.d, color)),
   }));
 }
 
@@ -301,9 +301,11 @@ function connectivityElements(data, color, config) {
     const isBridge = w.connectionType?.startsWith('bridge_');
     const segRects = w.segments.map(seg => {
       const r = seg.worldRect;
-      const h = isBridge ? 0.5 : 0.3;
+      // Bridge decks hang below r.y + 0.25 (cell top) so their top stays flush with the floor surface.
+      const h = isBridge ? CONNECTIVITY.bridgeThickness : GEOMETRY.walkwayThickness;
+      const y = isBridge ? r.y + 0.25 - h : r.y;
       const baseColor = seg.isCrossing ? '#ffffff' : (isBridge ? '#7733aa' : color);
-      return box(isBridge ? 'bridge' : 'walkway', r.x, r.y, r.z, r.w, h, r.d, baseColor, seg.isCrossing ? 0.5 : 0.8);
+      return box(isBridge ? 'bridge' : 'walkway', r.x, y, r.z, r.w, h, r.d, baseColor, seg.isCrossing ? 0.5 : 0.8);
     });
     elements.push({
       label: `Connectivity — ${isBridge ? w.connectionType : 'walkway'} ${i + 1}/${totalW} ${w.fromBuildingId}→${w.toBuildingId}${w.hasCrossing ? ' [CROSSING]' : ''}`,

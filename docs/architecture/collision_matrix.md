@@ -72,7 +72,7 @@ The collision matrix is a flat `Uint8Array` covering the full map volume at 1-in
 | `81` | `CELL.INTERNAL_WALL_S` | Walls stage — Phase 1 correction | Internal wall face, south-facing |
 | `82` | `CELL.INTERNAL_WALL_E` | Walls stage — Phase 1 correction | Internal wall face, east-facing |
 | `83` | `CELL.INTERNAL_WALL_W` | Walls stage — Phase 1 correction | Internal wall face, west-facing |
-| `90` | `CELL.DOOR` | Connectivity stage — Step 7b-i | Doorway opening — stamped into the building shell (2 cells wide × 3 cells tall) at each surviving anchor's trigger-cell position, before wall generation runs. Wall generator reads these to carve openings. |
+| `90` | `CELL.DOOR` | Connectivity stage — Step 7b-i | Doorway opening — stamped into the building shell (2 cells wide × `wallMatrixRows` (2) cells tall) at each surviving anchor's trigger-cell position, before wall generation runs. Wall generator reads these to carve openings. |
 | `105` | `CELL.WALKWAY` | Connectivity stage — Step 7c | Walkway or bridge span cell. Stamped along the full span of each surviving connection (2 cells wide). |
 | `106` | `CELL.WALKWAY_CROSSING` | Connectivity stage — Step 7c | Cell where two connections cross at the same tier. Only a floor slab is emitted at crossing cells — no side walls or battlements. |
 | `107` | `CELL.PILLAR` | Connectivity stage — pillar pass | Support pillar column cell. Stamped vertically from the connection floor down to the first slab surface below (or ground). Placed in pairs (one per width cell) at regular intervals along connections ≥ `pillarMinLength` units. |
@@ -110,22 +110,32 @@ const isOccupied      = v => v !== CELL.EMPTY;
 
 ## Vertical layout (per floor level)
 
-Room height = 3", slab thickness = 1", so each floor level occupies 4" of Y space.  
+Floors are thin: each tier's floor is the very top of the tier below. A tier occupies `tierHeight` (3") of Y space; its slab is rendered `FLOOR_SLAB.thickness` (0.25", same as a wall) thick, flush with the top of a 1" matrix cell (the top matrix row of the storey below). Clear headroom is `tierHeight - FLOOR_SLAB.thickness` = 2.75", which is 2 matrix rows of wall plus a 0.75" strip inside the next slab cell. All vertical maths lives in `src/core/levels.js`.  
 The matrix reserves 12 cells below Y=0 for future below-ground geometry (rivers, sewers, tunnels).
 
 | Y cell range | Contents |
 |---|---|
 | `< 0` | Below-ground reserve (12 cells; FOUNDATION_PLACEHOLDER / STREET_PLACEHOLDER at Y=-1) |
-| `-1` | Ground floor slab (FLOOR / FLOOR_N/S/E/W cells) |
-| `0 – 2` | Ground-level room (SHELL cells inside building footprint; walls from Y=0) |
-| `3` | First upper floor slab |
-| `4 – 6` | First-floor room |
-| `7` | Second upper floor slab |
-| `8 – 10` | Second-floor room |
-| … | Pattern repeats: slab at `i * 4 - 1` for floor index `i ≥ 0` |
+| `-1` | Ground floor slab cell (FLOOR / FLOOR_N/S/E/W cells; slab geometry fills only its top 0.25", surface at Y=0) |
+| `0 – 1` | Ground-level room (SHELL cells inside building footprint; walls from Y=0) |
+| `2` | First upper floor slab cell (surface at Y=3) |
+| `3 – 4` | First-floor room |
+| `5` | Second upper floor slab cell (surface at Y=6) |
+| `6 – 7` | Second-floor room |
+| … | Pattern repeats: slab cell at `i * 3 - 1` for floor index `i ≥ 0` |
 
-Formula: `slabY(floorIndex) = floorIndex * (tierHeight + slabThickness) - slabThickness`  
-With defaults: `slabY(i) = i * 4 - 1`
+Formulas (`src/core/levels.js`), defaults `tierHeight = 3`, `slabThickness = 1` (matrix cell), `FLOOR_SLAB.thickness = 0.25`:
+
+| Helper | Formula | Default |
+|---|---|---|
+| `floorCellY(i)` (`yCollisionLevel`) | `i * tierHeight - slabThickness` | `i * 3 - 1` |
+| `floorSurfaceY(i)` | `i * tierHeight` | `i * 3` |
+| `floorGeomY(i)` | `surface - FLOOR_SLAB.thickness` | `i * 3 - 0.25` |
+| `wallMatrixRows` | `tierHeight - slabThickness` | 2 |
+| `wallGeomHeight` | `tierHeight - FLOOR_SLAB.thickness` | 2.75 |
+
+Wall geometry is written to the matrix only for the `wallMatrixRows` rows; the slab cell above keeps its `FLOOR` label.  
+
 
 ---
 
@@ -134,7 +144,7 @@ With defaults: `slabY(i) = i * 4 - 1`
 1. **Buildings** — `fillBox` entire building volume with `CELL.SHELL`
 2. **Floors** — `fillBox` each interior floor slab (index 0 to maxTier−2) with `CELL.FLOOR`
 3. **Roofs** — `fillBox` top slab (index maxTier−1) with `CELL.ROOF`; label pass marks exposed edges as `CELL.ROOF_N/S/E/W/NE/NW/SE/SW` (exterior) or `CELL.IROOF_*` (interior, edge faces SHELL)
-4. **Connectivity** — stamps `CELL.DOOR` (value 90) into the shell volume at each surviving anchor's trigger-cell position (2 wide × 3 tall), marking where the wall generator must carve doorway openings
+4. **Connectivity** — stamps `CELL.DOOR` (value 90) into the shell volume at each surviving anchor's trigger-cell position (2 wide × `wallMatrixRows` tall), marking where the wall generator must carve doorway openings
 5. **Walls Pass 1** — overwrite each exposed-edge FLOOR cell with `CELL.FLOOR_N/S/E/W` (and END/ISLAND variants)
 6. **Walls Pass 2** — `fillBox` each wall segment with `CELL.WALL_N/S/E/W`, skipping cells already marked `CELL.DOOR` (never above roof level)
 

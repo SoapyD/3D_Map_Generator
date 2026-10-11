@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { runStages } from '../helpers/run-stages.js';
 import { CONNECTIVITY, LADDERS } from '../../src/config.js';
+import { levelHeight } from '../../src/core/levels.js';
 
 const SEEDS = [42, 100, 7];
 const WALKWAY_TYPES = ['walkway', 'bridge_low', 'bridge_battlement'];
@@ -51,10 +52,10 @@ describe('generateConnectivity', () => {
 
   it('walkway tiers are the river level (-1) or an elevated tier level', () => {
     const { connectivity, config } = runStages(42);
-    const stride = config.tierHeight + config.slabThickness;
+    const stride = levelHeight(config);
     for (const w of connectivity.connections.walkways) {
       if (w.tier === -1) continue;
-      // tier is the matrix cell row of the walking surface: the top cell of a tier band (3, 7, 11 ...)
+      // tier is the matrix cell row of the walking surface: the top cell of a tier band (2, 5, 8 ...)
       expect((w.tier + 1) % stride).toBe(0);
     }
   });
@@ -120,7 +121,7 @@ describe('generateLadders', () => {
 
   it('kept ladder segments start at ground level (0) or a tier level and end on a tier boundary', () => {
     const { ladders, config } = runStages(42);
-    const stride = config.tierHeight + config.slabThickness;
+    const stride = levelHeight(config);
     for (const path of ladders.ladderPaths) {
       for (const s of path.segments) {
         expect(s.keptBottomY % stride).toBe(0);

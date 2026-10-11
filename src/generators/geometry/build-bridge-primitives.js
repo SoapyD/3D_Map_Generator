@@ -21,10 +21,10 @@ export function buildBridgePrimitives(bridges) {
     for (const seg of b.segments) {
       const r = seg.worldRect;
 
-      // Slab: 0.5" thick, top face flush with cell top.
-      // r.y is anchor.y = wp.y + 0.75 (= cell floor + 0.75).
-      // Cell top = wp.y + 1 = r.y + 0.25, so slabY = r.y + 0.25 - bridgeThickness = r.y - 0.25.
-      const slabY = r.y - 0.25;
+      // Slab: bridgeThickness (= FLOOR_SLAB.thickness) thick, top face flush with cell top.
+      // r.y is anchor.y = wp.y + 0.75 (= cell floor + 0.75), so cell top = wp.y + 1 = r.y + 0.25
+      // and slabY = r.y + 0.25 - bridgeThickness (= r.y while the deck matches the floor slab).
+      const slabY = r.y + 0.25 - bridgeThickness;
 
       primitives.push({
         type: 'slab', name: `bridge_${i}`,

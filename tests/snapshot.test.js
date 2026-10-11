@@ -87,7 +87,7 @@ describe('Snapshot regression - seed 42', () => {
   });
 
   it('seed 42 OBJ vertex count is locked', () => {
-    expect(objVertexCount(42)).toMatchInlineSnapshot(`24270`);
+    expect(objVertexCount(42)).toMatchInlineSnapshot(`23878`);
   });
 });
 
@@ -112,6 +112,6 @@ describe('Snapshot regression - seed 100', () => {
   });
 
   it('seed 100 OBJ vertex count is locked', () => {
-    expect(objVertexCount(100)).toMatchInlineSnapshot(`25862`);
+    expect(objVertexCount(100)).toMatchInlineSnapshot(`25522`);
   });
 });
