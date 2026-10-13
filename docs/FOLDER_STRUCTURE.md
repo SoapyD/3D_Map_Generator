@@ -33,7 +33,11 @@
 │   │                              #   scene/, geometry/ and _old_system/ (legacy)
 │   ├── profiles/                  # Swappable config profiles (withering, …)
 │   ├── export/                    # GLB, OBJ + atlas, collision and per-tier exporters
-│   ├── preview/                   # server.js, viewer.html, debug-recorder.js
+│   ├── preview/                   # Unified viewer (README "Running the viewer"): server.js (--preview),
+│   │                              #   preview-routes.js (one route table), shell.html (tabs),
+│   │                              #   visualizer.html, viewer.html (/model.html), debug-recorder.js,
+│   │                              #   run-fixture.js, tab-flags.js; loaded-map/ = Loaded map tab
+│   │                              #   (loaded-map.html, decode-fixture.js, texture-report.js, map-state.js)
 │   └── tools/                     # Standalone building/bridge preview scripts
 │
 ├── assets/textures/               # Texture packs (base, transparent_base, …)

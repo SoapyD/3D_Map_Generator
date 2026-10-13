@@ -26,7 +26,7 @@ npm run preview -- --profile withering --seed 3
 `npm run visualize` hard-codes `--seed 42 --size 48x48`. Explicit flags win over profile defaults, so that script overrides the profile's map size. To view a profile, run the CLI directly:
 
 ```
-node src/index.js --profile withering --seed 3 --visualize
+node src/index.js --profile withering --seed 3 --preview
 ```
 
 There are no per-profile npm scripts yet.

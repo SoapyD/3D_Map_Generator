@@ -50,7 +50,7 @@ Plus two data files:
 | Output | Contents | File |
 |---|---|---|
 | Geometry JSON | `{ version, primitives, collisionMatrix }` | `<baseName>_geometry.json` |
-| Debug frames JSON | Recorder frame data (only when `--visualize`) | `debug_frames.json` |
+| Debug frames JSON | Recorder frame data (written when `--preview` or `--visualize` is on) | `debug_frames.json` |
 | Matrix history JSON | Per-cell write history (only when `--debugMatrix`) | `<baseName>_matrix_history.json` |
 
 ### OBJ ladder mode
@@ -125,5 +125,5 @@ A margin of 0.01 is used for floating-point safety. The previous 0.5 margin inco
 
 - GLB and OBJ are always exported together — there is no flag to suppress either.
 - `--split-tiers` is additive and opt-in: it never replaces the combined outputs, and its per-tier OBJs reuse the single combined atlas PNG.
-- `--visualize` enables the debug recorder which captures per-stage snapshots consumed by the preview visualiser.
+- `--preview` (alias `--visualize`) enables the debug recorder which captures per-stage snapshots consumed by the preview visualiser.
 - The `map_skirt` texture must exist in both `assets/textures/base/map_skirt/` and `assets/textures/loaded/map_skirt/`. Run `node src/generators/generate-textures.js` to regenerate if missing.

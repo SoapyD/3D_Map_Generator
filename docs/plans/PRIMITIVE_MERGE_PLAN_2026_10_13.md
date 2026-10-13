@@ -92,7 +92,7 @@ Proposal: write one `.mtl` material per texture key, use UVs that repeat every 3
 - **Why it is risky:**
   - Unverified: TTS may not repeat UVs beyond 0–1, or may not accept multiple materials per custom model. Our belief is that a TTS custom model takes a single diffuse image. That is why the atlas exists, but no doc records it (grep of `docs/` finds only the mechanism at `11-scene-and-export.md:75`).
   - The THIN_FLOOR_SLABS plan relies on the 3" segment grid (`THIN_FLOOR_SLABS_PLAN_2026_10_11.md:27`). It would need revisiting.
-  - The loaded-map preview already uses GLB-style 3" repeat UVs (`LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md:36`). It can act as the visual reference for Phase B.
+  - The loaded-map preview already uses GLB-style 3" repeat UVs (`archive/LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md:36`). It can act as the visual reference for Phase B.
 - **Gate:** build a small hand-made OBJ (two quads, UVs 0–4 for a 1-tile texture, two materials) and load it in TTS. Check: repeat works, multi-material works, vertex count is as expected. Do not commit Phase B until this passes.
 - **If TTS needs one image:** either split OBJs per texture (more files, more load) or stay on the atlas and rely on Phase A alone.
 

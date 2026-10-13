@@ -1,6 +1,9 @@
 # Loaded-Map Texture Preview Plan — 2026-10-13
 
-Status: **proposed**, nothing built. Applied by another session working in this repo (`D:\programming\Node\3D_Map_Generator`); the Withering repo (`D:\programming\Node\Game_Template`) is **read-only reference** here. All paths and line numbers in the manifest were grepped on 2026-10-13; re-grep before editing (lines drift).
+**Completed:** 2026-10-13
+**Outcome:** Built as a tab in one unified preview server: the Loaded map and Visualizer tabs (the Model tab was dropped; `viewer.html` stays routable at `/model.html`). `--preview` always records debug frames and `--visualize` is an alias. `--preview-map FILE` starts the server from a frozen fixture with no generation, and `--textures` sets the default pack. The Loaded map tab has a texture report with fallback statuses, a fallback highlight, tier cut-away, a base/loaded switch, a file picker and WASD camera controls. The agents did not visually verify browser behaviour; the owner is to confirm it in a browser.
+
+Status: **implemented** (completed 2026-10-13). Originally **proposed**, nothing built. Applied by another session working in this repo (`D:\programming\Node\3D_Map_Generator`); the Withering repo (`D:\programming\Node\Game_Template`) is **read-only reference** here. All paths and line numbers in the manifest were grepped on 2026-10-13; re-grep before editing (lines drift).
 
 ## Purpose
 

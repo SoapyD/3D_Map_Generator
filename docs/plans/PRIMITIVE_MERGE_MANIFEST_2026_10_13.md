@@ -204,6 +204,6 @@ docs/processes/pipeline-flows/11-scene-and-export.md:75   one shared diffuse atl
 docs/processes/pipeline-flows/11-scene-and-export.md:92   manifest: shared atlas PNG
 docs/architecture/docs_and_config_guide.md:77             GEOMETRY section description (atlas tile/segment sizes)
 docs/plans/THIN_FLOOR_SLABS_PLAN_2026_10_11.md:27         3" pitch matches OBJ 3" segment subdivision (Phase B dependency)
-docs/plans/LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md:36   P1 uses 3" repeat per face (GLB-style); reference for Phase B
-docs/plans/LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md:68   OBJ-side equivalent: build-obj-and-atlas.js:52, ensure-texture.js:7
+docs/plans/archive/LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md:36   P1 uses 3" repeat per face (GLB-style); reference for Phase B
+docs/plans/archive/LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md:68   OBJ-side equivalent: build-obj-and-atlas.js:52, ensure-texture.js:7
 ```

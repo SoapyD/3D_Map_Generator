@@ -31,7 +31,7 @@ import { applyProfile } from './profiles/apply-profile.js';
  * @param {object} config - fully-resolved config (DEFAULTS already merged in)
  * @param {object} rng    - seeded RNG from createRng(config.seed)
  * @param {object} [opts]
- * @param {object|null} [opts.recorder] - debug recorder for --visualize (CLI only); no-op when absent
+ * @param {object|null} [opts.recorder] - debug recorder for --preview (CLI only); no-op when absent
  * @param {boolean} [opts.log]          - print per-stage banners (CLI only)
  * @returns {{ geometry: object, matrix: object }}
  */

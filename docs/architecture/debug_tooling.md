@@ -14,15 +14,15 @@ The generator has several independent debug mechanisms. They are activated by CL
 
 ### `--preview`
 - Sets `config.preview = true`
-- After generation completes, starts the HTTP preview server (`src/preview/server.js`) on port 3010
-- Server routes: `/` → `viewer.html`, `/model.glb`, `/geometry.json`
-- `viewer.html` is a basic Three.js GLB viewer with a collision grid toggle (the grid data comes from `geometry.json` which embeds `matrix.toDebugJSON()`)
+- After generation completes, starts the unified preview server (`src/preview/server.js`, routes in `preview-routes.js`) on port 3010
+- Serves a tabbed shell at `/` with a Loaded map tab (`loaded-map.html`) and a Visualizer tab (`visualizer.html`); the old basic viewer is still at `/model.html` but is no longer a tab
+- Always activates the debug recorder, so `debug_frames.json` exists for every generated run (see README "Running the viewer")
 
 ### `--visualize`
 - Sets `config.visualize = true` **and** `config.preview = true`
 - Activates the **debug recorder** (`src/preview/debug-recorder.js`): captures per-element rect arrays as each pipeline stage completes
 - Writes `output/debug_frames.json` on completion
-- Starts the preview server, but directs the browser to `visualizer.html` instead of `viewer.html`
+- Alias of `--preview` since 2026-10-13; both behave identically
 - Also enables the **trigger cell scan** in `emit-anchors.js` — without this flag the scan is skipped and no trigger cell rects are emitted into the frame data (performance saving)
 
 ### `--debug-connectivity`
@@ -40,11 +40,11 @@ The generator has several independent debug mechanisms. They are activated by CL
 
 ## The visualiser (`visualizer.html`)
 
-Served when `--visualize` is passed. Reads `debug_frames.json` and reconstructs the pipeline step-by-step.
+Served as the Visualizer tab of the unified preview (`--preview`, alias `--visualize`; always enabled for a generated map). See README "Running the viewer". Reads `debug_frames.json` and reconstructs the pipeline step-by-step.
 
 ### Data flow
 ```
-node src/index.js --visualize
+node src/index.js --preview     # --visualize is an alias
   → debug-recorder.js captures stage data
   → output/debug_frames.json written
   → server starts → browser opens visualizer.html
@@ -79,8 +79,8 @@ The collision matrix records a write history for every cell automatically — no
 
 | Mechanism | Flag | Output | Visualiser impact |
 |---|---|---|---|
-| Preview server | `--preview` | (none — starts server) | Opens `viewer.html` |
-| Debug recorder + visualiser | `--visualize` | `debug_frames.json` | Opens `visualizer.html`; enables trigger cell scan |
+| Preview server | `--preview` | `debug_frames.json` | Starts the tabbed server (Loaded map + Visualizer); records frames |
+| Alias | `--visualize` | same as `--preview` | Identical to `--preview`; enables trigger cell scan |
 | Connectivity dump | `--debug-connectivity` | `debug_connectivity.json` | None |
 | Debug flag | `--debug` | (none currently) | None |
 | Matrix write history output | `--debug-matrix` *(planned)* | `*_matrix_history.json` | None (conflict highlighting planned separately) |
