@@ -42,7 +42,11 @@ export function createMapState() {
     if (!decoded.ok) return null;
     const set = safeSet(textureSet);
     if (!glbCache.has(set)) {
-      const scene = buildScene({ version: 1, primitives: decoded.map.primitives }, { textureSet: set, debug: false });
+      const scene = buildScene({ version: 1, primitives: decoded.map.primitives }, {
+        textureSet: set, debug: false,
+        // tierOf() inputs, so the merged meshes split per tier like a generated map (unknown tier count: no upper clamp)
+        tiers: decoded.map.tiers ?? Infinity, tierHeight: decoded.map.levelHeight, slabThickness: decoded.map.floorThickness,
+      });
       glbCache.set(set, await buildGlbBuffer(scene));
     }
     return glbCache.get(set);

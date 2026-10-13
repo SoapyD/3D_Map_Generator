@@ -179,7 +179,10 @@ export async function buildGlbBuffer(scene) {
     if (idxAccIdx !== undefined) primitive.indices = idxAccIdx;
 
     const meshIdx = meshDefs.length;
-    meshDefs.push({ primitives: [primitive], name: mesh.name || undefined });
+    const meshDef = { primitives: [primitive], name: mesh.name || undefined };
+    // Merged meshes carry their member primitives (name, textureKey, index range) as glTF extras.
+    if (mesh.userData?.primitives) meshDef.extras = mesh.userData;
+    meshDefs.push(meshDef);
     nodes.push({ mesh: meshIdx, name: mesh.name || undefined });
 
     geo.dispose();

@@ -27,7 +27,8 @@ config: {
 1. If not debug: build texture pools via `buildTexturePools(config.textureSet)`.
 2. For each primitive in `geometry.primitives`:
    - Call `buildPrimitiveMesh(prim, getMaterial, ladderOpts)` → returns an array of `THREE.Mesh`.
-   - Add all meshes to the scene.
+   - Collect `{ prim, mesh }` entries.
+2b. Mesh merge (`GEOMETRY.mergeMeshes`, default `{ enabled: true, byTier: true }`; `config.mergeMeshes` overrides): `mergeSceneMeshes` groups the entries by (material, `tierOf(prim)`) in first-encounter order, bakes each mesh to world space and concatenates them into one indexed `BufferGeometry` per group (`merge-group-geometry.js`). The scene then holds about 50 to 90 meshes instead of 250 to 700. Every merged mesh is named `merged_t{tier}_m{n}` and carries `userData.primitives = [{ name, textureKey, indexStart, indexCount }]` (the GLB exporter writes it as the mesh glTF `extras`, which `GLTFLoader` restores as `userData`). `enabled: false` keeps the unmerged per-primitive meshes (byte-identical GLB to the pre-merge exporter). Ladders, quads and ceilings merge like slabs; the debug (flat colour) path merges per debug material. The primitives list, geometry JSON and collision matrix are untouched (the merge happens only here). See [MERGED_MESHES_PLAN_2026_10_13.md](../../plans/MERGED_MESHES_PLAN_2026_10_13.md).
 3. Material resolution:
    - `debug=true` → `resolveDebugMaterial(prim.name)` — flat colour per primitive type.
    - `debug=false` → `resolveTexturedMaterial(prim.textureKey, pools)` — world-space UVs: every face's UV = world position / `GEOMETRY.glbTileSize` along the face's axes (`src/core/box-face-world-uv.js`), plus one texture offset per texture key (`GEOMETRY.uvKeyOffset`, `src/generators/scene/texture-key-uv-offset.js`). Adjacent boxes of one texture share UVs along a common edge, so there is no visible seam between neighbouring boxes.
@@ -66,11 +67,17 @@ The geometry stage may merge adjacent boxes (see stage 10, "Primitive merge pass
 
 ### Tier assignment helper
 
-`tierOf(prim, config)` (`src/export/assign-primitive-tier.js`) maps a primitive to one vertical tier. The per-tier export that used it was removed; it is kept as a tested helper (used by the merge-pass tests).
+`tierOf(prim, config)` (`src/export/assign-primitive-tier.js`) maps a primitive to one vertical tier. It splits the merged scene meshes per tier and is used by the merge-pass tests. The loaded-map preview passes `tiers`, `tierHeight` and `slabThickness` from the fixture; the tier cut-away is a global clip plane, so it works on merged meshes unchanged.
+
+### Loaded-map fallback highlight with merged meshes
+
+`src/preview/loaded-map/loaded-map.html` cannot recolour one primitive inside a merged mesh, so when Highlight fallbacks is on it adds an overlay mesh per merged mesh. The overlay shares the vertex attributes, indexes only the triangles of the fallback primitives (`userData.primitives` index ranges, matched by name) and uses the flat highlight material with a polygon offset. Switching it off removes the overlays. GLBs without `userData.primitives` still swap material per mesh name.
 
 ## Key Files
 
 - [src/generators/scene/build-scene.js](../../../../src/generators/scene/build-scene.js)
+- [src/generators/scene/merge-scene-meshes.js](../../../../src/generators/scene/merge-scene-meshes.js) - per (material, tier) mesh merge
+- [src/generators/scene/merge-group-geometry.js](../../../../src/generators/scene/merge-group-geometry.js) - geometry concatenation
 - [src/generators/scene/buildTexturePools.js](../../../../src/generators/scene/buildTexturePools.js)
 - [src/generators/scene/resolve-textured-material.js](../../../../src/generators/scene/resolve-textured-material.js)
 - [src/export/glb-exporter.js](../../../../src/export/glb-exporter.js)

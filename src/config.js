@@ -213,6 +213,10 @@ export const GEOMETRY = {
     types: ['wall', 'pavement', 'floor'],   // merge groups: wall_N, pavement_N, floor_fN_x_z slabs
     epsilon: 0.0001,                        // inches; edge-touch / equality tolerance
   },
+  // Scene/GLB mesh merge (buildScene): instead of one THREE.Mesh per primitive, geometries are merged into one mesh per
+  // (material[, tier]) group. enabled=false reproduces the per-primitive meshes exactly. byTier splits each material by tierOf().
+  // Per-primitive names/ranges survive in the merged mesh's userData.primitives (glTF extras).
+  mergeMeshes: { enabled: true, byTier: true },
   // Ladder mesh dimensions
   ladderPoleWidth: 0.24,
   ladderPoleDepth: 0.24,
