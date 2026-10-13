@@ -12,9 +12,8 @@ import { runPipeline } from './pipeline.js';
 import { BELOW_GROUND } from './generators/collision/matrix.js';
 import { buildScene } from './generators/scene/index.js';
 import { exportToGlb, getOutputPath } from './export/glb-exporter.js';
-import { exportToObj } from './export/obj-geometry/export-to-obj.js';
 import { getObjOutputPath } from './export/obj-geometry/get-obj-output-path.js';
-import { exportCollisionObj } from './export/collision-exporter.js';
+import { warnDeprecatedOnce } from './core/warn-deprecated-once.js';
 
 async function main() {
   const config = parseArgs(process.argv);
@@ -87,21 +86,28 @@ async function main() {
   console.log('Building scene and exporting...');
   const scene = buildScene(geometry, config);
 
-  // Always export both GLB and OBJ with texture atlas
+  // GLB and geometry JSON are always written. The legacy OBJ + atlas PNG + collision OBJ
+  // (Tabletop Simulator, DEPRECATED) are written only with --obj.
   const outputPath = getOutputPath(config);
   await exportToGlb(scene, outputPath);
 
-  const objPath = await exportToObj(geometry, config, dir, baseName);
-  const collisionPath = await exportCollisionObj(geometry, dir, baseName);
-
   console.log(`\nDone!`);
   console.log(`  GLB: ${outputPath}`);
-  console.log(`  OBJ: ${objPath}`);
-  console.log(`  Texture: ${path.join(dir, baseName + '.png')}`);
-  console.log(`  Collision: ${collisionPath}`);
   console.log(`  Geometry: ${geometryPath}`);
 
+  if (config.obj) {
+    warnDeprecatedOnce('--obj');
+    const { exportToObj } = await import('./export/obj-geometry/export-to-obj.js');
+    const { exportCollisionObj } = await import('./export/collision-exporter.js');
+    const objPath = await exportToObj(geometry, config, dir, baseName);
+    const collisionPath = await exportCollisionObj(geometry, dir, baseName);
+    console.log(`  OBJ (legacy): ${objPath}`);
+    console.log(`  Texture (legacy): ${path.join(dir, baseName + '.png')}`);
+    console.log(`  Collision (legacy): ${collisionPath}`);
+  }
+
   if (config.splitTiers) {
+    warnDeprecatedOnce('--split-tiers');
     const { exportTiers } = await import('./export/export-tiers.js');
     const manifest = await exportTiers(geometry, config, dir, baseName);
     const written = manifest.tiers.filter(t => !t.empty).length;

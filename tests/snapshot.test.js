@@ -3,7 +3,7 @@ import { runStages, countPrims, quiet } from './helpers/run-stages.js';
 import { buildObjAndAtlas } from '../src/export/obj-geometry/build-obj-and-atlas.js';
 
 /**
- * Regression guards: object and vertex counts for fixed seeds on the default config
+ * Regression guards: object and (legacy OBJ) face counts for fixed seeds on the default config
  * (48x48, 4 tiers). If a count changes, generation changed. Review the change, then update.
  * Counts were last regenerated after the pipeline moved to the matrix-based stages
  * (foundations/buildings/floors/roofs/streets/connectivity/ladders/walls/cover/geometry).
@@ -28,10 +28,10 @@ function countObjects(seed) {
   };
 }
 
-function objVertexCount(seed) {
+function objFaceCount(seed) {
   const { geometry, config } = runStages(seed);
   const { objString } = quiet(() => buildObjAndAtlas(geometry, config));
-  return objString.split('\n').filter(l => l.startsWith('v ')).length;
+  return objString.split('\n').filter(l => l.startsWith('f ')).length;
 }
 
 describe.each([42, 100])('Snapshot regression - seed %i', (seed) => {
@@ -49,10 +49,11 @@ describe.each([42, 100])('Snapshot regression - seed %i', (seed) => {
     for (const key of Object.keys(fresh)) expect(fresh[key]).toBe(base[key]);
   });
 
-  // TTS hard cap (CLAUDE.md). Seed 100 used to exceed it (25,522); the exporter grid fix plus the
-  // primitive merge pass bring every seed well under (see PRIMITIVE_MERGE_PLAN).
-  it(`seed ${seed}: OBJ vertex count stays under the 25k TTS limit`, () => {
-    expect(objVertexCount(seed)).toBeLessThan(25000);
+  // Legacy OBJ export (deprecated; no vertex cap applies). Determinism guard: building twice is identical.
+  it(`seed ${seed}: legacy OBJ face count is deterministic and non-empty`, () => {
+    const first = objFaceCount(seed);
+    expect(first).toBeGreaterThan(0);
+    expect(objFaceCount(seed)).toBe(first);
   });
 
   it(`seed ${seed}: geometry has at least one primitive of each core kind`, () => {
@@ -84,8 +85,8 @@ describe('Snapshot regression - seed 42', () => {
     `);
   });
 
-  it('seed 42 OBJ vertex count is locked', () => {
-    expect(objVertexCount(42)).toMatchInlineSnapshot(`14926`);
+  it('seed 42 legacy OBJ face count is locked', () => {
+    expect(objFaceCount(42)).toMatchInlineSnapshot(`13364`);
   });
 });
 
@@ -109,7 +110,7 @@ describe('Snapshot regression - seed 100', () => {
     `);
   });
 
-  it('seed 100 OBJ vertex count is locked', () => {
-    expect(objVertexCount(100)).toMatchInlineSnapshot(`15228`);
+  it('seed 100 legacy OBJ face count is locked', () => {
+    expect(objFaceCount(100)).toMatchInlineSnapshot(`13706`);
   });
 });

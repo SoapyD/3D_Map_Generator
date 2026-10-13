@@ -1,6 +1,6 @@
 # Primitive Merge Plan — 2026-10-13
 
-Status: **Phase A implemented, uncommitted on `feature/primitive-merge` (A0 + merge pass + tests; measured results in "Implementation status and results" below)**. Phase B not started. Target release **v0.4.0** (`package.json:3` is 0.3.0). Phase A is the merge pass; Phase B (OBJ without atlas) is an **open decision** that needs the owner. Preview work on `feature/loaded-map-preview` (see [`LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md`](LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md)) is built first and is used to compare merged vs unmerged output. File and line refs: [`PRIMITIVE_MERGE_MANIFEST_2026_10_13.md`](PRIMITIVE_MERGE_MANIFEST_2026_10_13.md) (sections A–H, each with its regenerating grep). Section letters are referenced below as **[M-A]** etc.
+Status: **Phase A implemented, uncommitted on `feature/primitive-merge` (A0 + merge pass + tests; measured results in "Implementation status and results" below)**. Phase B (Track 2) is SUPERSEDED and will not be done: TTS is no longer a target and the OBJ export is deprecated (see the conventions alignment plan, Phase 3). The 25,000-vertex cap is retired. The merge pass itself was later disabled by default (see the conventions plan, Phase 1 and 2 results). Target release **v0.4.0** (`package.json:3` is 0.3.0). Phase A is the merge pass; Phase B (OBJ without atlas) is an **open decision** that needs the owner. Preview work on `feature/loaded-map-preview` (see [`LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md`](LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md)) is built first and is used to compare merged vs unmerged output. File and line refs: [`PRIMITIVE_MERGE_MANIFEST_2026_10_13.md`](PRIMITIVE_MERGE_MANIFEST_2026_10_13.md) (sections A–H, each with its regenerating grep). Section letters are referenced below as **[M-A]** etc.
 
 ## Context
 
@@ -124,7 +124,9 @@ OBJ total triangle area (all 10 seed/profile runs) and collision box volume iden
 
 Not visually verified: textures, seams and tier bands of merged output in TTS or the preview (see the preview comparison in the PR notes).
 
-## Track 2 — OBJ without atlas or subdivision (Phase B, OPEN DECISION)
+## Track 2 — OBJ without atlas or subdivision (Phase B, SUPERSEDED)
+
+**SUPERSEDED (2026-10-13).** Tabletop Simulator is no longer a target and the OBJ export is deprecated, so this proposal is dropped. See [`CONVENTIONS_ALIGNMENT_PLAN_2026_10_13.md`](CONVENTIONS_ALIGNMENT_PLAN_2026_10_13.md) (Phase 3). Kept below for history only.
 
 Proposal: write one `.mtl` material per texture key, use UVs that repeat every 3" like the GLB path, and remove the atlas and subdivision. This would remove `SEG_SIZE` from `add-shared-flat.js:3`, `add-shared-wall.js:3` and `add-sub-box.js:6`, the atlas build in `build-obj-and-atlas.js:52-104`, and the atlas PNG write at `:100-101`.
 
@@ -142,7 +144,7 @@ Proposal: write one `.mtl` material per texture key, use UVs that repeat every 3
 2. **Merge scope.** Walls (about 14k, the biggest lever), pavements and floor plates are the first candidates. Edge prims (`edges`, 3,244) and ladders are excluded in the first cut; merging slabs does not reduce edge cost. Confirm.
 3. **Target margin.** Hard limit `< 25,000`, or a target such as `≤ 23,000` for seed-to-seed headroom? Recommended: `≤ 23,000` for every seed and profile tested.
 4. **UV hash for merged primitives.** Keep the first constituent's origin (textures identical, recommended) or accept new texture offsets?
-5. **Phase B go / no-go**, after the TTS test above.
+5. ~~**Phase B go / no-go**, after the TTS test above.~~ Superseded: Phase B is dropped (OBJ deprecated).
 6. **Release scope.** Ship v0.4.0 with Phase A only, and Phase B later as a breaking format change? Recommended: yes.
 
 ## Phases and gates
@@ -151,7 +153,7 @@ Proposal: write one `.mtl` material per texture key, use UVs that repeat every 3
 - **Phase A0 — optional exporter-only drop** (separate PR, identical rendering).
 - **Phase A1–A3 — merge pass, coverage, tests** (one PR, behind `primitiveMerge.enabled`).
 - **Phase A4 — measure, flip default on** if all gates pass.
-- **Phase B — gated** by the TTS test and Open decision 5.
+- **Phase B — SUPERSEDED** (dropped; see the conventions alignment plan, Phase 3).
 
 ## Verification
 
@@ -169,7 +171,7 @@ Proposal: write one `.mtl` material per texture key, use UVs that repeat every 3
 - **Tier misassignment:** a merge that crosses tiers or drops the `floor_fN_` prefix moves geometry to the wrong tier file.
 - **Savings ceiling:** edges and ladders do not merge in the first cut, so Phase A may not be enough on its own for seed 100 without A0.
 - **Snapshot churn:** counts in `tests/snapshot.test.js` change on every merge; update them deliberately.
-- **Phase B unknowns:** TTS UV repeat and multi-material behaviour are unverified.
+- **Phase B unknowns:** superseded; Phase B is dropped.
 
 ## Verified vs inferred
 

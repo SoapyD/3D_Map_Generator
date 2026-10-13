@@ -38,7 +38,7 @@ For the CLI tool itself (not Claude hooks), the generation pipeline should have 
 - All floors are flat (Y values constant per tier)
 - All elevated areas are reachable (connectivity flood-fill)
 - No sightline exceeds configured maximum
-- File size is reasonable for TTS import (< 50MB)
+- GLB file size is reasonable for the Withering game / browser preview (< 50MB)
 - Polygon count is reasonable (< 500k triangles)
 
 ### Claude Code Hooks (settings.json)

@@ -1,6 +1,6 @@
 # Mordheim 3D Map Generator
 
-Procedural ruined city map generator for Mordheim / Tabletop Simulator. Generates seed-based 3D terrain maps with buildings, walls, walkways, ladders, and cover — all with perfectly flat surfaces so models don't tip over.
+Procedural ruined city map generator for Mordheim. The output (GLB, geometry primitives and collision matrix) is consumed by the Withering game; Tabletop Simulator is no longer a target. Generates seed-based 3D terrain maps with buildings, walls, walkways, ladders, and cover — all with perfectly flat surfaces so models don't tip over.
 
 ## Quick Start
 
@@ -10,9 +10,13 @@ node src/index.js --seed 42
 ```
 
 Outputs:
-- `output/mordheim_map_42.glb` — GLB file for browser preview
-- `output/mordheim_map_42.obj` — OBJ file for TTS import
+- `output/mordheim_map_42.glb` — GLB file (browser preview, Withering game)
+- `output/mordheim_map_42_geometry.json` — primitives plus the collision matrix
+
+With the deprecated `--obj` flag it also writes (legacy, for consumers pinned to v0.2.0):
+- `output/mordheim_map_42.obj` — OBJ file (was for TTS import)
 - `output/mordheim_map_42.png` — Texture atlas
+- `output/mordheim_map_42_collision.obj` — collision OBJ
 
 ## CLI Options
 
@@ -23,6 +27,8 @@ Outputs:
 | `--tiers N` | Number of elevated tiers (+ base) | 4 |
 | `--tier-height N` | Vertical spacing between tiers (inches) | 3 |
 | `--debug` | Use flat debug colours instead of textures | off |
+| `--obj` | **Deprecated.** Also write the legacy OBJ + atlas PNG + collision OBJ (Tabletop Simulator). Prints a one-time deprecation warning | off |
+| `--split-tiers` | **Deprecated.** Also write one OBJ + collider per tier and a manifest (legacy TTS elevator). Warns once | off |
 | `--preview` | Generate, then start the viewer on localhost:3010 (see [Running the viewer](#running-the-viewer)). Always records debug frames to `output/debug_frames.json` | off |
 | `--visualize` | Alias of `--preview` | off |
 | `--preview-map FILE` | Skip generation; start the viewer from a frozen `withering-map/1` or `/2` fixture. The Visualizer tab is greyed out | none |
@@ -104,7 +110,9 @@ The header shows the fixture's generator revision and `(dirty)` if it was cut fr
 
 Design history: `docs/plans/archive/LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md`.
 
-## Importing into Tabletop Simulator
+## Importing into Tabletop Simulator (legacy, deprecated)
+
+> Tabletop Simulator is no longer a target. These steps apply only to OBJ files from `--obj` or generator v0.2.0 (tag `v0.2.0`), and the OBJ export is scheduled for removal.
 
 1. Upload the `.obj` and `.png` files somewhere accessible via URL (Steam Cloud, Imgur, etc.)
 2. In TTS: Objects > Components > Custom > Custom Model
@@ -121,7 +129,7 @@ Design history: `docs/plans/archive/LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.m
 4. **Walls** — Quadrant-driven with upper/lower damage rows
 5. **Connectivity** — Walkways (blue), yellow/red/orange ladders
 6. **Cover** — Rooftop, ground, and interior cover objects
-7. **Export** — GLB + OBJ with texture atlas
+7. **Export** — GLB + geometry JSON (OBJ with texture atlas only with the deprecated `--obj`)
 
 ## Configuration
 
@@ -147,7 +155,7 @@ assets/textures/base/
 ### Included packs
 
 - **`base`** — default solid colour textures, fully opaque
-- **`transparent_base`** — same as base but walls have 85% opacity (15% transparent). Transparency works in GLB viewers but **not in TTS** (TTS doesn't support transparent PNGs on custom models)
+- **`transparent_base`** — same as base but walls have 85% opacity (15% transparent). Transparency works in GLB viewers (legacy note: it did not work in the old TTS OBJ path, which does not support transparent PNGs on custom models)
 
 ### Switching texture packs
 
@@ -176,7 +184,7 @@ PNGs with alpha channels are automatically detected. Materials with alpha < 100%
 2. Edit the wall PNGs to have a lower alpha (e.g. 85%)
 3. Use `--texture-set your_transparent_pack`
 
-Note: TTS does not support PNG transparency on custom models. The transparent pack is useful for the GLB browser preview only.
+Note (legacy): the old TTS OBJ path did not support PNG transparency on custom models. The transparent pack is useful for the GLB browser preview only.
 
 ### Regenerating procedural textures
 

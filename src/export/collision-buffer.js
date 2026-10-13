@@ -1,5 +1,5 @@
 /**
- * Collision mesh buffer core — builds the simplified TTS collider OBJ string in memory (no file
+ * DEPRECATED (legacy TTS collider, kept for consumers pinned to v0.2.0). Collision mesh buffer core — builds the simplified TTS collider OBJ string in memory (no file
  * writes). The file-writing `exportCollisionObj` wraps this; the programmatic
  * `generateColliderToBuffer` returns the string directly.
  *

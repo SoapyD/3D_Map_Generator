@@ -1,11 +1,13 @@
 ---
 name: vertex-optimiser
-description: Analyse OBJ vertex usage, identify waste, and apply optimisation techniques to stay under TTS limits.
+description: DEPRECATED (TTS-only). Analyse legacy OBJ vertex usage for the retired 25k Tabletop Simulator cap. Do not use for current work.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: sonnet
 ---
 
 # Vertex Optimiser
+
+> **DEPRECATED.** Tabletop Simulator is no longer a target and the 25,000-vertex cap is retired (see `docs/plans/CONVENTIONS_ALIGNMENT_PLAN_2026_10_13.md`). The OBJ export is itself deprecated and only written with `--obj`. This agent is kept for reference and for work on the legacy exporter pinned to v0.2.0. Do not run it for normal geometry changes.
 
 Analyses the OBJ export pipeline for vertex waste and applies optimisation techniques. Run this when adding new geometry types, when vertex counts approach the TTS 25k limit, or as a periodic check.
 

@@ -28,8 +28,8 @@ Run `node src/index.js --seed 42` and verify it completes without error.
 **Gate 3: Generation test (seed 100)**
 Run `node src/index.js --seed 100` and verify it completes without error.
 
-**Gate 4: Vertex count check**
-Count vertices (`grep -c "^v "`) in both output OBJ files. Fail if either exceeds 25,000.
+**Gate 4: Determinism and matrix parity**
+Run `node src/index.js --seed 42` twice and confirm identical GLB and geometry JSON hashes. The old 25,000-vertex TTS cap no longer applies; the OBJ is only written with the deprecated `--obj` flag.
 
 **Gate 5: Config completeness**
 Grep all .js files under `src/` for numeric literals that should be in config. Flag any new magic numbers not present in `src/config.js`.
@@ -37,8 +37,8 @@ Grep all .js files under `src/` for numeric literals that should be in config. F
 **Gate 6: Unused imports**
 For each import statement in every source file, verify the imported name is actually used in that file.
 
-**Gate 7: Both exporters in sync**
-Verify that any geometry type rendered in `scene-builder.js` (floors, walls, walkways, cover, ladders, platforms, courtyards, street scatter) also has a corresponding export block in `obj-exporter.js`.
+**Gate 7: Scene builder and collision matrix in sync**
+Verify that any geometry type rendered by the GLB scene builder (floors, walls, walkways, cover, ladders, platforms, courtyards, street scatter) is also written to the collision matrix where it should be collidable. Do not require OBJ parity: the OBJ exporter is deprecated.
 
 ### Step 2: Write the report
 
@@ -69,5 +69,5 @@ Branch: <current branch>
 - Run ALL gates even if early ones fail.
 - Report only — do not fix anything.
 - Include file paths and line numbers for failures.
-- Vertex count is a hard limit — always flag if close (>23,000).
+- Flag any change to the collision-matrix hash or per-seed determinism that is not deliberate. There is no vertex limit any more.
 - Test at least 2 different seeds to catch seed-dependent issues.

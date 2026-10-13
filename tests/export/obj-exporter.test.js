@@ -3,7 +3,6 @@ import { getObjOutputPath } from '../../src/export/obj-geometry/get-obj-output-p
 import { buildObjAndAtlas } from '../../src/export/obj-geometry/build-obj-and-atlas.js';
 import { runStages, quiet } from '../helpers/run-stages.js';
 
-const TTS_VERTEX_LIMIT = 25000;
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47];
 
 describe('getObjOutputPath', () => {
@@ -14,6 +13,8 @@ describe('getObjOutputPath', () => {
   });
 });
 
+// Legacy OBJ + atlas export (deprecated, kept for consumers pinned to v0.2.0). The old 25,000-vertex
+// Tabletop Simulator cap no longer applies; these tests lock validity, determinism and face count.
 describe('buildObjAndAtlas (seed 42)', () => {
   const { geometry, config } = runStages(42);
   const { objString, atlasPngBuffer } = quiet(() => buildObjAndAtlas(geometry, config));
@@ -28,10 +29,6 @@ describe('buildObjAndAtlas (seed 42)', () => {
     expect(vt.length).toBeGreaterThan(0);
     expect(vn.length).toBeGreaterThan(0);
     expect(f.length).toBeGreaterThan(0);
-  });
-
-  it('stays under the 25k TTS vertex limit', () => {
-    expect(v.length).toBeLessThan(TTS_VERTEX_LIMIT);
   });
 
   it('vertex lines are "v x y z" with finite numbers', () => {
@@ -80,7 +77,7 @@ describe('buildObjAndAtlas (seed 42)', () => {
     expect(again.objString).toBe(objString);
   });
 
-  it('seed 42 vertex count is locked', () => {
-    expect(v.length).toMatchInlineSnapshot(`14926`);
+  it('seed 42 face count is locked (legacy OBJ; no vertex cap applies)', () => {
+    expect(f.length).toMatchInlineSnapshot(`13364`);
   });
 });

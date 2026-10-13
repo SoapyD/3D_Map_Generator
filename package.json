@@ -1,7 +1,7 @@
 {
   "name": "3d-map-generator",
   "version": "0.3.0",
-  "description": "Procedural ruined city map generator for Mordheim / Tabletop Simulator",
+  "description": "Procedural ruined city map generator for Mordheim",
   "type": "module",
   "main": "src/index.js",
   "exports": {

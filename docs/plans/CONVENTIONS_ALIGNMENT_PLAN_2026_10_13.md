@@ -1,6 +1,6 @@
 # Conventions Alignment Plan — 2026-10-13
 
-**Status (2026-10-13): Phases 1 and 2 implemented, uncommitted on `feature/primitive-merge`. Phase 3 still BLOCKED (a live consumer exists, see Phase 3). Phase 4 text not started (on hold).** Results are in "Phase 1 and 2 results" below; the manifest sections B, C, D, F, N were updated for the new code. Companion: [`CONVENTIONS_ALIGNMENT_MANIFEST_2026_10_13.md`](CONVENTIONS_ALIGNMENT_MANIFEST_2026_10_13.md) (file:line refs and regenerating greps). This plan supersedes Track 2 (Phase B) of [`PRIMITIVE_MERGE_PLAN_2026_10_13.md`](PRIMITIVE_MERGE_PLAN_2026_10_13.md).
+**Status (2026-10-13): Phases 1, 2, 3a and 4 (4a and 4b) implemented, uncommitted on `feature/primitive-merge` (Phases 1-2 committed as a74f324). Phase 3b (deletion) NOT STARTED: blocked until the wyrdwars_manager pin PR (#317, pins the generator to v0.2.0 / c97bb01) is merged and the owner says to delete.** Results are in "Phase 1 and 2 results" below; the manifest sections B, C, D, F, N were updated for the new code. Companion: [`CONVENTIONS_ALIGNMENT_MANIFEST_2026_10_13.md`](CONVENTIONS_ALIGNMENT_MANIFEST_2026_10_13.md) (file:line refs and regenerating greps). This plan supersedes Track 2 (Phase B) of [`PRIMITIVE_MERGE_PLAN_2026_10_13.md`](PRIMITIVE_MERGE_PLAN_2026_10_13.md).
 
 ## Summary
 
@@ -124,14 +124,31 @@ Goal: each face's UV = world position / `glbTileSize`, so adjacent boxes line up
 
 **Risks:** a single global offset gives visibly regular tiling. The per-key hash is the compromise.
 
-## Phase 3 — Retire TTS-only paths (NOT STARTED; BLOCKED)
+## Phase 3 — Retire TTS-only paths (3a DONE as deprecation; 3b NOT STARTED, BLOCKED)
 
-**Gate result: the owner's condition is not met.** `D:\programming\Node\wyrdwars_manager` depends on the generator as a git dependency (`api/package.json:22`, pinned to codeload commit `d366710…` in `pnpm-lock.yaml:438`). It imports:
+### Phase 3a results (2026-10-13, owner: "apply 3 and 4")
+
+Context decided by the owner: the generator no longer targets Tabletop Simulator; the consumer is the Withering game (GLB + primitives + collision matrix). `wyrdwars_manager` stays on generator v0.2.0 (tag `v0.2.0`, commit `c97bb01`; its pin PR #317 is open and **not yet merged**) and uses the OBJ/tier/collider library exports. The old behaviour is also preserved in tags `v0.2.0` and `v0.3.0`. Applied as **deprecate, not delete**:
+
+- **`--obj` is real.** `src/index.js` writes the OBJ, atlas PNG and collision OBJ only with `--obj` (default off, `DEFAULTS.obj`). The GLB and `_geometry.json` are always written. The OBJ exporters are imported lazily inside the `--obj` branch. Preview (`--preview`, `--preview-map`) never read the OBJ and is unaffected. `src/tools/preview-building-export.js` has its own local `--obj` format flag and calls `exportToObj` directly; unchanged.
+- **Deprecation warnings.** `src/core/warn-deprecated-once.js` (`warnDeprecatedOnce(feature)`, once per process, text in `DEPRECATION` in `src/config.js`) is called by `generateObjToBuffers`, `generateColliderToBuffer`, `generateTiersToBuffers` (marked `@deprecated`, returned data unchanged) and by the CLI for `--obj` and `--split-tiers`. `src/export/collision-buffer.js` and `src/export/export-tiers.js` carry a deprecation header. `tests/core/warn-deprecated-once.test.js` asserts warn-once and unchanged return data.
+- **Vertex cap removed as a requirement.** `.claude/hooks/check-vertex-count.mjs` is informational only (exit 0, runs only after `--obj` runs, states the TTS cap no longer applies); `.claude/settings.json` unchanged and valid. `tests/export/obj-exporter.test.js` and `tests/snapshot.test.js` dropped the 25k assertions; the vertex locks became legacy-OBJ face-count locks (seed 42: 13,364; seed 100: 13,706) plus a determinism check.
+- **Agents.** `vertex-optimiser.md` marked deprecated (TTS-only); the 25k rule was replaced with matrix parity, determinism, tests and `check:all` in `_session-brief.md`, `pr-shipper.md`, `release-validator.md`, `status-tracker.md`, `test-builder.md`. `project-manager.md` unchanged.
+- **Not done (by design).** No code or test file was deleted. `src/export/obj-geometry/`, `export-tiers.js`, the collision OBJ files, `src/lib.js` exports, `GEOMETRY.objAtlas*`/`uvHash*` and the `pngjs` OBJ imports all remain.
+- **Observed during this step.** `test/lib.test.js` (the stale top-level `test/` folder, uses `node:test`, not run by vitest) still imports the deprecated exports and would now emit the one-time warning if run by hand.
+
+### Phase 3b — deletion (NOT STARTED; BLOCKED)
+
+Out of scope until (1) the wyrdwars_manager pin PR #317 is merged (so it no longer follows the unpinned generator) and (2) the owner says to delete. Then use the removal footprint table below, ship as the next minor or major, and run the gates at the end of this section. Until then the footprint table is the to-do list, not done work.
+
+### Original gate analysis (before the 2026-10-13 decision)
+
+**Gate result: the owner's condition was not met at the time of writing.** `D:\programming\Node\wyrdwars_manager` depends on the generator as a git dependency (`api/package.json:22`, pinned to codeload commit `d366710…` in `pnpm-lock.yaml:438`). It imports:
 - `generateObjToBuffers` (`lib/src/core/maps/generateMapObjAssets.ts:2, 11`), exposed by `getMapObj.ts:17` and `getMapTexture.ts:17`.
 - `generateTiersToBuffers` (`generateMapTiers.ts:2, 32`), exposed by `getMapTiersManifest.ts:18`, `getMapTierObj.ts:21` and `getMapTierCollider.ts:22`.
 - `generateColliderToBuffer` (`generateMapCollider.ts:2, 11`), exposed by `getMapCollider.ts:17`.
 
-Phase 3 can start only after the owner chooses (a) migrating wyrdwars to the GLB and collision-matrix path, or (b) keeping a pinned old generator version for it. Whether these controllers are routed was not checked.
+Phase 3 could start only after the owner chose (a) migrating wyrdwars to the GLB and collision-matrix path, or (b) keeping a pinned old generator version for it. The owner chose (b) on 2026-10-13 (v0.2.0); whether these controllers are routed was not checked.
 
 **Removal footprint**
 
@@ -157,7 +174,11 @@ Phase 3 can start only after the owner chooses (a) migrating wyrdwars to the GLB
 
 **Gates:** wyrdwars migrated or pinned; the test removals listed above; `npm test`; `npm run check:all`; no dangling imports (ripgrep for every removed module name).
 
-## Phase 4 — Docs, CLAUDE.md and agents (text only)
+## Phase 4 — Docs, CLAUDE.md and agents (text only) — DONE (4a and 4b, 2026-10-13)
+
+Both 4a and 4b were applied together with Phase 3a, worded as "TTS is no longer a target; deprecated, kept for v0.2.0 consumers" rather than "removed", because 3b has not run. Files changed: `CLAUDE.md`, `README.md`, `docs/PROJECT_OVERVIEW.md`, `docs/GENERATION_PIPELINE.md`, `docs/FOLDER_STRUCTURE.md`, `docs/AGENTS_AND_HOOKS.md`, `docs/IMPLEMENTATION_PHASES.md` (historical banner), `docs/issues.md` (seed 7/100 cap entries closed), `docs/architecture/design_philosophy.md`, `docs/architecture/docs_and_config_guide.md`, `docs/processes/pipeline-flows/10-geometry.md`, `11-scene-and-export.md`, `docs/plans/PRIMITIVE_MERGE_PLAN_2026_10_13.md` (Track 2 / Phase B superseded), source comments in `src/config.js`, `src/lib.js`, `src/pipeline.js`, `src/index.js`, `src/export/collision-buffer.js`, `src/export/export-tiers.js`, `src/generate-*-buffers.js`, and `package.json` description (version not bumped). `8-walls.md:7` already described the greedy cover after Phase 1. When 3b runs, the legacy sections in these docs must be deleted rather than re-worded.
+
+Original task list:
 
 - **4a. Now (no code).**
   - CLAUDE.md: the target statement (`:1`, `:5`), the Export Details block (`:24`, `:27`, `:30`), "no curves in OBJ export" (`:40`), the Testing rule (`:58-61`, the 25k line at `:60`).

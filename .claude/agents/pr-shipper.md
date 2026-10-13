@@ -29,9 +29,9 @@ Takes work already in the working tree (or on a feature branch) and ships it: ru
 Run `git status` and `git branch --show-current`. If on a feature branch, stay on it. If on `dev` or `master`, create `<type>/<short-description>` first (match existing naming). Never commit on `dev` or `master`.
 
 ### Step 2: Local gates (before committing)
-- `npm test` -- expected baseline: one `it.fails` for seed 100 exceeding 25k vertices. Any other failure must be fixed.
+- `npm test` -- all tests must pass (no expected failures).
 - `npm run check:all` -- baseline is 37 findings. Do not add new ones.
-- For generation/geometry changes, also run several seeds (e.g. 42, 7, 123) and confirm vertex counts stay under 25,000 (per CLAUDE.md). Check both GLB and OBJ if geometry or UVs changed.
+- For generation/geometry changes, also run several seeds (e.g. 42, 7, 123) and confirm determinism per seed and collision-matrix parity (the 25,000-vertex TTS cap no longer applies). Check the GLB; the legacy OBJ (`--obj`) only if you touched the deprecated OBJ code.
 - Docs: if pipeline or config behaviour changed, confirm the relevant docs from CLAUDE.md "Reference Documents" (especially `docs/architecture/docs_and_config_guide.md`) are updated; update them in the same PR if not.
 
 ### Step 3: Commit

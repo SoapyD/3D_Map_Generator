@@ -6,7 +6,7 @@
  * used to inline their own stage lists, which silently drifted — lib.js fell
  * behind index.js (no collision matrix, missing roofs/streets/ladders) and threw
  * the moment a matrix-dependent stage ran. Keeping the order here means the
- * browser GLB and the TTS OBJ are always generated from the same geometry.
+ * browser GLB and the (legacy, --obj) OBJ are always generated from the same geometry.
  *
  * Returns the built geometry plus the collision matrix. The CLI embeds the
  * matrix in its viewer handover and debug dumps; lib.js ignores it.

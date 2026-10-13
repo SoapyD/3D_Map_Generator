@@ -60,7 +60,7 @@ The pipeline includes a built-in validation pass after generation. A generated m
 - All floors are flat (Y values constant per tier)
 - All elevated areas are reachable from ground level (flood-fill)
 - No sightline exceeds the configured maximum
-- Output file size and polygon count are within TTS limits
+- Output file size and primitive count are reasonable for the consumer (the Withering game); the old Tabletop Simulator limits (25,000 vertices per OBJ) no longer apply
 
 Validation is not an afterthought bolted on at the end — it is the definition of "done."
 

@@ -87,11 +87,11 @@ Each generator is a pure function (data in, enriched data out), so test the cont
 
 ### Step 5: Write tests for exporters
 
-**OBJ exporter tests:**
+**OBJ exporter tests (legacy/deprecated export; only when touching it):**
 - Output contains valid OBJ syntax (v, vt, vn, f lines)
 - Atlas PNG is generated with correct dimensions
-- Vertex count for a known seed matches expected value
-- UV coordinates fall within atlas tile bounds (no bleeding)
+- Face count for a known seed matches expected value (no vertex cap applies)
+- UV coordinates fall within the 0-1 atlas range
 - All face indices reference valid vertices
 
 **GLB exporter tests:**
@@ -106,7 +106,7 @@ Each generator is a pure function (data in, enriched data out), so test the cont
 ### Step 6: Write snapshot tests
 
 For seeds 42 and 100, capture and assert:
-- Total vertex count
+- Total primitive count
 - Number of objects (buildings, floors, walls, walkways, ladders, cover)
 - These act as regression guards — if counts change, something changed in generation
 
@@ -123,5 +123,5 @@ For seeds 42 and 100, capture and assert:
 - One test file per source module, mirroring the src/ directory structure in tests/.
 - Use descriptive test names: `"seed 42 produces 16 buildings"` not `"test1"`.
 - Keep test data minimal — don't copy entire config, just override what matters.
-- Snapshot values (vertex counts, object counts) must include the seed in the test name.
+- Snapshot values (face/primitive counts, object counts) must include the seed in the test name.
 - Do not modify source files — only create/edit test files and config.

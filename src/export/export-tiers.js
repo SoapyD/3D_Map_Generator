@@ -1,4 +1,5 @@
 /**
+ * DEPRECATED (legacy TTS, --split-tiers; kept for consumers pinned to v0.2.0).
  * Per-tier split export — groups the world-baked geometry primitives by tier and produces one
  * OBJ + one simplified collider OBJ per non-empty tier, plus a manifest, all sharing a SINGLE
  * texture atlas PNG. Because geometry is world-baked, every per-tier file carries absolute
