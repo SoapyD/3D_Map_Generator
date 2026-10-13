@@ -71,7 +71,7 @@ Non-river street rects → `CELL.STREET` at `Y = -slabThickness`, replacing `CEL
 
 ### Phase 5 — Pavements (`write-pavements.js`)
 
-For each foundation block, scan every `(cx, cz)` at `cy = 0`. Cells that are not `CELL.SHELL` get `CELL.PAVEMENT` at `Y = -slabThickness`. Written cells are collected and converted to **row-run rects** (contiguous cx runs per cz row) so geometry correctly excludes building footprints.
+For each foundation block, scan every `(cx, cz)` at `cy = 0`. Cells that are not `CELL.SHELL` get `CELL.PAVEMENT` at `Y = -slabThickness`. Written cells are collected and converted to rects by the shared greedy rect cover (`coverGridWithRects`: runs along X, stacked along Z while the whole run is present) so geometry correctly excludes building footprints.
 
 ## Output Contract
 
@@ -87,7 +87,7 @@ For each foundation block, scan every `(cx, cz)` at `cy = 0`. Cells that are not
     }
   ],
   streets:   [{ x, z, w, d }], // non-river street rects
-  pavements: [{ x, z, w, d }], // row-run rects excluding shells
+  pavements: [{ x, z, w, d }], // greedy-cover rects excluding shells
 }
 ```
 
@@ -99,7 +99,7 @@ For each foundation block, scan every `(cx, cz)` at `cy = 0`. Cells that are not
 - [src/generators/streets/write-river.js](../../../../src/generators/streets/write-river.js) — writes `CELL.RIVER`; clears street placeholder
 - [src/generators/streets/derive-river-banks.js](../../../../src/generators/streets/derive-river-banks.js) — matrix scan → bank records + `CELL.RIVER_BANK`
 - [src/generators/streets/write-streets.js](../../../../src/generators/streets/write-streets.js) — writes `CELL.STREET`
-- [src/generators/streets/write-pavements.js](../../../../src/generators/streets/write-pavements.js) — writes `CELL.PAVEMENT`; returns row-run rects
+- [src/generators/streets/write-pavements.js](../../../../src/generators/streets/write-pavements.js) — writes `CELL.PAVEMENT`; returns greedy-cover rects
 - [src/generators/streets/derive-street-rects.js](../../../../src/generators/streets/derive-street-rects.js) — existing helper; unchanged
 
 ## Edge Cases & Constraints
@@ -107,5 +107,5 @@ For each foundation block, scan every `(cx, cz)` at `cy = 0`. Cells that are not
 - Must run **before** Connectivity (Stage 6) — `CELL.RIVER` must be in the matrix before anchor ray-casts fire. River corridors at `cy = -slabThickness` are `CELL.EMPTY` (placeholder cleared), so crossings work without changes to `pair-anchors.js`.
 - All river volumes are written before any bank derivation runs — banks for River 1 cannot span positions River 2 will later occupy.
 - Bank derivation uses `!= CELL.RIVER` cell checks, so intersection nodes where two rivers share a rect are handled correctly; duplicate bank records are deduplicated by `(x, z, length, axis, facing)` key.
-- Pavement row-run rects correctly exclude building shells; geometry emits flat slabs with top face at `Y = 0`.
+- Pavement cover rects correctly exclude building shells; geometry emits flat slabs with top face at `Y = 0`.
 - `--all-rivers` overrides the RNG roll regardless of seed.

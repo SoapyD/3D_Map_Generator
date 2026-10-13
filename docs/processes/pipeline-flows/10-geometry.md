@@ -1,6 +1,6 @@
 # Stage 10: Geometry Build
 
-> Last verified: 2026-10-13 (primitive merge pass added)
+> Last verified: 2026-10-13 (primitive merge pass disabled after the greedy rect cover)
 
 ## Overview
 
@@ -80,7 +80,9 @@ Each primitive is a plain JS object:
 }
 ```
 
-### Primitive merge pass
+### Primitive merge pass (disabled)
+
+**Status: `GEOMETRY.primitiveMerge.enabled = false`.** After the shared greedy rect cover (walls, pavements, floor plates; see stages 8, 5 and 3) the pass removed 0% of primitives on seeds 1, 7, 42, 100 and 2024 under both profiles (threshold to keep it: 2%), so it ships off and is kept only for A/B tests. The description below applies when it is enabled.
 
 After all builders have run, `buildGeometry` calls `mergePrimitives(primitives, config.primitiveMerge ?? GEOMETRY.primitiveMerge)` (`src/generators/geometry/merge-primitives.js`; helpers in `src/generators/geometry/merge/`). It joins adjacent boxes into one primitive so the OBJ spends fewer vertices; the merged list is what GLB, OBJ, collision, tier export and the loaded-map preview all consume. Switch it off with `GEOMETRY.primitiveMerge.enabled = false` (unmerged baseline for A/B comparison).
 
@@ -88,7 +90,7 @@ After all builders have run, `buildGeometry` calls `mergePrimitives(primitives, 
 - **Candidates must share** type, `textureKey`, `y`, `h`, the flags (`shared`, `emitTop`, `emitBottom`, `simpleBottom`, `rotateUV`, `axis`) and the name family (`floor_fN` so the tier named by the prefix never changes). Walls also share their line (axis plus the fixed cross-coordinate and thickness), so only collinear walls can join.
 - **Geometry rule**: two boxes merge only when their union is exactly a rectangle (equal extent on one axis, touching end-to-end on the other). Overlaps and gaps never merge. The pass is a deterministic greedy pairwise fixpoint in primitive order (no RNG).
 - **Result**: the merged primitive keeps the earlier constituent's name and position in the list (so name prefixes, `tierOf` and the collision allowlist behave as before) and gains `uvOrigin: { x, y, z, w, h, d }` = the first constituent's box, so the exporters hash the same origin for the per-object UV offset (see stage 11). The input list is not mutated.
-- **Wall note**: wall primitives are 1" (or 0.75") tall rows. Rows are never merged vertically (different `y`), so on default-profile maps almost no walls merge; the savings come from pavements and floor plates.
+- **Wall note**: the wall stage now emits stacked rects, so the pass has nothing left to join.
 
 ## Output Contract
 

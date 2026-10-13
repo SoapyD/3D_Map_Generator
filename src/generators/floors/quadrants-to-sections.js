@@ -1,38 +1,22 @@
+import { coverGridWithRects } from '../../core/grid-rect-cover/index.js';
+
+// Quadrant indices on the 2x2 mask: 0 = top-left, 1 = top-right, 2 = bottom-left, 3 = bottom-right.
+const QUAD_COLS = 2;
+const QUAD_ROWS = 2;
+
+/**
+ * Covers the present quadrants of a building footprint with the fewest greedy rects (shared grid
+ * cover). All four quadrants give one full-footprint rect.
+ */
 export function quadrantsToSections(building, present) {
-  const mx = building.x + building.w / 2;
-  const mz = building.z + building.d / 2;
+  const halfW = building.w / QUAD_COLS;
+  const halfD = building.d / QUAD_ROWS;
 
-  const quads = {
-    0: { x: building.x, z: building.z, w: building.w / 2, d: building.d / 2 },
-    1: { x: mx,         z: building.z, w: building.w / 2, d: building.d / 2 },
-    2: { x: building.x, z: mz,         w: building.w / 2, d: building.d / 2 },
-    3: { x: mx,         z: mz,         w: building.w / 2, d: building.d / 2 },
-  };
-
-  const sections = [];
-  const used = new Set();
-
-  // Merge adjacent pairs into larger rects where possible
-  if (present.has(0) && present.has(1)) {
-    sections.push({ x: building.x, z: building.z, w: building.w, d: building.d / 2 });
-    used.add(0); used.add(1);
-  }
-  if (present.has(2) && present.has(3)) {
-    sections.push({ x: building.x, z: mz, w: building.w, d: building.d / 2 });
-    used.add(2); used.add(3);
-  }
-  if (present.has(0) && present.has(2) && !used.has(0) && !used.has(2)) {
-    sections.push({ x: building.x, z: building.z, w: building.w / 2, d: building.d });
-    used.add(0); used.add(2);
-  }
-  if (present.has(1) && present.has(3) && !used.has(1) && !used.has(3)) {
-    sections.push({ x: mx, z: building.z, w: building.w / 2, d: building.d });
-    used.add(1); used.add(3);
-  }
-
-  for (const q of present) {
-    if (!used.has(q)) sections.push(quads[q]);
-  }
-
-  return sections;
+  return coverGridWithRects(QUAD_COLS, QUAD_ROWS, (c, r) => present.has(r * QUAD_COLS + c))
+    .map((span) => ({
+      x: building.x + span.col * halfW,
+      z: building.z + span.row * halfD,
+      w: span.cols * halfW,
+      d: span.rows * halfD,
+    }));
 }

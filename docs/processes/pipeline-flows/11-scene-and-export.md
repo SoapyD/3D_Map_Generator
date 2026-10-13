@@ -30,7 +30,7 @@ config: {
    - Add all meshes to the scene.
 3. Material resolution:
    - `debug=true` → `resolveDebugMaterial(prim.name)` — flat colour per primitive type.
-   - `debug=false` → `resolveTexturedMaterial(prim.textureKey, pools)` — UV-mapped from the atlas.
+   - `debug=false` → `resolveTexturedMaterial(prim.textureKey, pools)` — world-space UVs: every face's UV = world position / `GEOMETRY.glbTileSize` along the face's axes (`src/core/box-face-world-uv.js`), plus one texture offset per texture key (`GEOMETRY.uvKeyOffset`, `src/generators/scene/texture-key-uv-offset.js`). Adjacent boxes of one texture share UVs along a common edge, so there is no visible seam between neighbouring boxes.
 
 Texture categories loaded by `buildTexturePools`:
 `walls`, `landmark_walls`, `floors`, `objects`, `ladders`, `walkways`, `courtyards`, `base_map`, `roofs`, `rivers`, `river_banks`, `streets`, `pavements`, `map_skirt`.
@@ -98,7 +98,7 @@ Each tier entry carries its **XZ footprint bounds** (identical across tiers — 
 
 ### Merged primitives and `uvOrigin`
 
-The geometry stage may merge adjacent boxes (see stage 10, "Primitive merge pass"). A merged primitive carries `uvOrigin` (the first constituent's box). The per-object UV offset hash (`GEOMETRY.uvHashU/V`) reads `uvOrigin` when present, in every exporter: `addSharedFlat` and `addSharedWall` (OBJ, corner x/y/z) and `createSlab` via `build-primitive-mesh.js` / `uv-origin-center.js` (GLB, box centre). The first segment of a merged piece therefore keeps its previous texture offset; later 3" segments continue the pattern from there, so a merged span is not tile-for-tile identical to its unmerged constituents. Disable with `GEOMETRY.primitiveMerge.enabled = false`.
+The geometry stage may merge adjacent boxes (see stage 10, "Primitive merge pass"). A merged primitive carries `uvOrigin` (the first constituent's box). The per-object UV offset hash (`GEOMETRY.uvHashU/V`) reads `uvOrigin` in the OBJ exporter only (`addSharedFlat`, `addSharedWall`, corner x/y/z). The GLB no longer uses `uvOrigin` or the per-object hash (world-space UVs, see above). The first segment of a merged piece therefore keeps its previous texture offset; later 3" segments continue the pattern from there, so a merged span is not tile-for-tile identical to its unmerged constituents. The merge pass is disabled by default (`GEOMETRY.primitiveMerge.enabled = false`, see stage 10).
 
 ### Unused vertex grids (OBJ)
 

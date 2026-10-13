@@ -75,17 +75,17 @@ describe('Snapshot regression - seed 42', () => {
         "internalWalls": 9,
         "ladderSegments": 29,
         "pillars": 20,
-        "primitives": 1079,
+        "primitives": 802,
         "roofs": 24,
         "streetScatter": 14,
         "walkways": 20,
-        "walls": 485,
+        "walls": 276,
       }
     `);
   });
 
   it('seed 42 OBJ vertex count is locked', () => {
-    expect(objVertexCount(42)).toMatchInlineSnapshot(`20196`);
+    expect(objVertexCount(42)).toMatchInlineSnapshot(`14926`);
   });
 });
 
@@ -100,16 +100,16 @@ describe('Snapshot regression - seed 100', () => {
         "internalWalls": 9,
         "ladderSegments": 31,
         "pillars": 6,
-        "primitives": 1127,
+        "primitives": 810,
         "roofs": 25,
         "streetScatter": 17,
         "walkways": 22,
-        "walls": 587,
+        "walls": 327,
       }
     `);
   });
 
   it('seed 100 OBJ vertex count is locked', () => {
-    expect(objVertexCount(100)).toMatchInlineSnapshot(`21638`);
+    expect(objVertexCount(100)).toMatchInlineSnapshot(`15228`);
   });
 });

@@ -35,9 +35,8 @@ For each tier level `i`:
    - If 2 quadrants removed: roll `tier3EscalateChance` to remove an adjacent quadrant.
 2. Compute `present` quadrants = `{0,1,2,3}` minus `removed`.
 3. Decompose the building footprint into rects given the present quadrants:
-   - `ruins-small`: single-quadrant decomposition via `ruinsToSections`.
-   - Other ruins: full building rect (no quadrant damage).
-   - Normal buildings: `quadrantsToSections` maps present quadrants → rect list.
+   - Ruins (including `ruins-small`): one full building rect (no quadrant damage).
+   - Normal buildings: `quadrantsToSections` covers the present quadrants of the 2x2 mask with the shared greedy rect cover (`coverGridWithRects`): all four present = one full-footprint rect.
 4. Compute `yCollisionLevel = floorCellY(i) = i * tierHeight - slabThickness` (the 1" matrix cell), plus `surfaceY = floorSurfaceY(i) = i * tierHeight` (walking surface) and `geomY = floorGeomY(i)` (bottom of the rendered `FLOOR_SLAB.thickness` slab, flush with the cell top). Geometry renders the slab at `geomY` with height `FLOOR_SLAB.thickness`.
 5. Push a floor record. If this is the **last** tier (`floorIndex === maxTier - 1`), push to `roofSlabs` instead of `floors`.
 
@@ -81,12 +80,11 @@ For each tier level `i`:
 - [src/generators/floors/index.js](../../../../src/generators/floors/index.js) — entry; iterates buildings, separates floors from roofSlabs, calls label pass
 - [src/generators/floors/process-building-floors.js](../../../../src/generators/floors/process-building-floors.js) — per-building damage escalation and rect decomposition
 - [src/generators/floors/quadrants-to-sections.js](../../../../src/generators/floors/quadrants-to-sections.js) — maps present quadrant set → rect list
-- [src/generators/floors/ruins-small-to-sections.js](../../../../src/generators/floors/ruins-small-to-sections.js) — ruins-small subdivision
 - [src/generators/floors/label-floor-cells.js](../../../../src/generators/floors/label-floor-cells.js) — directional label pass
 
 ## Edge Cases & Constraints
 
 - Damage escalation is stochastic but always upward — lower tiers can never have more damage than higher tiers.
-- `ruins-small` and `ruins-medium-*` buildings skip the quadrant escalation logic; ruins-small gets a fixed sub-footprint decomposition.
+- `ruins-small` and `ruins-medium-*` buildings skip the quadrant escalation logic; all ruins (including ruins-small) get one full-footprint rect.
 - The label pass must run after all buildings' floors are written, so cross-building adjacency is resolved correctly.
 - `roofSlabs` uses the same damage state as the highest interior floor — no separate damage roll for the roof tier.

@@ -81,6 +81,6 @@ describe('buildObjAndAtlas (seed 42)', () => {
   });
 
   it('seed 42 vertex count is locked', () => {
-    expect(v.length).toMatchInlineSnapshot(`20196`);
+    expect(v.length).toMatchInlineSnapshot(`14926`);
   });
 });

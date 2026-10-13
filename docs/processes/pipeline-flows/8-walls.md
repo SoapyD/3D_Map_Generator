@@ -4,7 +4,7 @@
 
 ## Overview
 
-Derives wall geometry from floor-edge labels in the collision matrix. Each exposed floor edge becomes a wall segment that is subdivided, optionally damaged, optionally windowed, then merged back into the fewest rectangles. Merged segments are written to the matrix as `CELL.WALL_N/S/E/W`, skipping any cells already marked `CELL.DOOR`. Runs after Connectivity so door markers are already present.
+Derives wall geometry from floor-edge labels in the collision matrix. Each exposed floor edge becomes a wall segment that is subdivided, optionally damaged, optionally windowed, then merged back into rectangles by a greedy rect cover (`coverGridWithRects`: deterministic, not minimal, because windows and damage holes can need more rects than the optimum). Merged segments are written to the matrix as `CELL.WALL_N/S/E/W`, skipping any cells already marked `CELL.DOOR`. Runs after Connectivity so door markers are already present.
 
 ## Input Contract
 
@@ -57,7 +57,7 @@ b. `applyBlobDamage(grid, rng)` — if `WALL.applyBlobDamage`, randomly zeros ou
 
 c. `applyWindowPlan(grid, wall, plan, building)` — if `WALL.applyWindows`, punches window openings according to the building's plan.
 
-d. `mergeWallCells(grid, wall)` — run-length merges adjacent solid cells into the fewest axis-aligned boxes.
+d. `mergeWallCells(grid, wall)` — covers the solid cells with axis-aligned boxes using the shared greedy rect cover (`src/core/grid-rect-cover/`): from each unassigned cell it extends along the wall, then stacks rows while the whole run is solid below. An undamaged wall is one box (the short 0.75" top row keeps its real height). The result is greedy, not minimal.
 
 **5. Write to matrix**
 
@@ -93,7 +93,7 @@ Internal walls (from `extractWallSegments`) are written separately with `CELL.IN
 - [src/generators/walls/subdivide-wall.js](../../../../src/generators/walls/subdivide-wall.js) — divides a wall rect into a per-cell grid
 - [src/generators/walls/apply-blob-damage.js](../../../../src/generators/walls/apply-blob-damage.js) — stochastic blob-damage pass
 - [src/generators/walls/place-windows.js](../../../../src/generators/walls/place-windows.js) — window plan generation and application
-- [src/generators/walls/merge-wall-cells.js](../../../../src/generators/walls/merge-wall-cells.js) — run-length merge of solid cells back to boxes
+- [src/generators/walls/merge-wall-cells.js](../../../../src/generators/walls/merge-wall-cells.js) — greedy rect cover of solid cells back to boxes (uses [grid-rect-cover](../../../../src/core/grid-rect-cover/coverGridWithRects.js))
 
 ## Edge Cases & Constraints
 

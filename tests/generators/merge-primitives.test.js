@@ -9,14 +9,15 @@ import { buildCollisionObj } from '../../src/export/collision-buffer.js';
 
 const SEEDS = [42, 100, 7];
 const EPS = 1e-6;
-const OPTS = GEOMETRY.primitiveMerge;
+// The pass ships disabled (the greedy rect cover leaves nothing to merge); tests enable it explicitly.
+const OPTS = { ...GEOMETRY.primitiveMerge, enabled: true };
 const OFF = { ...OPTS, enabled: false };
 const family = (name) => name.replace(/(_-?\d+)+$/, '');
 
-/** Merged geometry (default config) and the unmerged baseline for the same seed. */
+/** Merged geometry (pass enabled) and the unmerged baseline for the same seed. */
 function both(seed) {
   const r = runStages(seed);
-  const merged = r.geometry.primitives;
+  const merged = quiet(() => buildGeometry(r.cover, { ...r.config, primitiveMerge: OPTS })).primitives;
   const plain = quiet(() => buildGeometry(r.cover, { ...r.config, primitiveMerge: OFF })).primitives;
   return { r, merged, plain };
 }
@@ -153,8 +154,8 @@ describe('mergePrimitives (generated maps)', () => {
     describe(`seed ${seed}`, () => {
       const { r, merged, plain } = both(seed);
 
-      it('reduces the primitive count', () => {
-        expect(merged.length).toBeLessThan(plain.length);
+      it('never increases the primitive count', () => {
+        expect(merged.length).toBeLessThanOrEqual(plain.length);
       });
 
       it('keeps per-texture, per-tier box volume unchanged', () => {
