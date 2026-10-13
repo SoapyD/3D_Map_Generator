@@ -1,4 +1,5 @@
 import { CELL } from '../collision/matrix.js';
+import { floorIndexFromCy } from '../../core/levels.js';
 import { GEOMETRY, COVER } from '../../config.js';
 
 const CARDINALS = [[-1,0],[1,0],[0,-1],[0,1]];
@@ -48,8 +49,7 @@ function findBuildingIndex(wx, wz, buildings) {
 }
 
 function cyToTier(cy, config) {
-  const levelHeight = config.tierHeight + config.slabThickness;
-  return Math.round((cy + config.slabThickness) / levelHeight);
+  return floorIndexFromCy(cy, config);
 }
 
 function groupFloorCells(cells, buildings, config) {

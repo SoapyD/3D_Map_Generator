@@ -52,7 +52,7 @@ export function runStages(seed, overrides = {}) {
     try {
 
     const grid = generateGrid(config, rng);
-    const matrix = createCollisionMatrix(grid.activeArea, config.tiers, config.tierHeight, config.slabThickness);
+    const matrix = createCollisionMatrix(grid.activeArea, config.tiers, config);
     const slabY = -config.slabThickness;
     matrix.setWriteContext(STAGE.BUILDINGS, 0);
     for (const b of grid.blocks) {

@@ -12,7 +12,11 @@ import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { buildObjAtlas, emitPrimitivesToObj } from './obj-geometry/build-obj-and-atlas.js';
 import { buildCollisionObj } from './collision-buffer.js';
+import { levelHeight, floorThickness } from '../core/levels.js';
 import { tierOf, tierCount, primBaseY, primTopY } from './assign-primitive-tier.js';
+
+// v2: levelHeight is now tierHeight (was tierHeight + slabThickness) and floorThickness was added.
+const MANIFEST_VERSION = 2;
 
 /**
  * Append an invisible "bounds cage" to an OBJ string: three collinear vertices at the given box's
@@ -137,7 +141,7 @@ export function buildTierBuffers(geometry, config, baseName = `mordheim_map_${co
   const atlasCtx = buildObjAtlas(geometry, config);
   const wallPrims = geometry.primitives.filter(p => p.type === 'wall');
   const groups = groupPrimitivesByTier(geometry, config);
-  const levelHeight = config.tierHeight + config.slabThickness;
+  const pitch = levelHeight(config);
 
   // Global (whole-map) XZ footprint. Every per-tier OBJ + collider gets an invisible "footprint cage"
   // spanning this footprint in X/Z but only the tier's OWN height in Y. That gives every tier an
@@ -207,12 +211,13 @@ export function buildTierBuffers(geometry, config, baseName = `mordheim_map_${co
   }
 
   const manifest = {
-    version: 1,
+    version: MANIFEST_VERSION,
     seed: config.seed,
     tierCount: tierCount(config),
-    levelHeight,
+    levelHeight: pitch,            // floor-surface to floor-surface distance (= tierHeight); the elevator lift delta
     tierHeight: config.tierHeight,
-    slabThickness: config.slabThickness,
+    slabThickness: config.slabThickness, // matrix cell reserved per slab (not the rendered thickness)
+    floorThickness: floorThickness(config), // rendered floor/roof slab thickness, flush with each tier's surface
     units: 'inches',
     tiers: manifestTiers,
   };

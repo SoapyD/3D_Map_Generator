@@ -93,7 +93,7 @@ Proximity spacing (`LADDERS.pathSpacing`) and per-side count (`LADDERS.maxSideCo
 
 The debug path builder (`buildDebugPaths`) iterates selected external, non-culled ladders per building and produces multi-segment path records from ground to roof. `ruins-small` buildings have a 40% chance of skipping ladder generation entirely.
 
-For each segment, `CELL.DOOR` is stamped into the matrix at every floor level the segment crosses — 3 cells wide (centred on the ladder's edge cell), 3 cells tall. These door stamps cause the Wall stage to leave openings for the ladder access points.
+For each segment, `CELL.DOOR` is stamped into the matrix at every floor level the segment crosses — 3 cells wide (centred on the ladder's edge cell), `wallMatrixRows` (2) cells tall — never the next tier's slab cell. These door stamps cause the Wall stage to leave openings for the ladder access points.
 
 ## Output Contract
 

@@ -28,7 +28,7 @@ Terminology used across the `src/generators` pipeline.
 
 **Cell** — Grid unit of the collision matrix. 1 cell = 1 inch in world space.
 
-**Tier** — Vertical level index (0-based). World Y position of tier `t` = `t * tierHeight`.
+**Tier** — Vertical level index (0-based). World Y of tier `t`'s walking surface = `t * tierHeight`; its slab is a thin (`FLOOR_SLAB.thickness`) plate flush with that surface, so the floor is the very top of the tier below.
 
 **World Position** — Absolute `(x, z)` coordinates in global space.
 
@@ -164,7 +164,8 @@ Terminology used across the `src/generators` pipeline.
 | Constant | Description |
 |---|---|
 | `TEX_SIZE` | Texture resolution (32 px) |
-| `slabThickness` | Vertical thickness of floor/roof/platform slabs |
+| `slabThickness` | Height of the 1" collision-matrix cell reserved for a floor/roof/street slab (not the rendered thickness) |
+| `FLOOR_SLAB.thickness` | Rendered thickness of floor and roof slabs (0.25", = wall thickness), flush with the top of the slab cell |
 | `walkwayThickness` | Vertical thickness of walkway primitives |
 | `platformThickness` | Vertical thickness of ladder/junction platforms |
 | `wallHeight (wallH)` | Height of bridge side walls |
@@ -172,7 +173,7 @@ Terminology used across the `src/generators` pipeline.
 | `bridgeThickness` | Vertical thickness of bridge slab |
 | `courtyardY` | Fixed Y for deleted-footprint slabs |
 | `anchorPeriod` | Anchor emission interval (typically 4 cells) |
-| `tierHeight` | Vertical distance between tiers |
+| `tierHeight` | Floor-surface to floor-surface pitch between tiers (3"); clear headroom is `tierHeight - FLOOR_SLAB.thickness` |
 
 ---
 

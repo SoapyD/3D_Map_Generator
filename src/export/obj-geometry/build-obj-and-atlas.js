@@ -10,6 +10,7 @@
 import { PNG } from 'pngjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { floorThickness } from '../../core/levels.js';
 import { addSubBox } from './add-sub-box.js';
 import { addSharedFlat } from './add-shared-flat.js';
 import { addSimpleBox } from './add-simple-box.js';
@@ -214,7 +215,7 @@ export function emitPrimitivesToObj(primitives, config, atlasCtx, wallPrimsForCo
       }
 
       case 'ceiling': {
-        addSharedFlat(state, prim.name, prim.x, prim.y, prim.z, prim.w, prim.h || config.slabThickness, prim.d, uv, true, false, false, false);
+        addSharedFlat(state, prim.name, prim.x, prim.y, prim.z, prim.w, prim.h || floorThickness(config), prim.d, uv, true, false, false, false);
         break;
       }
 

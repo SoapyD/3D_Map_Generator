@@ -8,13 +8,16 @@ import { rasteriseConnections } from './rasterise-connections.js';
 import { generatePillars } from './generate-pillars.js';
 import { CELL, STAGE } from '../collision/matrix.js';
 import { CONNECTIVITY } from '../../config.js';
+import { wallMatrixRows, wallGeomHeight } from '../../core/levels.js';
 
 // Step 7b-i — vectors pointing FROM anchor cell BACK TO its trigger (floor-edge) cell
 const TO_TRIGGER = { N: [0, 1], S: [0, -1], E: [-1, 0], W: [1, 0] };
-const DOOR_HEIGHT = 3; // cells = full room height
 
-function stampDoors(survivors, matrix) {
+// Doors span every wall row of a tier (wallMatrixRows) and must stop below the next tier's slab cell,
+// which belongs to that floor and carries its edge labels.
+function stampDoors(survivors, matrix, config) {
   const cs = matrix.cellSize;
+  const doorRows = wallMatrixRows(config);
   const doors = [];
   const seen = new Set();
 
@@ -33,12 +36,12 @@ function stampDoors(survivors, matrix) {
 
       matrix.setWriteContext(STAGE.CONNECTIVITY, doors.length);
       for (const tc of [tc0, tc1]) {
-        for (let dy = 1; dy <= DOOR_HEIGHT; dy++) {
+        for (let dy = 1; dy <= doorRows; dy++) {
           matrix.setCell(tc.cx, cy + dy, tc.cz, CELL.DOOR);
         }
       }
 
-      // World-space rect for debug rendering (2 wide × 3 tall)
+      // World-space rect for debug rendering (2 wide × full wall height)
       const minCx = Math.min(tc0.cx, tc1.cx);
       const minCz = Math.min(tc0.cz, tc1.cz);
       const maxCx = Math.max(tc0.cx, tc1.cx) + 1;
@@ -49,7 +52,7 @@ function stampDoors(survivors, matrix) {
         direction: anchor.direction,
         x: wp.x, y: wp.y, z: wp.z,
         w: (maxCx - minCx) * cs,
-        h: DOOR_HEIGHT * cs,
+        h: wallGeomHeight(config),
         d: (maxCz - minCz) * cs,
       });
     }
@@ -174,7 +177,7 @@ export function generateConnectivity(data, config, rng, matrix) {
     writeFileSync('debug_connectivity.json', JSON.stringify(dump, null, 2));
   }
 
-  const doors = stampDoors(survivors, matrix);
+  const doors = stampDoors(survivors, matrix, config);
 
   const dataWithSurvivors = {
     ...data,

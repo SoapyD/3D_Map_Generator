@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { tierOf, tierCount, primBaseY, primTopY } from '../../src/export/assign-primitive-tier.js';
 
-// Defaults: levelHeight = tierHeight + slabThickness = 4. Floor i slab at y = i*4 - 1, walls at y = i*4.
+// Defaults: levelHeight = tierHeight = 3. Tier i's floor surface is y = i*3; its slab occupies
+// [i*3 - 0.25, i*3] (FLOOR_SLAB.thickness) and its walls start at y = i*3.
 const config = { tiers: 4, tierHeight: 3, slabThickness: 1 };
 
 describe('tierCount', () => {
@@ -13,14 +14,14 @@ describe('tierCount', () => {
 
 describe('tierOf — floors (authoritative name parse)', () => {
   it('reads the tier from floor_f{n}_ regardless of Y', () => {
-    expect(tierOf({ name: 'floor_f0_10_20', y: -1 }, config)).toBe(0);
+    expect(tierOf({ name: 'floor_f0_10_20', y: -0.25 }, config)).toBe(0);
     expect(tierOf({ name: 'floor_f3_10_20', y: 999 }, config)).toBe(3);
   });
   it('clamps an out-of-range floor index into [0, tiers]', () => {
     expect(tierOf({ name: 'floor_f9_0_0', y: 0 }, config)).toBe(4);
   });
   it('applies to floor edge primitives too (same name)', () => {
-    expect(tierOf({ name: 'floor_f2_5_5', y: 7 }, config)).toBe(2);
+    expect(tierOf({ name: 'floor_f2_5_5', y: 5.75 }, config)).toBe(2);
   });
 });
 
@@ -38,47 +39,48 @@ describe('tierOf — cross-tier connectors → lower/base tier (floor-band)', ()
     expect(tierOf({ name: 'pillar_0', y: 0 }, config)).toBe(0);
   });
   it('walkway at a tier-2 floor top bands to 2', () => {
-    expect(tierOf({ name: 'walkway_1', y: 8 }, config)).toBe(2);
+    expect(tierOf({ name: 'walkway_1', y: 5.75 }, config)).toBe(2);
   });
   it('bridge deck + its wall/battlement sub-meshes share the deck tier', () => {
-    expect(tierOf({ name: 'bridge_3', y: 8 }, config)).toBe(2);
-    expect(tierOf({ name: 'bridge_3_wallL', y: 8 }, config)).toBe(2);
-    expect(tierOf({ name: 'bridge_3_batt0_left', y: 8 }, config)).toBe(2);
+    expect(tierOf({ name: 'bridge_3', y: 5.5 }, config)).toBe(2); // 0.5" deck, top flush with the tier-2 surface
+    expect(tierOf({ name: 'bridge_3_wallL', y: 6 }, config)).toBe(2);
+    expect(tierOf({ name: 'bridge_3_batt0_left', y: 6 }, config)).toBe(2);
   });
   it('matches every ladder name form via the "ladder" substring, using y0 as base', () => {
-    expect(tierOf({ name: 'ladder_0', y0: 8, y1: 12 }, config)).toBe(2);
-    expect(tierOf({ name: 'ground_ladder_2', y0: 0, y1: 4 }, config)).toBe(0);
-    expect(tierOf({ name: 'orange_ladder_1', y0: 4, y1: 8 }, config)).toBe(1);
-    expect(tierOf({ name: 'interior_ladder_0', y0: 4, y1: 8 }, config)).toBe(1);
-    expect(tierOf({ name: 'ladder_path_1_0_0', y0: 8, y1: 12 }, config)).toBe(2);
-    expect(tierOf({ name: 'ladder_platform_0', y: 8 }, config)).toBe(2);
-    expect(tierOf({ name: 'junction_platform_0', y: 4 }, config)).toBe(1);
+    expect(tierOf({ name: 'ladder_0', y0: 6, y1: 9 }, config)).toBe(2);
+    expect(tierOf({ name: 'ground_ladder_2', y0: 0, y1: 3 }, config)).toBe(0);
+    expect(tierOf({ name: 'orange_ladder_1', y0: 3, y1: 6 }, config)).toBe(1);
+    expect(tierOf({ name: 'interior_ladder_0', y0: 3, y1: 6 }, config)).toBe(1);
+    expect(tierOf({ name: 'ladder_path_1_0_0', y0: 6, y1: 9 }, config)).toBe(2);
+    expect(tierOf({ name: 'ladder_platform_0', y: 6 }, config)).toBe(2);
+    expect(tierOf({ name: 'junction_platform_0', y: 3 }, config)).toBe(1);
   });
 });
 
 describe('tierOf — everything else (walls, roofs, rooftop cover) → floor-band', () => {
-  it('bands walls by their Y (tier i wall row 0 at y = i*4)', () => {
+  it('bands walls by their Y (tier i wall row 0 at y = i*3)', () => {
     expect(tierOf({ name: 'wall_0', y: 0 }, config)).toBe(0);
-    expect(tierOf({ name: 'wall_5', y: 4 }, config)).toBe(1);
-    expect(tierOf({ name: 'wall_9', y: 8 }, config)).toBe(2);
+    expect(tierOf({ name: 'wall_5', y: 3 }, config)).toBe(1);
+    expect(tierOf({ name: 'wall_9', y: 6 }, config)).toBe(2);
   });
-  it('keeps ALL wall rows of a tier with that tier (floor + 3" of wall, not just row 0)', () => {
-    // Walls subdivide into 1"-tall rows stacking the full tierHeight above the floor. Every row
-    // (y = i*4, i*4+1, i*4+2) must stay on tier i — the old round-band pushed rows 1 & 2 up to i+1.
+  it('keeps ALL wall rows of a tier with that tier (floor + 2.75" of wall, not just row 0)', () => {
+    // Walls subdivide into rows of [1, 1, 0.75] stacking tierHeight - slab thickness above the floor.
+    // Every row (y = i*3, i*3+1, i*3+2) must stay on tier i.
     for (const r of [0, 1, 2]) {
-      expect(tierOf({ name: 'wall_r', y: 0 * 4 + r }, config)).toBe(0);
-      expect(tierOf({ name: 'wall_r', y: 1 * 4 + r }, config)).toBe(1);
-      expect(tierOf({ name: 'wall_r', y: 2 * 4 + r }, config)).toBe(2);
+      expect(tierOf({ name: 'wall_r', y: 0 * 3 + r }, config)).toBe(0);
+      expect(tierOf({ name: 'wall_r', y: 1 * 3 + r }, config)).toBe(1);
+      expect(tierOf({ name: 'wall_r', y: 2 * 3 + r }, config)).toBe(2);
     }
-    // The next floor's row 0 begins the next tier.
-    expect(tierOf({ name: 'wall_r', y: 3 * 4 }, config)).toBe(3);
+    // The next floor's slab (just under its surface) and row 0 begin the next tier.
+    expect(tierOf({ name: 'roof_r', y: 3 * 3 - 0.25 }, config)).toBe(3);
+    expect(tierOf({ name: 'wall_r', y: 3 * 3 }, config)).toBe(3);
   });
   it('bands roofs by Y', () => {
-    expect(tierOf({ name: 'roof_2_0', y: 7 }, config)).toBe(2);
+    expect(tierOf({ name: 'roof_2_0', y: 5.75 }, config)).toBe(2);
   });
   it('distinguishes interior_cover_ (banded) from interior_ladder_ (connector)', () => {
     // rooftop cover on tier 2 — must NOT be treated as a connector.
-    expect(tierOf({ name: 'interior_cover_0', y: 7 }, config)).toBe(2);
+    expect(tierOf({ name: 'interior_cover_0', y: 6 }, config)).toBe(2);
   });
   it('clamps extreme Y into [0, tiers]', () => {
     expect(tierOf({ name: 'wall_x', y: 9999 }, config)).toBe(4);

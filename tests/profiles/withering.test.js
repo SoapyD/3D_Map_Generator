@@ -24,7 +24,7 @@ function gridAndBuildings(seed) {
     return quiet(() => {
       const rng = createRng(seed);
       const grid = generateGrid(config, rng);
-      const matrix = createCollisionMatrix(grid.activeArea, config.tiers, config.tierHeight, config.slabThickness);
+      const matrix = createCollisionMatrix(grid.activeArea, config.tiers, config);
       return generateBuildings(grid, config, rng, matrix);
     });
   } finally {

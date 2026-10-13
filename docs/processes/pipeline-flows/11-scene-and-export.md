@@ -1,6 +1,6 @@
 # Stage 11: Scene Build and Export
 
-> Last verified: 2026-08-27
+> Last verified: 2026-10-13 against src/export/export-tiers.js (manifest v2)
 
 ## Overview
 
@@ -81,7 +81,7 @@ Tier assignment — `tierOf(prim, config)` (`src/export/assign-primitive-tier.js
 1. **Floors** — authoritative tier from the `floor_f{n}_` name.
 2. **Ground terrain** (`street_`, `river_`, `skirt_`, `border_`, `deleted_`, `pavement_`, `building_footprint_`) → tier 0.
 3. **Cross-tier connectors** (any name containing `ladder`, plus `pillar_`, `bridge_`, `walkway_`, `junction_platform_`) → their **lower/base** tier by floor-banding `baseY` (v1: a raised upper tier detaches cosmetically at the top).
-4. **Everything else** (walls, roofs, rooftop cover) → **floor-banded** to the floor at or below `baseY` (`floor((baseY + slabThickness) / levelHeight)`, `levelHeight = tierHeight + slabThickness`). A tier owns its floor slab and all the wall rows above it up to — but not including — the next floor, so every 1"-tall wall row (`y = i*levelHeight + 0..tierHeight-1`) stays on tier `i`.
+4. **Everything else** (walls, roofs, rooftop cover) → **floor-banded** to the floor at or below `baseY` (`tierIndexFromY`: `floor((baseY + FLOOR_SLAB.bandLookahead) / tierHeight)`; the pitch `levelHeight` is now just `tierHeight`). A tier owns its thin floor slab (`y = i*tierHeight - 0.25`), the connector slabs flush on its surface (the lookahead covers 0.5" bridge decks) and all the wall rows above it up to — but not including — the next floor, so every wall row (`y = i*tierHeight + 0..2`) stays on tier `i`.
 
 Outputs (for each **non-empty** tier `t`; empty tiers are skipped but retained in the manifest with `empty: true`):
 
@@ -90,11 +90,11 @@ Outputs (for each **non-empty** tier `t`; empty tiers are skipped but retained i
 | Tier OBJ | `<baseName>_tier{t}.obj` |
 | Tier collider OBJ | `<baseName>_tier{t}_collision.obj` (omitted if the tier has no collidable surfaces) |
 | Shared atlas PNG | `<baseName>.png` (one, shared by all tiers) |
-| Manifest | `<baseName>_tiers.json` — `{ version, seed, tierCount, levelHeight, tierHeight, slabThickness, units, tiers: [{ tier, obj, collision, primitiveCount, xMin, xMax, yMin, yMax, zMin, zMax, center: [cx,cy,cz], empty }] }` |
+| Manifest | `<baseName>_tiers.json` — `{ version (2), seed, tierCount, levelHeight, tierHeight, slabThickness, floorThickness, units, tiers: [{ tier, obj, collision, primitiveCount, xMin, xMax, yMin, yMax, zMin, zMax, center: [cx,cy,cz], empty }] }` |
 
 Each tier entry carries its **XZ footprint bounds** (identical across tiers — the corner posts reach the map corners) and its **per-tier Y** range, giving a `center` whose XZ is the map centre and whose Y is the tier's own. A loader repositions each tier to its `center`: the XZ offset is the same for every tier (the corner posts already align them horizontally), and the Y offset stacks the tiers vertically.
 
-`levelHeight` in the manifest is the vertical distance between stacked tier floors — the elevator lift delta a TTS script applies.
+`levelHeight` in the manifest is the vertical distance between stacked tier floors (floor surface to floor surface, = `tierHeight`, 3" by default) — the elevator lift delta a TTS script applies. Manifest **version 2** changed its meaning (v1: `tierHeight + slabThickness`, 4") and added `floorThickness` (rendered slab thickness, 0.25"); `slabThickness` is the 1" matrix cell, not the rendered thickness.
 
 ### Wall end-cap coverage
 

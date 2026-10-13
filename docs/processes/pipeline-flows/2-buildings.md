@@ -31,7 +31,7 @@ matrix: CollisionMatrix
    - Buildings are packed into the block with no gaps (treemap fill).
 2. For each placed building, write its shell into the collision matrix:
    - `matrix.setWriteContext(STAGE.BUILDINGS, buildingIndex)`
-   - `matrix.fillBox(b.x, -slabThickness, b.z, b.w, b.maxTier * levelHeight - tierHeight, b.d, CELL.SHELL)`
+   - `matrix.fillBox(b.x, -slabThickness, b.z, b.w, shellHeight(b.maxTier, config), b.d, CELL.SHELL)`
    - Shells start at `Y = -slabThickness` so walls can begin at `Y = 0`.
 
 ## Output Contract
@@ -60,6 +60,6 @@ matrix: CollisionMatrix
 
 ## Edge Cases & Constraints
 
-- Shell height is `maxTier * levelHeight - tierHeight` — this stops the shell below the roof slab, which is written by the Roofs stage.
+- Shell height is `shellHeight(maxTier)` = `floorCellY(maxTier-1) - floorCellY(0) + slabThickness` (`3 * maxTier - 2` by default) — it runs up to and including the roof slab cell, which the Roofs stage then overwrites. The pitch is `tierHeight` (thin floors), not `tierHeight + slabThickness`.
 - `ruins-small` buildings (1×1 BBD) are very small; they get a different floor decomposition in Stage 3.
 - The treemap guarantees full block coverage with no overlapping footprints.

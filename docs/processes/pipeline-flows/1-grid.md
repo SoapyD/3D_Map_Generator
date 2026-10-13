@@ -29,7 +29,7 @@ rng: RNG
    - Split position is snapped to BBD and clamped inside the valid range.
    - Recursion terminates when no further split is possible — leaf nodes become blocks.
 4. Derive street rectangles from block gaps via `deriveStreetRects`.
-5. Create the collision matrix from `activeArea`, `config.tiers`, `config.tierHeight`, `config.slabThickness`.
+5. Create the collision matrix from `activeArea`, `config.tiers` and `config` (height = `matrixHeight` in `src/core/levels.js`: `(tiers + 1) * tierHeight`).
 6. Write ground-slab placeholders into the matrix at `Y = -slabThickness`:
    - `CELL.FOUNDATION_PLACEHOLDER` for each block rect
    - `CELL.STREET_PLACEHOLDER` for each street rect

@@ -4,12 +4,12 @@
  * objects in Tabletop Simulator). Pure: no side effects, no I/O.
  *
  * Tier model (see docs/PROJECT_OVERVIEW.md): the map is a stack of flat slabs. Tier `i`'s
- * floor slab sits at y = i*levelHeight - slabThickness and its walls at y = i*levelHeight,
- * where levelHeight = tierHeight + slabThickness. Floor indices run 0..config.tiers, so the
+ * floor slab ends flush at its walking surface y = floorSurfaceY(i) and its walls start there;
+ * the pitch and slab maths live in src/core/levels.js. Floor indices run 0..config.tiers, so the
  * total tier count is config.tiers + 1.
  */
 
-const EPS = 1e-6;
+import { tierIndexFromY } from '../core/levels.js';
 
 // Ground / below-ground terrain — always tier 0. Ordering note: 'river_' also catches
 // 'river_bank_', and 'street_' also catches 'street_scatter_' (both correctly ground).
@@ -54,8 +54,6 @@ export function tierCount(config) {
 export function tierOf(prim, config) {
   const name = prim.name || '';
   const maxTier = config.tiers;
-  const slab = config.slabThickness;
-  const levelHeight = config.tierHeight + slab;
   const baseY = primBaseY(prim);
 
   // 1. Floors — authoritative tier encoded in the name (floor_f{tier}_...).
@@ -67,7 +65,7 @@ export function tierOf(prim, config) {
 
   // 3. Cross-tier connectors → lower/base tier (floor-band the base Y).
   if (name.includes('ladder') || CONNECTOR_PREFIXES.some(p => name.startsWith(p))) {
-    return clampTier(Math.floor((baseY + slab + EPS) / levelHeight), maxTier);
+    return clampTier(tierIndexFromY(baseY, config), maxTier);
   }
 
   // 4. Everything else (walls, roofs, rooftop cover) → floor-band to the floor at or below it.
@@ -75,5 +73,5 @@ export function tierOf(prim, config) {
   // at y = i*levelHeight + r, for r in 0..tierHeight-1), so a tier owns its floor AND all the wall
   // rows up to — but not including — the next floor: baseY in [i*levelHeight, (i+1)*levelHeight) → i.
   // Round-banding here wrongly pushed the upper wall rows (r >= levelHeight/2) into the tier above.
-  return clampTier(Math.floor((baseY + slab + EPS) / levelHeight), maxTier);
+  return clampTier(tierIndexFromY(baseY, config), maxTier);
 }

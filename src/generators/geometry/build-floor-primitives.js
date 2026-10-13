@@ -1,3 +1,4 @@
+import { floorThickness } from '../../core/levels.js';
 import { findBuilding } from '../building-lookup/index.js';
 import { floorTextureKey } from '../floor-texture-key.js';
 import { getEdgeGaps } from '../geometry-helpers/index.js';
@@ -6,7 +7,8 @@ export function buildFloorPrimitives(floors, buildings, config) {
   const primitives = [];
 
   for (const floor of floors) {
-    const y = floor.yCollisionLevel; // cellSize=1" so cell index = world Y in inches
+    const y = floor.geomY; // bottom of the thin slab; its top is flush with the matrix cell top (floor.surfaceY)
+    const h = floorThickness(config);
     const texKey = floorTextureKey(floor.buildingIndex, buildings);
 
     for (const rect of floor.rects) {
@@ -14,7 +16,7 @@ export function buildFloorPrimitives(floors, buildings, config) {
 
       primitives.push({
         type: 'slab', name,
-        x: rect.x, y, z: rect.z, w: rect.w, h: config.slabThickness, d: rect.d,
+        x: rect.x, y, z: rect.z, w: rect.w, h, d: rect.d,
         textureKey: texKey,
         emitTop: true, emitBottom: true, simpleBottom: false, rotateUV: false,
         shared: true,
@@ -26,7 +28,7 @@ export function buildFloorPrimitives(floors, buildings, config) {
       }
       primitives.push({
         type: 'edges', name,
-        x: rect.x, y, z: rect.z, w: rect.w, h: config.slabThickness, d: rect.d,
+        x: rect.x, y, z: rect.z, w: rect.w, h, d: rect.d,
         textureKey: texKey, edgeGaps,
       });
     }

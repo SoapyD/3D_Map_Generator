@@ -25,19 +25,20 @@ export function mergeWallCells(grid, wall) {
       }
 
       const runCols = runEnd - runStart + 1;
-      const segY = wall.y + row * grid.rowHeight;
+      const segY = wall.y + grid.rowOffsets[row];
+      const rowH = grid.rowHeights[row];
 
       if (isNS) {
         rects.push({
           direction: wall.direction, floorY: wall.floorY,
           x: wall.x + runStart * grid.colWidth, y: segY, z: wall.z,
-          w: runCols * grid.colWidth, h: grid.rowHeight, d: wall.d,
+          w: runCols * grid.colWidth, h: rowH, d: wall.d,
         });
       } else {
         rects.push({
           direction: wall.direction, floorY: wall.floorY,
           x: wall.x, y: segY, z: wall.z + runStart * grid.colWidth,
-          w: wall.w, h: grid.rowHeight, d: runCols * grid.colWidth,
+          w: wall.w, h: rowH, d: runCols * grid.colWidth,
         });
       }
 

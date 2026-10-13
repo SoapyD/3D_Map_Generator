@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { runStages } from '../helpers/run-stages.js';
+import { levelHeight } from '../../src/core/levels.js';
 
 const SEEDS = [42, 100, 7];
 const COVER_HEIGHTS = [1, 2]; // short / tall pieces (docs/processes/pipeline-flows/9-cover.md)
@@ -71,7 +72,7 @@ describe('generateCover', () => {
 
   it('cover rests on a tier surface (y is a multiple of the tier stride)', () => {
     const { cover, config } = runStages(42);
-    const stride = config.tierHeight + config.slabThickness;
+    const stride = levelHeight(config);
     for (const c of cover.cover) expect(c.y % stride).toBe(0);
   });
 

@@ -67,7 +67,7 @@ Small test ground for *The Withering* (`Game_Template/docs/plans/withering`).
 | Aim | Setting |
 |---|---|
 | Smaller map | 32×32 (default 48×48). 24 and 28 also work, but 24 mostly fits only small buildings |
-| Ground + tiers 1, 2 and 3 | `tiers: 4`. Standing surfaces are at 0", 4", 8" and 12". (`tiers: 3` would stop at tier 2 / 8".) Also fixed: small ruins used to ignore `tiers` and could exceed it |
+| Ground + tiers 1, 2 and 3 | `tiers: 4`. Standing surfaces are at 0", 3", 6" and 9". (`tiers: 3` would stop at tier 2 / 6".) Also fixed: small ruins used to ignore `tiers` and could exceed it |
 | One building per block, blocks split by roads | `BUILDINGS.mode: 'single'` with `GRID.strategy: 'bspTopLeft'`, which always gives exactly 4 blocks from 24" to 32" (centre-first can give just one) |
 | Empty blocks | None forced. `BUILDINGS.emptyBlocks` is available but the profile leaves it off; a block stays empty only if nothing in `singleSizes` fits it |
 | Connections up to the full map | `CONNECTIVITY.maxLengthMapFraction: 1` (default 0.5). On this profile it changes little, because small blocks make most connections short anyway |
