@@ -23,8 +23,10 @@ Outputs:
 | `--tiers N` | Number of elevated tiers (+ base) | 4 |
 | `--tier-height N` | Vertical spacing between tiers (inches) | 3 |
 | `--debug` | Use flat debug colours instead of textures | off |
-| `--preview` | Start basic browser preview (model + grid toggle) on localhost:3010 | off |
-| `--visualize` | Start the full visualizer on localhost:3010 — layer/grid toggles, prior-step playback, debug overlays | off |
+| `--preview` | Generate, then start the unified preview server on localhost:3010: tabbed page with Loaded map (default; the current run, textured) and Visualizer (layer/grid toggles, prior-step playback, debug overlays). Always records debug frames to `output/debug_frames.json` | off |
+| `--preview-map FILE` | Skip generation; start the same unified server (localhost:3010) with the Loaded map tab preloaded with a frozen `withering-map/1`/`/2` fixture (texture report, fallback highlight, tier cut-away, base/loaded switch, file picker). The Visualizer tab is greyed out (no generation). See `docs/plans/LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md` | none |
+| `--textures NAME` | With `--preview-map`: texture pack to start with (`base` or `loaded`; alias of `--texture-set`) | base |
+| `--visualize` | Alias of `--preview` (the Visualizer tab is always enabled for generated runs) | off |
 | `--profile NAME` | Swap in a named config profile, e.g. `withering` (small 3-level test ground). See `docs/architecture/profiles.md` | none |
 | `--texture-set NAME` | Texture pack folder name in assets/textures/ | base |
 

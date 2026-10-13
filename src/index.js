@@ -6,7 +6,7 @@
 
 import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
-import { parseArgs } from './config.js';
+import { parseArgs, PREVIEW } from './config.js';
 import { createRng } from './core/rng.js';
 import { runPipeline } from './pipeline.js';
 import { BELOW_GROUND } from './generators/collision/matrix.js';
@@ -18,10 +18,17 @@ import { exportCollisionObj } from './export/collision-exporter.js';
 
 async function main() {
   const config = parseArgs(process.argv);
+
+  if (config.previewMap) {
+    // Loaded-map texture preview: decode a frozen fixture instead of generating.
+    const { startMapPreview } = await import('./preview/loaded-map/map-preview-server.js');
+    await startMapPreview(config.previewMap, config.textureSet);
+    return;
+  }
   const rng = createRng(config.seed);
 
   let recorder = null;
-  if (config.visualize) {
+  if (config.visualize || config.preview) { // preview implies recording so the Visualizer tab always works
     const { createRecorder } = await import('./preview/debug-recorder.js');
     recorder = createRecorder(config.seed, config);
   }
@@ -104,7 +111,7 @@ async function main() {
   if (config.preview) {
     console.log('\nStarting preview server...');
     const { startPreview } = await import('./preview/server.js');
-    startPreview(outputPath, 3010, config.visualize ? 'visualize' : 'preview');
+    startPreview(outputPath, PREVIEW.port, PREVIEW.modes.run, config);
   }
 }
 
