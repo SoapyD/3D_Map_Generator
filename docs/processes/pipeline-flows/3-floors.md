@@ -1,6 +1,6 @@
 # Stage 3: Floor Plate Generation
 
-> Last verified: 2026-04-21
+> Last verified: 2026-10-13 against src/core/levels.js and src/generators/floors
 
 ## Overview
 
