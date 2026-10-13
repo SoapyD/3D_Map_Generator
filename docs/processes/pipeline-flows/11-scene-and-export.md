@@ -1,6 +1,6 @@
 # Stage 11: Scene Build and Export
 
-> Last verified: 2026-08-27
+> Last verified: 2026-10-13 against src/export/export-tiers.js (manifest v2)
 
 ## Overview
 
