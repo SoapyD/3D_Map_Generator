@@ -33,8 +33,6 @@ export const DEFAULTS = {
   debug: false,
   debugConnectivity: false, // --debug-connectivity: write connectivity debug JSON
   debugMatrix: false,       // --debug-matrix: serialise collision-matrix write history
-  obj: false,
-  splitTiers: false,  // also emit one OBJ + collider per tier + a manifest (TTS elevator/reveal)
   outputDir: 'output',
   allRivers: false,   // treat every street corridor as a river
   profile: null,      // --profile NAME: swap in a named config profile (see src/profiles/)
@@ -205,13 +203,17 @@ export const GRID = {
 // --- Geometry ---
 export const GEOMETRY = {
   glbTileSize: 3,            // GLB only: inches per texture repeat
-  objAtlasTileSize: 256,     // OBJ atlas: pixels per tile
-  objSegmentPixelSize: 128,  // OBJ atlas: pixels per 3" segment (256 = full tile, 128 = 2/tile, 64 = 4/tile)
-  objAtlasPadding: 4,        // pixels of padding around each atlas tile
-  // UV hash constants for per-object tiling offset (shared by GLB + OBJ)
-  uvHashU: [0.7123, 0.3917],     // multipliers for U offset: x * [0] + z * [1]
-  uvHashV: [0.5431, 0.9281, 0.1637], // multipliers for V offset: x * [0] + z * [1] + y * [2]
-  // OBJ ladder mesh dimensions
+  // GLB texture offset, one per texture key (not per box, so adjacent boxes stay seamless): the key's
+  // string hash (multiplier hashBase) scaled by scaleU / scaleV, fractional part.
+  uvKeyOffset: { hashBase: 31, scaleU: 0.7123, scaleV: 0.5431 },
+  // Primitive merge pass (end of buildGeometry): joins adjacent same-texture boxes into one (was for the removed OBJ vertex cap; off by default).
+  // A merged primitive keeps its first constituent's box as `uvOrigin` (no longer read by any exporter; the GLB uses world-space UVs).
+  primitiveMerge: {
+    enabled: false,                         // off: after the greedy rect cover (walls/pavements/floors) it removes 0% of primitives; kept for A/B tests
+    types: ['wall', 'pavement', 'floor'],   // merge groups: wall_N, pavement_N, floor_fN_x_z slabs
+    epsilon: 0.0001,                        // inches; edge-touch / equality tolerance
+  },
+  // Ladder mesh dimensions
   ladderPoleWidth: 0.24,
   ladderPoleDepth: 0.24,
   ladderRungHeight: 0.18,
@@ -301,16 +303,6 @@ export function parseArgs(argv) {
 
     if (arg === '--debug-matrix') {
       config.debugMatrix = true;
-      continue;
-    }
-
-    if (arg === '--obj') {
-      config.obj = true;
-      continue;
-    }
-
-    if (arg === '--split-tiers') {
-      config.splitTiers = true;
       continue;
     }
 

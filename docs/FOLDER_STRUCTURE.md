@@ -26,14 +26,17 @@
 │   ├── pipeline.js                # Runs the stages in order
 │   ├── lib.js                     # Package entry (importable API)
 │   ├── config.js                  # Defaults, tunables, CLI arg parsing
-│   ├── generate-*-buffers.js      # In-memory generation (OBJ / collider / per-tier)
 │   ├── core/                      # RNG and shared geometry/rect helpers
 │   ├── generators/                # One folder per stage (grid is under foundations/),
 │   │                              #   plus collision/ (matrix), selectors/, utils/,
 │   │                              #   scene/, geometry/ and _old_system/ (legacy)
 │   ├── profiles/                  # Swappable config profiles (withering, …)
-│   ├── export/                    # GLB, OBJ + atlas, collision and per-tier exporters
-│   ├── preview/                   # server.js, viewer.html, debug-recorder.js
+│   ├── export/                    # GLB exporter, output base name, tierOf helper (OBJ / collider / per-tier exporters removed; see tags v0.2.0, v0.3.0)
+│   ├── preview/                   # Unified viewer (README "Running the viewer"): server.js (--preview),
+│   │                              #   preview-routes.js (one route table), shell.html (tabs),
+│   │                              #   visualizer.html, viewer.html (/model.html), debug-recorder.js,
+│   │                              #   run-fixture.js, tab-flags.js; loaded-map/ = Loaded map tab
+│   │                              #   (loaded-map.html, decode-fixture.js, texture-report.js, map-state.js)
 │   └── tools/                     # Standalone building/bridge preview scripts
 │
 ├── assets/textures/               # Texture packs (base, transparent_base, …)

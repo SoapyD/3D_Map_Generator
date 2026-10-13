@@ -1,6 +1,6 @@
 # Primitive Merge — Grepped File Manifest
 
-Companion to `PRIMITIVE_MERGE_PLAN_2026_10_13.md`. Generated 2026-10-13 on branch `dev` from live reads and greps. Line numbers will drift; re-run the command under each heading before starting a phase. `_old_system/` is excluded throughout and is not touched.
+Companion to `PRIMITIVE_MERGE_PLAN_2026_10_13.md`. Generated 2026-10-13 on branch `dev` from live reads and greps. Line numbers will drift (refs below updated 2026-10-13 after Phase A0-A3 landed on `feature/primitive-merge`); re-run the command under each heading before starting a phase. `_old_system/` is excluded throughout and is not touched.
 
 Shorthand: `EX` = `--exclude-dir=_old_system`; scope is `src tests scripts`.
 
@@ -10,7 +10,7 @@ Regenerate: `grep -rnE 'buildGeometry|_geometry\.json|buildScene\(|exportToGlb\(
 
 ```
 src/generators/geometry/build-geometry.js:41   export function buildGeometry(data, config)
-src/generators/geometry/build-geometry.js:95   return { version: 1, primitives };   <- merge pass goes just before this
+src/generators/geometry/build-geometry.js:98-99 mergePrimitives(...) then return { version: 1, primitives: merged }   <- merge pass (added)
 src/pipeline.js:121                            const geometry = buildGeometry(coverData, config);
 src/pipeline.js:122                            return { geometry, matrix };
 src/index.js:76                                const geometryWithMatrix = { ...geometry, collisionMatrix: ... };
@@ -31,14 +31,15 @@ Regenerate: `grep -nE 'GEOMETRY|glbTileSize|objAtlasTileSize|objSegmentPixelSize
 
 ```
 src/config.js:47        wallThickness: 0.25,
-src/config.js:171       export const GEOMETRY = {          <- add primitiveMerge keys here
+src/config.js:206       export const GEOMETRY = {
+src/config.js:216-220   primitiveMerge: { enabled, types, epsilon }   <- added
 src/config.js:172       glbTileSize: 3,
 src/config.js:173       objAtlasTileSize: 256,
 src/config.js:174       objSegmentPixelSize: 128,
 src/config.js:177       uvHashU: [0.7123, 0.3917],
 src/config.js:178       uvHashV: [0.5431, 0.9281, 0.1637],
 src/config.js:195       streetThickness:   0.25,
-src/config.js:196       pavementThickness: 0.25,
+src/config.js:238       pavementThickness: 0.25,
 ```
 
 ## C. OBJ flat / wall / sub-box emitters (subdivision and UV hash)
@@ -50,14 +51,15 @@ src/export/obj-geometry/add-shared-flat.js:3       const SEG_SIZE = 3;
 src/export/obj-geometry/add-shared-flat.js:9       export function addSharedFlat(state, name, x0, y0, z0, sizeX, sizeY, sizeZ, uv, emitBottom, rotateUV, simpleBottom, emitTop)
 src/export/obj-geometry/add-shared-flat.js:10-11   segsX / segsZ = ceil(size / SEG_SIZE)
 src/export/obj-geometry/add-shared-flat.js:21-24   UV hash from x0, z0, y0 (origin dependency)
-src/export/obj-geometry/add-shared-flat.js:28-37   TOP grid pushed unconditionally (2 × (segsX+1)(segsZ+1) total with bottom)
-src/export/obj-geometry/add-shared-flat.js:39-45   BOTTOM grid pushed unconditionally  <- A0 target
+src/export/obj-geometry/add-shared-flat.js:24      uvOrigin hash override (added)
+src/export/obj-geometry/add-shared-flat.js:37-45   TOP grid, now only if emitTop (A0)
+src/export/obj-geometry/add-shared-flat.js:47-62   BOTTOM grid only if emitBottom; simpleBottom writes 4 corners only (A0, done)
 src/export/obj-geometry/add-shared-flat.js:60      if (emitTop) { faces }
 src/export/obj-geometry/add-shared-flat.js:76-77   if (emitBottom) { if (simpleBottom) ... }
 src/export/obj-geometry/add-shared-wall.js:3       const SEG_SIZE = 3;
 src/export/obj-geometry/add-shared-wall.js:9       export function addSharedWall(state, name, x0, y0, z0, sizeX, sizeY, sizeZ, uv)
 src/export/obj-geometry/add-shared-wall.js:14-15   segsL / segsH = ceil(... / SEG_SIZE)
-src/export/obj-geometry/add-shared-wall.js:27-28   UV hash from x0, z0, y0 (origin dependency)
+src/export/obj-geometry/add-shared-wall.js:28      UV hash from uvOrigin ?? (x0, y0, z0)
 src/export/obj-geometry/add-shared-wall.js:36-47   front and back grids (both always emitted)
 src/export/obj-geometry/add-sub-box.js:6           const SEG_SIZE = 3;
 src/export/obj-geometry/add-sub-box.js:12          export function addSubBox(state, name, x0, y0, z0, sizeX, sizeY, sizeZ, uv, showEdges, rotateUV, thinAxis)
@@ -204,6 +206,25 @@ docs/processes/pipeline-flows/11-scene-and-export.md:75   one shared diffuse atl
 docs/processes/pipeline-flows/11-scene-and-export.md:92   manifest: shared atlas PNG
 docs/architecture/docs_and_config_guide.md:77             GEOMETRY section description (atlas tile/segment sizes)
 docs/plans/THIN_FLOOR_SLABS_PLAN_2026_10_11.md:27         3" pitch matches OBJ 3" segment subdivision (Phase B dependency)
-docs/plans/LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md:36   P1 uses 3" repeat per face (GLB-style); reference for Phase B
-docs/plans/LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md:68   OBJ-side equivalent: build-obj-and-atlas.js:52, ensure-texture.js:7
+docs/plans/archive/LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md:36   P1 uses 3" repeat per face (GLB-style); reference for Phase B
+docs/plans/archive/LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md:68   OBJ-side equivalent: build-obj-and-atlas.js:52, ensure-texture.js:7
+```
+
+## K. Phase A files added (2026-10-13)
+
+Regenerate: `git status --short` on `feature/primitive-merge`, or `ls src/generators/geometry/merge`
+
+```
+src/generators/geometry/merge-primitives.js            mergePrimitives(primitives, options)   (called from build-geometry.js:98)
+src/generators/geometry/merge/merge-group-type.js      wall | pavement | floor | null
+src/generators/geometry/merge/merge-group-key.js       shared-key a pair must match
+src/generators/geometry/merge/merge-two-boxes.js       exact-rectangle union test
+src/generators/geometry/merge/merge-group-prims.js     greedy pairwise fixpoint
+src/generators/geometry/merge/build-merged-prim.js     merged prim + uvOrigin
+src/generators/scene/uv-origin-center.js               GLB: uvOrigin box -> centre
+src/generators/scene/build-primitive-mesh.js           passes uvOrigin to createSlab (slab + wall cases)
+src/core/geometry-misc.js:20,46-49                     createSlab uvOrigin option
+src/export/obj-geometry/build-obj-and-atlas.js:134,142 passes prim.uvOrigin
+tests/generators/merge-primitives.test.js              A3 tests
+tests/snapshot.test.js, tests/export/obj-exporter.test.js   counts updated (export-tiers.test.js needed no change: synthetic fixtures)
 ```

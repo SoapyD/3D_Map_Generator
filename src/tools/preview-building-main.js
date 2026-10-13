@@ -1,7 +1,7 @@
 /**
  * Building Preview Tool
  *
- * Generates a single building in isolation and exports GLB + OBJ.
+ * Generates a single building in isolation and exports a GLB (currently broken: needs the removed BUILDING config).
  * Useful for testing building types, shapes, and features.
  *
  * Usage:

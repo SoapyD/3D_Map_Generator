@@ -1,6 +1,6 @@
 # Stage 10: Geometry Build
 
-> Last verified: 2026-04-24
+> Last verified: 2026-10-13 (primitive merge pass disabled after the greedy rect cover)
 
 ## Overview
 
@@ -76,15 +76,28 @@ Each primitive is a plain JS object:
   w, h, d,              // dimensions
   textureKey: string,
   // additional fields vary by type (emitTop, emitBottom, thinAxis, axis, ...)
+  // uvOrigin?: { x, y, z, w, h, d }  // only on merged primitives: first constituent's box (UV hash origin)
 }
 ```
+
+### Primitive merge pass (disabled)
+
+**Status: `GEOMETRY.primitiveMerge.enabled = false`.** After the shared greedy rect cover (walls, pavements, floor plates; see stages 8, 5 and 3) the pass removed 0% of primitives on seeds 1, 7, 42, 100 and 2024 under both profiles (threshold to keep it: 2%), so it ships off and is kept only for A/B tests. The description below applies when it is enabled.
+
+After all builders have run, `buildGeometry` calls `mergePrimitives(primitives, config.primitiveMerge ?? GEOMETRY.primitiveMerge)` (`src/generators/geometry/merge-primitives.js`; helpers in `src/generators/geometry/merge/`). It joins adjacent same-texture boxes into one primitive (originally to save OBJ vertices under the old TTS cap; the OBJ export has since been removed). It is **disabled by default** (`GEOMETRY.primitiveMerge.enabled = false`): after the shared greedy rect cover (`coverGridWithRects`) merges walls, pavements and floor plates at the source, the pass removes 0% of primitives on seeds 1, 7, 42, 100 and 2024 (default and `withering`), below the 2% keep threshold. The code and its tests are kept and the tests enable it explicitly. When enabled, the merged list is what GLB, collision and the loaded-map preview consume.
+
+- **Groups** (`GEOMETRY.primitiveMerge.types`): `wall` (`wall_N`), `pavement` (`pavement_N`), `floor` (`floor_fN_x_z` slabs). Edges, ladders, ceilings, roofs, bridges (`bridge_*`, including `_wall_`/`_batt_` pieces) and everything else are never merged.
+- **Candidates must share** type, `textureKey`, `y`, `h`, the flags (`shared`, `emitTop`, `emitBottom`, `simpleBottom`, `rotateUV`, `axis`) and the name family (`floor_fN` so the tier named by the prefix never changes). Walls also share their line (axis plus the fixed cross-coordinate and thickness), so only collinear walls can join.
+- **Geometry rule**: two boxes merge only when their union is exactly a rectangle (equal extent on one axis, touching end-to-end on the other). Overlaps and gaps never merge. The pass is a deterministic greedy pairwise fixpoint in primitive order (no RNG).
+- **Result**: the merged primitive keeps the earlier constituent's name and position in the list (so name prefixes, `tierOf` and the collision allowlist behave as before) and gains `uvOrigin: { x, y, z, w, h, d }` = the first constituent's box, historically so the OBJ exporter could hash the same origin for its per-object UV offset; no exporter reads it any more (stage 11). The input list is not mutated.
+- **Wall note**: the wall stage now emits stacked rects, so the pass has nothing left to join.
 
 ## Output Contract
 
 ```js
 {
   version: 1,
-  primitives: object[],   // flat array of all primitive objects
+  primitives: object[],   // flat array of all primitive objects (after the merge pass)
 }
 // Written to disk as `<baseName>_geometry.json` with collisionMatrix embedded
 ```
@@ -92,6 +105,7 @@ Each primitive is a plain JS object:
 ## Key Files
 
 - [src/generators/geometry/build-geometry.js](../../../../src/generators/geometry/build-geometry.js) — entry point
+- [src/generators/geometry/merge-primitives.js](../../../../src/generators/geometry/merge-primitives.js) — merge pass (helpers in `merge/`)
 - [src/generators/geometry/build-map-skirt-primitives.js](../../../../src/generators/geometry/build-map-skirt-primitives.js) — base box panels
 - [src/generators/geometry/build-river-primitives.js](../../../../src/generators/geometry/build-river-primitives.js)
 - [src/generators/geometry/build-river-bank-primitives.js](../../../../src/generators/geometry/build-river-bank-primitives.js)

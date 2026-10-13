@@ -13,7 +13,7 @@ describe('parseArgs', () => {
     expect(config.streetWidth).toBe(GLOBAL_GRID.streetWidth);
     expect(config.preview).toBe(false);
     expect(config.debug).toBe(false);
-    expect(config.obj).toBe(false);
+    expect(config.obj).toBeUndefined();
   });
 
   it('parses --seed', () => {
@@ -46,11 +46,6 @@ describe('parseArgs', () => {
   it('parses --debug flag', () => {
     const config = parseArgs(['node', 'index.js', '--debug']);
     expect(config.debug).toBe(true);
-  });
-
-  it('parses --obj flag', () => {
-    const config = parseArgs(['node', 'index.js', '--obj']);
-    expect(config.obj).toBe(true);
   });
 
   it('parses --tier-height with kebab-case', () => {

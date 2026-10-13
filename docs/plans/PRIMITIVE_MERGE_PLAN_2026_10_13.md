@@ -1,6 +1,6 @@
 # Primitive Merge Plan — 2026-10-13
 
-Status: **proposed, not started** (no code changed). Target release **v0.4.0** (`package.json:3` is 0.3.0). Phase A is the merge pass; Phase B (OBJ without atlas) is an **open decision** that needs the owner. Preview work on `feature/loaded-map-preview` (see [`LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md`](LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md)) is built first and is used to compare merged vs unmerged output. File and line refs: [`PRIMITIVE_MERGE_MANIFEST_2026_10_13.md`](PRIMITIVE_MERGE_MANIFEST_2026_10_13.md) (sections A–H, each with its regenerating grep). Section letters are referenced below as **[M-A]** etc.
+Status: **Phase A implemented, uncommitted on `feature/primitive-merge` (A0 + merge pass + tests; measured results in "Implementation status and results" below)**. Phase B (Track 2) is SUPERSEDED and will not be done: TTS is no longer a target and the OBJ export has since been deleted (conventions alignment plan, Phase 3b; old code in tags v0.2.0 / v0.3.0, so the OBJ file and line references below point at deleted code and are historical). The 25,000-vertex cap is retired. The merge pass itself was later disabled by default (see the conventions plan, Phase 1 and 2 results). Target release **v0.4.0** (`package.json:3` is 0.3.0). Phase A is the merge pass; Phase B (OBJ without atlas) is an **open decision** that needs the owner. Preview work on `feature/loaded-map-preview` (see [`LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md`](LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md)) is built first and is used to compare merged vs unmerged output. File and line refs: [`PRIMITIVE_MERGE_MANIFEST_2026_10_13.md`](PRIMITIVE_MERGE_MANIFEST_2026_10_13.md) (sections A–H, each with its regenerating grep). Section letters are referenced below as **[M-A]** etc.
 
 ## Context
 
@@ -84,7 +84,49 @@ Stop emitting grids that no face references: skip the top grid when `emitTop` is
 
 Record before/after per seed and profile (see Verification). Ship as one PR on a feature branch off `dev`.
 
-## Track 2 — OBJ without atlas or subdivision (Phase B, OPEN DECISION)
+## Implementation status and results (2026-10-13, branch `feature/primitive-merge`, uncommitted)
+
+Phase 0, A0, A1-A3 and the A4 measurements are done. Phase B is not started (owner decision 5). `package.json` is not bumped. Owner decisions applied: A0 first; scope = walls, pavements, floor plates; target <= 23,000; `uvOrigin` carried; Phase A only.
+
+### Measured vertex counts (`^v ` lines of `output/mordheim_map_N.obj`)
+
+| Profile | Seed | Baseline | After A0 | After A0 + merge |
+|---|---|---|---|---|
+| default | 1 | 24,682 | 21,780 | 20,748 |
+| default | 7 | 26,490 | 23,610 | **22,604** |
+| default | 42 | 23,878 | 21,070 | 20,196 |
+| default | 100 | 25,522 | 22,578 | 21,638 |
+| default | 2024 | 24,596 | 21,776 | 20,834 |
+| withering | 1 | 7,522 | 6,199 | 5,778 |
+| withering | 7 | 8,586 | 7,309 | 6,889 |
+| withering | 42 | 10,154 | 8,721 | 8,281 |
+| withering | 100 | 7,002 | 5,757 | 5,343 |
+| withering | 2024 | 8,850 | 7,585 | 7,157 |
+
+Extra default seeds after A0 + merge: 2: 22,906; 3: 21,872; 5: 18,996; 11: 17,952; 99: 19,714; 123: 18,016; 500: 19,376; 777: 21,504. All <= 23,000.
+
+Gates: `npm test` 276/276 pass (baseline 244 + 1 expected fail; the seed-100 `it.fails` is now a normal test); `npm run check:all` 37 findings (baseline 37; file-sizes 16, identical list); `npm run check:file-sizes` identical to baseline.
+
+### What the measurements showed (plan corrections)
+
+- **A0 alone** removes 2,880 (seed 7) to 2,944 (seed 100) vertices per default map, about 3x the "324 on skirt_bottom" that the plan verified. Seeds 7 and 100 were already under 25,000 after A0. Face data is byte-identical (ordered position + UV per face), GLB byte-identical, collision OBJ byte-identical.
+- **Walls: the plan's wall merge saves almost nothing on default maps.** A wall primitive is a single 1" (or 0.75") tall row; rows stack at different `y`, so the "same `y`, `h`" rule only allows horizontal merges, and seed 7 has 0 horizontally adjacent same-row pairs (31 adjacent pairs differ in `y`/`h`). The 14,116 wall vertices (seed 7) are unchanged by the merge. The savings come from pavements (258 -> 70 prims, 2,520 -> 550 verts, including A0) and floor plates. The "590 prims, over half the budget" is the wall cost the plan hoped to cut; it needs a different rule (below).
+- **Withering** has merged walls (seed 7: 590 -> 176), so the wall rule does work there.
+- **Next lever (not implemented, outside owner decisions): vertical stacking of wall rows** (same x/z/w/d/axis/textureKey, consecutive `y`, same `tierOf`). A throwaway prototype on the current geometry took seed 7 from 22,604 to 16,256 and seed 100 from 21,638 to 15,658 (273 / 260 merges). Caveat: each 1" row currently stretches one 3" texture segment over 1" of height (`segsH = 1`), so a merged 2.75" wall would show the texture differently. Needs a visual decision before implementing.
+- Remaining biggest cost, seed 7 after merge: wall 14,116, floor_f0 1,158, roof_ceil 1,033, floor_f1 818, cover 580, pavement 550, walkway 532, floor_f2 414.
+- The plan said merged names should use "a deterministic counter"; none is needed: the merged primitive keeps the earlier constituent's name (unique, same prefix).
+- `tests/export/export-tiers.test.js` uses hand-written fixtures and does not call `buildGeometry`, so it needed no change. `tests/snapshot.test.js` (seed 42: 1284 -> 1079 prims, 23,878 -> 20,196 verts; seed 100: 1355 -> 1127, 25,522 -> 21,638) and `tests/export/obj-exporter.test.js` (seed 42 vertex lock) were updated.
+- `uvOrigin` keeps the texture offset of a merged primitive's first segment only; later 3" segments continue from it, so merged spans are not tile-for-tile identical to their constituents.
+
+### Verification done
+
+OBJ total triangle area (all 10 seed/profile runs) and collision box volume identical before/after merge; collision boxes 554 -> 321 (seed 1). Wall end-cap rectangles that are not covered are the same set before/after (seeds 1, 7, 100). Same seed twice gives identical OBJ, GLB and collision md5. With `enabled: false`, GLB and `_geometry.json` are byte-identical to the baseline and the OBJ face set is identical to the baseline. `--split-tiers` still works (seed 7: 4 tier OBJs). GLB mesh nodes seed 7: 1,208 -> 981.
+
+Not visually verified: textures, seams and tier bands of merged output in TTS or the preview (see the preview comparison in the PR notes).
+
+## Track 2 — OBJ without atlas or subdivision (Phase B, SUPERSEDED)
+
+**SUPERSEDED (2026-10-13).** Tabletop Simulator is no longer a target and the OBJ export is deprecated, so this proposal is dropped. See [`CONVENTIONS_ALIGNMENT_PLAN_2026_10_13.md`](CONVENTIONS_ALIGNMENT_PLAN_2026_10_13.md) (Phase 3). Kept below for history only.
 
 Proposal: write one `.mtl` material per texture key, use UVs that repeat every 3" like the GLB path, and remove the atlas and subdivision. This would remove `SEG_SIZE` from `add-shared-flat.js:3`, `add-shared-wall.js:3` and `add-sub-box.js:6`, the atlas build in `build-obj-and-atlas.js:52-104`, and the atlas PNG write at `:100-101`.
 
@@ -92,7 +134,7 @@ Proposal: write one `.mtl` material per texture key, use UVs that repeat every 3
 - **Why it is risky:**
   - Unverified: TTS may not repeat UVs beyond 0–1, or may not accept multiple materials per custom model. Our belief is that a TTS custom model takes a single diffuse image. That is why the atlas exists, but no doc records it (grep of `docs/` finds only the mechanism at `11-scene-and-export.md:75`).
   - The THIN_FLOOR_SLABS plan relies on the 3" segment grid (`THIN_FLOOR_SLABS_PLAN_2026_10_11.md:27`). It would need revisiting.
-  - The loaded-map preview already uses GLB-style 3" repeat UVs (`LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md:36`). It can act as the visual reference for Phase B.
+  - The loaded-map preview already uses GLB-style 3" repeat UVs (`archive/LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md:36`). It can act as the visual reference for Phase B.
 - **Gate:** build a small hand-made OBJ (two quads, UVs 0–4 for a 1-tile texture, two materials) and load it in TTS. Check: repeat works, multi-material works, vertex count is as expected. Do not commit Phase B until this passes.
 - **If TTS needs one image:** either split OBJs per texture (more files, more load) or stay on the atlas and rely on Phase A alone.
 
@@ -102,7 +144,7 @@ Proposal: write one `.mtl` material per texture key, use UVs that repeat every 3
 2. **Merge scope.** Walls (about 14k, the biggest lever), pavements and floor plates are the first candidates. Edge prims (`edges`, 3,244) and ladders are excluded in the first cut; merging slabs does not reduce edge cost. Confirm.
 3. **Target margin.** Hard limit `< 25,000`, or a target such as `≤ 23,000` for seed-to-seed headroom? Recommended: `≤ 23,000` for every seed and profile tested.
 4. **UV hash for merged primitives.** Keep the first constituent's origin (textures identical, recommended) or accept new texture offsets?
-5. **Phase B go / no-go**, after the TTS test above.
+5. ~~**Phase B go / no-go**, after the TTS test above.~~ Superseded: Phase B is dropped (OBJ deprecated).
 6. **Release scope.** Ship v0.4.0 with Phase A only, and Phase B later as a breaking format change? Recommended: yes.
 
 ## Phases and gates
@@ -111,7 +153,7 @@ Proposal: write one `.mtl` material per texture key, use UVs that repeat every 3
 - **Phase A0 — optional exporter-only drop** (separate PR, identical rendering).
 - **Phase A1–A3 — merge pass, coverage, tests** (one PR, behind `primitiveMerge.enabled`).
 - **Phase A4 — measure, flip default on** if all gates pass.
-- **Phase B — gated** by the TTS test and Open decision 5.
+- **Phase B — SUPERSEDED** (dropped; see the conventions alignment plan, Phase 3).
 
 ## Verification
 
@@ -129,7 +171,7 @@ Proposal: write one `.mtl` material per texture key, use UVs that repeat every 3
 - **Tier misassignment:** a merge that crosses tiers or drops the `floor_fN_` prefix moves geometry to the wrong tier file.
 - **Savings ceiling:** edges and ladders do not merge in the first cut, so Phase A may not be enough on its own for seed 100 without A0.
 - **Snapshot churn:** counts in `tests/snapshot.test.js` change on every merge; update them deliberately.
-- **Phase B unknowns:** TTS UV repeat and multi-material behaviour are unverified.
+- **Phase B unknowns:** superseded; Phase B is dropped.
 
 ## Verified vs inferred
 

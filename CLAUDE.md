@@ -1,14 +1,14 @@
-# 3D Map Generator — Mordheim Terrain for Tabletop Simulator
+# 3D Map Generator — Mordheim Ruined-City Terrain
 
 ## Project Summary
 
-Procedural generator for ruined city maps optimized for Mordheim gameplay. Outputs GLB (preview), OBJ + PNG atlas (TTS), and collision OBJ. All surfaces are perfectly flat, verticality is enforced, sightlines are controlled.
+Procedural generator for ruined city maps optimized for Mordheim gameplay. The consumer is the **Withering game**, which uses the GLB, the geometry primitives (boxes) and the collision matrix. **Tabletop Simulator (TTS) is no longer a target.** The OBJ + PNG atlas, the per-tier split (`--split-tiers`) and the collision OBJ exports were **removed in this version**; they live in git tags `v0.2.0` and `v0.3.0`. All surfaces are perfectly flat, verticality is enforced, sightlines are controlled.
 
 ## Tech Stack
 
 - Node.js (ESM modules)
 - Three.js (geometry generation + GLB export)
-- pngjs (texture atlas generation)
+- pngjs (GLB texture pools)
 - Custom seed-based RNG (mulberry32)
 - CLI: `node src/index.js --seed 42 --tiers 4 --size 48x48 --debug`
 
@@ -21,13 +21,13 @@ Procedural generator for ruined city maps optimized for Mordheim gameplay. Outpu
 4. **Walls** — Edge-detected walls with quadrant damage (upper/lower rows)
 5. **Connectivity** — Walkways, ladders (yellow/red/orange/cyan), platforms, gap detection (forced connections), branching T-junctions, bridges
 6. **Cover** — Rooftop, courtyard, interior, street scatter
-7. **Export** — GLB scene, OBJ (subdivided + atlas), collision mesh
+7. **Export** — GLB scene + geometry JSON (with the collision matrix).
 
 ### Export Details
-- OBJ uses 3" segment subdivision with 256px atlas tiles (4 segments per tile = 64px each)
-- GLB textures tile at 3" repeat (source textures are 32x32px)
-- Per-object UV offset breaks visible tiling repetition
-- TTS vertex limit: **25,000 per OBJ model**
+- GLB textures tile at 3" repeat (source textures are 32x32px); GLB UVs are world-space, with one offset per texture key to break visible repetition
+- GLB + geometry JSON are always written; the Withering game reads the primitives and the collision matrix
+- OBJ + atlas, per-tier split and collision OBJ exports were removed (tags `v0.2.0`, `v0.3.0`)
+- There is **no vertex cap**: the old 25,000-vertex TTS limit is gone with the OBJ export
 
 ## Code Conventions
 
@@ -37,7 +37,7 @@ Procedural generator for ruined city maps optimized for Mordheim gameplay. Outpu
 - All measurements in **inches** (Mordheim tabletop scale)
 - Seed-based RNG everywhere — no `Math.random()`, always use seeded RNG from `src/core/rng.js`
 - Axis convention: X = width, Y = up, Z = depth
-- All geometry is axis-aligned boxes — no curves in OBJ export
+- All geometry is axis-aligned boxes — no curves
 
 ## Critical Rules
 
@@ -52,14 +52,13 @@ Procedural generator for ruined city maps optimized for Mordheim gameplay. Outpu
 
 ### Code Quality
 - Overlap/collision checks should use shared helpers, not inline duplication
-- Keep OBJ exporter and GLB scene builder in sync — same geometry, different formats
-- When modifying geometry or UVs, update both exporters
+- Keep the GLB scene builder and the collision matrix in sync — matrix parity for the same seed unless a change is deliberate
 
 ### Testing
 - Test with multiple seeds before committing generation changes
-- Always verify vertex count stays under 25k TTS limit
-- Check both GLB and OBJ output when modifying geometry or UV logic
-- Run: `npm test`
+- Generation must stay deterministic per seed (same GLB and geometry JSON) and the collision matrix must stay identical unless a change is deliberate
+- Check the GLB output when modifying geometry or UV logic
+- Run: `npm test` and `npm run check:all` (baseline 37 findings, must not rise) and `npm run check:file-sizes` (no new entries)
 
 ## Key Constraints
 
@@ -84,4 +83,6 @@ Procedural generator for ruined city maps optimized for Mordheim gameplay. Outpu
 - `docs/PROJECT_OVERVIEW.md` — problem statement, design principles
 - `docs/BUILDING_REFERENCE.md` — building size classes and placement
 - `docs/issues.md` — known open issues
+- `docs/plans/CONVENTIONS_ALIGNMENT_PLAN_2026_10_13.md` and `docs/plans/CONVENTIONS_ALIGNMENT_MANIFEST_2026_10_13.md` — conventions alignment (shared rect cover, world-space GLB UVs, TTS/OBJ removal, Phase 3b done)
+- `docs/plans/PRIMITIVE_MERGE_PLAN_2026_10_13.md` — primitive merge (Track 2 superseded by the conventions plan)
 - `docs/plans/` — active plans; completed plans are in `docs/plans/archive/` (e.g. `VERTEX_LIMIT_PLAN_2026_03_30.md`, `VERTEX_OPTIMISATION_PLAN_2026_03_29.md`, `WATERWAYS_PLAN_2026_03_30.md`, `WALKWAY_IMPROVEMENTS_PLAN_2026_03_30.md`, `BUILDING_ADDITIONS_PLAN_2026_03_30.md`, `PACKAGE_INTEGRATION_PLAN_2026_03_28.md`, `FUTURE_FEATURES_2026_03_30.md`)

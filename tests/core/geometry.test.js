@@ -29,7 +29,7 @@ describe('createSlab', () => {
     expect(box.max.z - box.min.z).toBeCloseTo(6);
   });
 
-  it('has scaled UVs based on tile size', () => {
+  it('has a 24-vertex UV attribute (world-space values are covered in world-uv.test.js)', () => {
     const mesh = createSlab(0, 0, 0, 6, 3, 9, mat);
     const uv = mesh.geometry.getAttribute('uv');
     expect(uv).toBeDefined();

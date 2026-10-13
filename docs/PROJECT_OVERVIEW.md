@@ -1,14 +1,14 @@
-# 3D Map Generator — Mordheim Tabletop Terrain
+# 3D Map Generator — Mordheim Ruined-City Terrain
 
 ## Problem Statement
 
-Workshop maps for Mordheim in Tabletop Simulator (TTS) have two critical issues:
+Many existing Mordheim tabletop maps (originally Tabletop Simulator workshop maps) have two critical issues:
 1. **Geometry problems** — uneven surfaces cause models to tip over
 2. **Poor map design** — no verticality, no connected elevated routes, overly long sightlines
 
 ## Solution
 
-A procedural generator that creates seed-based 3D ruined city maps optimized for Mordheim gameplay, exportable to TTS.
+A procedural generator that creates seed-based 3D ruined city maps optimized for Mordheim gameplay. The consumer is the Withering game (GLB + geometry primitives + collision matrix). Tabletop Simulator was the original target and is no longer supported: the OBJ/atlas, collision OBJ and per-tier exports were removed (they live in git tags v0.2.0 and v0.3.0).
 
 ## Core Design Principles
 
@@ -64,7 +64,7 @@ Target: no unobstructed sightline longer than ~24" (Mordheim max shooting range)
 
 - **Runtime**: Node.js
 - **3D Geometry**: Three.js
-- **Export Format**: GLB (glTF binary) — TTS-compatible, supports embedded textures
+- **Export Format**: GLB (glTF binary) — supports embedded textures; geometry JSON and collision matrix alongside
 - **Generation**: BSP / grid-based partitioning with seed-based RNG
 - **CLI Interface**: `node generate.js --seed 42 --levels 4 --size 48x48`
 
@@ -73,4 +73,4 @@ Target: no unobstructed sightline longer than ~24" (Mordheim max shooting range)
 A single `.glb` file per generation containing:
 - All geometry (floors, walls, walkways, ladders)
 - Embedded textures (stone floors, brick walls, wood planks)
-- Correct scale for TTS import
+- Correct scale (1 unit = 1 inch)

@@ -40,12 +40,12 @@ describe('generateWalls', () => {
     }
   });
 
-  it('wall rows are at most 1 inch tall and stack within the tier band above their floor', () => {
+  it('wall rects stack within the tier band above their floor', () => {
     const { walls, config } = runStages(42);
     const stride = levelHeight(config);
     for (const w of walls.walls) {
       expect(w.h).toBeGreaterThan(0);
-      expect(w.h).toBeLessThanOrEqual(1);
+      expect(w.h).toBeLessThanOrEqual(wallGeomHeight(config) + EPS);
       // Each wall row lies within the room band above its floor surface.
       const offset = w.y - (w.floorY + config.slabThickness);
       expect(offset).toBeGreaterThanOrEqual(0);
@@ -112,9 +112,9 @@ describe('generateWalls', () => {
     expect(a.walls.internalWalls).toEqual(b.walls.internalWalls);
   });
 
-  it('seed 42 produces 485 wall segments and 9 internal walls', () => {
+  it('seed 42 produces 276 wall segments and 9 internal walls', () => {
     const { walls } = runStages(42);
-    expect(walls.walls.length).toBe(485);
+    expect(walls.walls.length).toBe(276);
     expect(walls.internalWalls.length).toBe(9);
   });
 });

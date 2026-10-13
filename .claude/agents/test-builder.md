@@ -31,7 +31,7 @@ Read all source files in `src/`. For each module, check if a corresponding test 
 
 1. **Core utilities** — `src/core/rng.js`, `src/core/geometry.js` (foundation everything depends on)
 2. **Generator stages** — grid, buildings, floors, walls, connectivity, cover (deterministic pipeline)
-3. **Exporters** — obj-exporter, glb-exporter, collision-exporter (output correctness)
+3. **Exporters** — glb-exporter (output correctness)
 4. **Config** — parseArgs, default values
 
 ### Step 3: Write tests for core utilities
@@ -87,12 +87,6 @@ Each generator is a pure function (data in, enriched data out), so test the cont
 
 ### Step 5: Write tests for exporters
 
-**OBJ exporter tests:**
-- Output contains valid OBJ syntax (v, vt, vn, f lines)
-- Atlas PNG is generated with correct dimensions
-- Vertex count for a known seed matches expected value
-- UV coordinates fall within atlas tile bounds (no bleeding)
-- All face indices reference valid vertices
 
 **GLB exporter tests:**
 - Output starts with glTF magic bytes (0x46546C67)
@@ -106,7 +100,7 @@ Each generator is a pure function (data in, enriched data out), so test the cont
 ### Step 6: Write snapshot tests
 
 For seeds 42 and 100, capture and assert:
-- Total vertex count
+- Total primitive count
 - Number of objects (buildings, floors, walls, walkways, ladders, cover)
 - These act as regression guards — if counts change, something changed in generation
 
@@ -123,5 +117,5 @@ For seeds 42 and 100, capture and assert:
 - One test file per source module, mirroring the src/ directory structure in tests/.
 - Use descriptive test names: `"seed 42 produces 16 buildings"` not `"test1"`.
 - Keep test data minimal — don't copy entire config, just override what matters.
-- Snapshot values (vertex counts, object counts) must include the seed in the test name.
+- Snapshot values (face/primitive counts, object counts) must include the seed in the test name.
 - Do not modify source files — only create/edit test files and config.

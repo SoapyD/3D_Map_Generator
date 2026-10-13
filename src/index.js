@@ -12,9 +12,7 @@ import { runPipeline } from './pipeline.js';
 import { BELOW_GROUND } from './generators/collision/matrix.js';
 import { buildScene } from './generators/scene/index.js';
 import { exportToGlb, getOutputPath } from './export/glb-exporter.js';
-import { exportToObj } from './export/obj-geometry/export-to-obj.js';
-import { getObjOutputPath } from './export/obj-geometry/get-obj-output-path.js';
-import { exportCollisionObj } from './export/collision-exporter.js';
+import { getOutputBaseName } from './export/get-output-base-name.js';
 
 async function main() {
   const config = parseArgs(process.argv);
@@ -47,7 +45,7 @@ async function main() {
   await mkdir(config.outputDir, { recursive: true });
 
   if (config.debugMatrix) {
-    const { dir: mDir, baseName: mBase } = getObjOutputPath(config);
+    const { dir: mDir, baseName: mBase } = getOutputBaseName(config);
     const historyOut = [];
     const rawHistory = matrix.dumpHistory();
     const { cellSize: cs, W: mW, D: mD } = matrix;
@@ -77,7 +75,7 @@ async function main() {
     await writeFile(`${config.outputDir}/debug_frames.json`, recorder.serialize());
     console.log(`  Visualizer frames written to ${config.outputDir}/debug_frames.json`);
   }
-  const { dir, baseName } = getObjOutputPath(config);
+  const { dir, baseName } = getOutputBaseName(config);
 
   // Write handover file — embed collision matrix for viewer grid toggle
   const geometryWithMatrix = { ...geometry, collisionMatrix: matrix.toDebugJSON() };
@@ -87,26 +85,13 @@ async function main() {
   console.log('Building scene and exporting...');
   const scene = buildScene(geometry, config);
 
-  // Always export both GLB and OBJ with texture atlas
+  // GLB and geometry JSON (with the collision matrix) are always written.
   const outputPath = getOutputPath(config);
   await exportToGlb(scene, outputPath);
 
-  const objPath = await exportToObj(geometry, config, dir, baseName);
-  const collisionPath = await exportCollisionObj(geometry, dir, baseName);
-
   console.log(`\nDone!`);
   console.log(`  GLB: ${outputPath}`);
-  console.log(`  OBJ: ${objPath}`);
-  console.log(`  Texture: ${path.join(dir, baseName + '.png')}`);
-  console.log(`  Collision: ${collisionPath}`);
   console.log(`  Geometry: ${geometryPath}`);
-
-  if (config.splitTiers) {
-    const { exportTiers } = await import('./export/export-tiers.js');
-    const manifest = await exportTiers(geometry, config, dir, baseName);
-    const written = manifest.tiers.filter(t => !t.empty).length;
-    console.log(`  Split tiers: ${written}/${manifest.tierCount} tier OBJ+collider files + ${baseName}_tiers.json`);
-  }
 
   if (config.preview) {
     console.log('\nStarting preview server...');
