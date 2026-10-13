@@ -13,10 +13,7 @@ Outputs:
 - `output/mordheim_map_42.glb` — GLB file (browser preview, Withering game)
 - `output/mordheim_map_42_geometry.json` — primitives plus the collision matrix
 
-With the deprecated `--obj` flag it also writes (legacy, for consumers pinned to v0.2.0):
-- `output/mordheim_map_42.obj` — OBJ file (was for TTS import)
-- `output/mordheim_map_42.png` — Texture atlas
-- `output/mordheim_map_42_collision.obj` — collision OBJ
+The OBJ + atlas, collision OBJ and per-tier exports were removed in this version. They live in git tags `v0.2.0` and `v0.3.0` (check out a tag to use them).
 
 ## CLI Options
 
@@ -27,8 +24,6 @@ With the deprecated `--obj` flag it also writes (legacy, for consumers pinned to
 | `--tiers N` | Number of elevated tiers (+ base) | 4 |
 | `--tier-height N` | Vertical spacing between tiers (inches) | 3 |
 | `--debug` | Use flat debug colours instead of textures | off |
-| `--obj` | **Deprecated.** Also write the legacy OBJ + atlas PNG + collision OBJ (Tabletop Simulator). Prints a one-time deprecation warning | off |
-| `--split-tiers` | **Deprecated.** Also write one OBJ + collider per tier and a manifest (legacy TTS elevator). Warns once | off |
 | `--preview` | Generate, then start the viewer on localhost:3010 (see [Running the viewer](#running-the-viewer)). Always records debug frames to `output/debug_frames.json` | off |
 | `--visualize` | Alias of `--preview` | off |
 | `--preview-map FILE` | Skip generation; start the viewer from a frozen `withering-map/1` or `/2` fixture. The Visualizer tab is greyed out | none |
@@ -110,16 +105,9 @@ The header shows the fixture's generator revision and `(dirty)` if it was cut fr
 
 Design history: `docs/plans/archive/LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md`.
 
-## Importing into Tabletop Simulator (legacy, deprecated)
+## Legacy Tabletop Simulator export (removed)
 
-> Tabletop Simulator is no longer a target. These steps apply only to OBJ files from `--obj` or generator v0.2.0 (tag `v0.2.0`), and the OBJ export is scheduled for removal.
-
-1. Upload the `.obj` and `.png` files somewhere accessible via URL (Steam Cloud, Imgur, etc.)
-2. In TTS: Objects > Components > Custom > Custom Model
-3. Set **Model/Mesh** URL to the `.obj` file
-4. Set **Diffuse/Image** URL to the `.png` file
-5. Set **Collider/Mesh** URL to the same `.obj` file (required for collision)
-6. Scale down as needed (try 0.05-0.1)
+The OBJ + atlas and collision OBJ outputs for Tabletop Simulator, and `--obj` / `--split-tiers`, were removed. Use git tag `v0.2.0` or `v0.3.0` if you need them.
 
 ## Generation Pipeline
 
@@ -129,7 +117,7 @@ Design history: `docs/plans/archive/LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.m
 4. **Walls** — Quadrant-driven with upper/lower damage rows
 5. **Connectivity** — Walkways (blue), yellow/red/orange ladders
 6. **Cover** — Rooftop, ground, and interior cover objects
-7. **Export** — GLB + geometry JSON (OBJ with texture atlas only with the deprecated `--obj`)
+7. **Export** — GLB + geometry JSON (with the collision matrix)
 
 ## Configuration
 
@@ -155,7 +143,7 @@ assets/textures/base/
 ### Included packs
 
 - **`base`** — default solid colour textures, fully opaque
-- **`transparent_base`** — same as base but walls have 85% opacity (15% transparent). Transparency works in GLB viewers (legacy note: it did not work in the old TTS OBJ path, which does not support transparent PNGs on custom models)
+- **`transparent_base`** — same as base but walls have 85% opacity (15% transparent). Transparency works in GLB viewers
 
 ### Switching texture packs
 
@@ -183,26 +171,3 @@ PNGs with alpha channels are automatically detected. Materials with alpha < 100%
 1. Copy the base pack
 2. Edit the wall PNGs to have a lower alpha (e.g. 85%)
 3. Use `--texture-set your_transparent_pack`
-
-Note (legacy): the old TTS OBJ path did not support PNG transparency on custom models. The transparent pack is useful for the GLB browser preview only.
-
-### Regenerating procedural textures
-
-```bash
-node src/generators/generate-textures.js
-```
-
-## Debug Colours
-
-When using `--debug`, elements are colour-coded:
-- Grey — base ground
-- Brown tones — building floors (by tier)
-- Tan — walls
-- Blue — walkways
-- Green — blocked walkways (hit a wall)
-- Yellow — walkway ladders
-- Red — ground ladders
-- Orange — free-standing ladders
-- Purple — cover objects
-- Grey — interior cover
-- Pink — deleted building footprints (debug)

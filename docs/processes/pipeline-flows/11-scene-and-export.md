@@ -1,6 +1,6 @@
 # Stage 11: Scene Build and Export
 
-> Last verified: 2026-10-13 against src/index.js. GLB + geometry JSON are always written; OBJ + atlas, collision OBJ and `--split-tiers` are DEPRECATED (legacy Tabletop Simulator, v0.2.0 consumers) and written only on request. The sections marked legacy below are kept for those consumers and are scheduled for deletion (conventions plan, Phase 3b).
+> Last verified: 2026-10-13 against src/index.js. GLB + geometry JSON are always written. The OBJ + atlas, collision OBJ and per-tier split exports were removed in this version (conventions plan, Phase 3b); the old behaviour is in git tags `v0.2.0` and `v0.3.0`.
 
 ## Overview
 
@@ -43,14 +43,7 @@ The GLB is always written:
 |---|---|---|
 | GLB | `exportToGlb(scene, outputPath)` | `<baseName>.glb` |
 
-Deprecated, written **only with `--obj`** (legacy, kept for consumers pinned to v0.2.0; the CLI prints a one-time deprecation warning):
-
-| Output | Function | File |
-|---|---|---|
-| OBJ + texture atlas PNG | `exportToObj(geometry, config, dir, baseName)` | `<baseName>.obj` / `.png` |
-| Collision OBJ | `exportCollisionObj(geometry, dir, baseName)` | `<baseName>_collision.obj` |
-
-The in-memory library exports `generateObjToBuffers`, `generateColliderToBuffer` and `generateTiersToBuffers` are likewise deprecated (they warn once per process and return the same data as before). There is no vertex cap: the old 25,000-vertex TTS limit is retired.
+The in-memory library has one export, `generateToBuffer` (returns the GLB). The former `generateObjToBuffers`, `generateColliderToBuffer` and `generateTiersToBuffers` were removed with the OBJ paths. There is no vertex cap.
 
 Data files:
 
@@ -60,68 +53,20 @@ Data files:
 | Debug frames JSON | Recorder frame data (written when `--preview` or `--visualize` is on) | `debug_frames.json` |
 | Matrix history JSON | Per-cell write history (only when `--debugMatrix`) | `<baseName>_matrix_history.json` |
 
-### Legacy (deprecated): OBJ ladder mode
+### Ladder mode
 
 Controlled by `config.flatLadders` (CLI flags `--flat-ladders` / `--3d-ladders`, default `true`):
 
-- `true` — flat 2D quads offset slightly from the adjacent wall face.
-- `false` — full 3D geometry: two pole boxes + individual rung boxes per rung.
+- `true` - flat 2D quads offset slightly from the adjacent wall face.
+- `false` - full 3D geometry: two pole boxes + individual rung boxes per rung.
 
-### Legacy (deprecated): Collision OBJ
+### Merged primitives
 
-`exportCollisionObj` filters `geometry.primitives` to `type === 'slab'` and matches primitive names against a prefix allowlist. Included prefixes:
+The geometry stage may merge adjacent boxes (see stage 10, "Primitive merge pass"; disabled by default, `GEOMETRY.primitiveMerge.enabled = false`). A merged primitive still carries `uvOrigin` (the first constituent's box), but no exporter reads it: the GLB uses world-space UVs.
 
-`skirt_`, `river_`, `street_`, `pavement_`, `base_floor`, `floor_`, `roof_`, `cover_`, `interior_cover_`, `street_scatter_`, `walkway_`, `bridge_`, `pillar_`, `ladder_platform_`, `junction_platform_`, `deleted_`.
+### Tier assignment helper
 
-Bridge wall and battlement slabs (`_wall_`, `_batt_` in name) are excluded so only the walkable deck surface is collidable.
-
-### Legacy (deprecated): per-tier split export (`--split-tiers`, opt-in, additive)
-
-`--split-tiers` (or the in-memory `generateTiersToBuffers(seed, opts)`) additionally emits one OBJ + one collider OBJ **per vertical tier**, plus a manifest. This lets Tabletop Simulator load the map as N stacked, independently movable tier objects (the "elevator" / reveal feature) instead of one monolithic model that the camera collides against. Combined GLB/OBJ/collider are still written unconditionally — the split is purely additive.
-
-All tiers share **one** diffuse atlas PNG: the atlas is built once from the full geometry (`buildObjAtlas`) and reused for every tier's OBJ (`emitPrimitivesToObj`), so UVs match a single `<baseName>.png`.
-
-**Alignment via corner posts.** The geometry is world-baked, but TTS does **not** self-align separately-imported tiers — it centres each `Custom_Model` on its **collider** bounding box, and each tier's raw geometry has a different centre (upper floors don't cover the whole footprint, so they'd land off-centre). So each tier gets **4 corner posts** (`cornerPostPrimitives`): one at each corner of the global map footprint, `1×1` in XZ and spanning **that tier's own height**, emitted into **both** the visual OBJ and the collider (name prefix `border_corner_` → collidable). This gives every tier an identical **XZ footprint** bounding box (→ TTS places them identically → they line up horizontally) with a **real per-tier height** (so the selection box isn't a whole-map block and units rest on the real floor). Vertical stacking is applied by the loader from each tier's manifest `center`. The posts sit at the map corners (skirt/border, off the play area), textured `map_border`, so they render as small posts (floating at the corners on the upper floors). Earlier iterations used an invisible degenerate-triangle "bounds cage" instead, but that cooked into a flickering invisible collider in Unity — real corner boxes are stable.
-
-Tier assignment — `tierOf(prim, config)` (`src/export/assign-primitive-tier.js`), total + disjoint (every primitive → exactly one tier in `[0, config.tiers]`; tier count is `config.tiers + 1`):
-
-1. **Floors** — authoritative tier from the `floor_f{n}_` name.
-2. **Ground terrain** (`street_`, `river_`, `skirt_`, `border_`, `deleted_`, `pavement_`, `building_footprint_`) → tier 0.
-3. **Cross-tier connectors** (any name containing `ladder`, plus `pillar_`, `bridge_`, `walkway_`, `junction_platform_`) → their **lower/base** tier by floor-banding `baseY` (v1: a raised upper tier detaches cosmetically at the top).
-4. **Everything else** (walls, roofs, rooftop cover) → **floor-banded** to the floor at or below `baseY` (`tierIndexFromY`: `floor((baseY + FLOOR_SLAB.bandLookahead) / tierHeight)`; the pitch `levelHeight` is now just `tierHeight`). A tier owns its thin floor slab (`y = i*tierHeight - 0.25`), the connector slabs flush on its surface (the lookahead covers 0.5" bridge decks) and all the wall rows above it up to — but not including — the next floor, so every wall row (`y = i*tierHeight + 0..2`) stays on tier `i`.
-
-Outputs (for each **non-empty** tier `t`; empty tiers are skipped but retained in the manifest with `empty: true`):
-
-| Output | File |
-|---|---|
-| Tier OBJ | `<baseName>_tier{t}.obj` |
-| Tier collider OBJ | `<baseName>_tier{t}_collision.obj` (omitted if the tier has no collidable surfaces) |
-| Shared atlas PNG | `<baseName>.png` (one, shared by all tiers) |
-| Manifest | `<baseName>_tiers.json` — `{ version (2), seed, tierCount, levelHeight, tierHeight, slabThickness, floorThickness, units, tiers: [{ tier, obj, collision, primitiveCount, xMin, xMax, yMin, yMax, zMin, zMax, center: [cx,cy,cz], empty }] }` |
-
-Each tier entry carries its **XZ footprint bounds** (identical across tiers — the corner posts reach the map corners) and its **per-tier Y** range, giving a `center` whose XZ is the map centre and whose Y is the tier's own. A loader repositions each tier to its `center`: the XZ offset is the same for every tier (the corner posts already align them horizontally), and the Y offset stacks the tiers vertically.
-
-`levelHeight` in the manifest is the vertical distance between stacked tier floors (floor surface to floor surface, = `tierHeight`, 3" by default) — the elevator lift delta a TTS script applies. Manifest **version 2** changed its meaning (v1: `tierHeight + slabThickness`, 4") and added `floorThickness` (rendered slab thickness, 0.25"); `slabThickness` is the 1" matrix cell, not the rendered thickness.
-
-### Merged primitives and `uvOrigin` (legacy OBJ detail)
-
-The geometry stage may merge adjacent boxes (see stage 10, "Primitive merge pass"). A merged primitive carries `uvOrigin` (the first constituent's box). The per-object UV offset hash (`GEOMETRY.uvHashU/V`) reads `uvOrigin` in the OBJ exporter only (`addSharedFlat`, `addSharedWall`, corner x/y/z). The GLB no longer uses `uvOrigin` or the per-object hash (world-space UVs, see above). The first segment of a merged piece therefore keeps its previous texture offset; later 3" segments continue the pattern from there, so a merged span is not tile-for-tile identical to its unmerged constituents. The merge pass is disabled by default (`GEOMETRY.primitiveMerge.enabled = false`, see stage 10).
-
-### Legacy: unused vertex grids (OBJ)
-
-`addSharedFlat` only writes the top vertex grid when `emitTop` is set and the bottom grid when `emitBottom` is set (a `simpleBottom` writes just its 4 corners). Faces are unchanged; previously both full grids were always written (half of them unreferenced for `emitBottom: false` slabs such as pavements, streets and `skirt_bottom`).
-
-### Legacy: wall end-cap coverage (OBJ)
-
-Coverage is always computed against the **merged** wall list (`geometry.primitives` filtered to `type === 'wall'`, in both `buildObjAndAtlas` and `exportTiers`), so a merged run has no internal seam cap and keeps its real end caps. Verified on seeds 1/7/100: the set of uncovered end-cap rectangles is identical before and after merging.
-
-
-`wallEdgeCovered(wallPrim, side, allWallPrims)` decides whether to suppress a wall's end-cap face. N/S walls are trimmed at corners to yield to E/W walls — so the check must verify the covering wall spans the **full face extent**, not just the edge point:
-
-- For axis=`'x'` walls: covering wall must contain `edgeX` AND fully span `[edgeZ, edgeZ + wallPrim.d]`.
-- For axis=`'z'` walls: covering wall must fully span `[edgeX, edgeX + wallPrim.w]` AND contain `edgeZ`.
-
-A margin of 0.01 is used for floating-point safety. The previous 0.5 margin incorrectly suppressed E/W end caps at trimmed corners, leaving transparent corner slots.
+`tierOf(prim, config)` (`src/export/assign-primitive-tier.js`) maps a primitive to one vertical tier. The per-tier export that used it was removed; it is kept as a tested helper (used by the merge-pass tests).
 
 ## Key Files
 
@@ -129,19 +74,12 @@ A margin of 0.01 is used for floating-point safety. The previous 0.5 margin inco
 - [src/generators/scene/buildTexturePools.js](../../../../src/generators/scene/buildTexturePools.js)
 - [src/generators/scene/resolve-textured-material.js](../../../../src/generators/scene/resolve-textured-material.js)
 - [src/export/glb-exporter.js](../../../../src/export/glb-exporter.js)
-- [src/export/obj-geometry/export-to-obj.js](../../../../src/export/obj-geometry/export-to-obj.js)
-- [src/export/obj-geometry/emit-ladder.js](../../../../src/export/obj-geometry/emit-ladder.js) — flat vs 3D ladder dispatch
-- [src/export/obj-geometry/wall-edge-covered.js](../../../../src/export/obj-geometry/wall-edge-covered.js) — end-cap suppression
-- [src/export/collision-exporter.js](../../../../src/export/collision-exporter.js)
-- [src/export/assign-primitive-tier.js](../../../../src/export/assign-primitive-tier.js) — `tierOf` / `tierCount` / `primBaseY` / `primTopY` (per-tier split)
-- [src/export/export-tiers.js](../../../../src/export/export-tiers.js) — `groupPrimitivesByTier` / `buildTierBuffers` / `cornerPostPrimitives` (footprint corner posts) / `exportTiers`
-- [src/export/obj-geometry/build-obj-and-atlas.js](../../../../src/export/obj-geometry/build-obj-and-atlas.js) — `buildObjAtlas` (shared atlas) + `emitPrimitivesToObj` (per-tier OBJ)
-- [src/generate-tiers-buffers.js](../../../../src/generate-tiers-buffers.js) — in-memory `generateTiersToBuffers` (consumed by the wyrdwars maps API)
+- [src/export/get-output-base-name.js](../../../../src/export/get-output-base-name.js) - output directory and base file name
+- [src/export/assign-primitive-tier.js](../../../../src/export/assign-primitive-tier.js) - `tierOf` / `tierCount` / `primBaseY` / `primTopY`
 - [src/generators/generate-textures.js](../../../../src/generators/generate-textures.js) — generates placeholder PNGs for `base` and `loaded` packs
 
 ## Edge Cases & Constraints
 
-- The GLB and geometry JSON are always written. OBJ + atlas + collision OBJ are written only with the deprecated `--obj` flag (default off).
-- `--split-tiers` is deprecated, additive and opt-in: its per-tier OBJs reuse the single combined atlas PNG, and it warns once.
+- The GLB and geometry JSON are always written. There are no other export formats.
 - `--preview` (alias `--visualize`) enables the debug recorder which captures per-stage snapshots consumed by the preview visualiser.
 - The `map_skirt` texture must exist in both `assets/textures/base/map_skirt/` and `assets/textures/loaded/map_skirt/`. Run `node src/generators/generate-textures.js` to regenerate if missing.

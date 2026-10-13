@@ -31,7 +31,7 @@ Run `git status` and `git branch --show-current`. If on a feature branch, stay o
 ### Step 2: Local gates (before committing)
 - `npm test` -- all tests must pass (no expected failures).
 - `npm run check:all` -- baseline is 37 findings. Do not add new ones.
-- For generation/geometry changes, also run several seeds (e.g. 42, 7, 123) and confirm determinism per seed and collision-matrix parity (the 25,000-vertex TTS cap no longer applies). Check the GLB; the legacy OBJ (`--obj`) only if you touched the deprecated OBJ code.
+- For generation/geometry changes, also run several seeds (e.g. 42, 7, 123) and confirm determinism per seed and collision-matrix parity. Check the GLB and geometry JSON.
 - Docs: if pipeline or config behaviour changed, confirm the relevant docs from CLAUDE.md "Reference Documents" (especially `docs/architecture/docs_and_config_guide.md`) are updated; update them in the same PR if not.
 
 ### Step 3: Commit

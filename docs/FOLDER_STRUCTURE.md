@@ -26,13 +26,12 @@
 │   ├── pipeline.js                # Runs the stages in order
 │   ├── lib.js                     # Package entry (importable API)
 │   ├── config.js                  # Defaults, tunables, CLI arg parsing
-│   ├── generate-*-buffers.js      # In-memory generation (OBJ / collider / per-tier; all deprecated, v0.2.0 consumers)
 │   ├── core/                      # RNG and shared geometry/rect helpers
 │   ├── generators/                # One folder per stage (grid is under foundations/),
 │   │                              #   plus collision/ (matrix), selectors/, utils/,
 │   │                              #   scene/, geometry/ and _old_system/ (legacy)
 │   ├── profiles/                  # Swappable config profiles (withering, …)
-│   ├── export/                    # GLB exporter; deprecated OBJ + atlas, collision OBJ and per-tier exporters (--obj / --split-tiers)
+│   ├── export/                    # GLB exporter, output base name, tierOf helper (OBJ / collider / per-tier exporters removed; see tags v0.2.0, v0.3.0)
 │   ├── preview/                   # Unified viewer (README "Running the viewer"): server.js (--preview),
 │   │                              #   preview-routes.js (one route table), shell.html (tabs),
 │   │                              #   visualizer.html, viewer.html (/model.html), debug-recorder.js,

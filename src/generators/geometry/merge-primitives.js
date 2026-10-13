@@ -4,7 +4,7 @@ import { mergeGroupPrims } from './merge/merge-group-prims.js';
 
 /**
  * Primitive merge pass: joins adjacent same-texture, same-tier boxes (walls within one building,
- * pavements, floor plates) into single primitives so the OBJ spends fewer vertices on them. Pure -
+ * pavements, floor plates) into single primitives so the scene has fewer boxes. Pure -
  * the input list and its primitives are not mutated. Primitive order is preserved (a merged
  * primitive sits where its first constituent was).
  *

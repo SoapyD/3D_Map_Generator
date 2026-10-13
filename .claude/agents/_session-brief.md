@@ -26,7 +26,7 @@ Always do these, in order:
 
 Some project-wide rules constrain all new work. Mention any relevant ones in the brief so new sessions honour them:
 
-- **Consumer is the Withering game (GLB + primitives + collision matrix); Tabletop Simulator is no longer a target.** The old 25,000-vertex cap is retired. OBJ + atlas, `--split-tiers` and the collision OBJ are deprecated (kept only for consumers pinned to v0.2.0; see `docs/plans/CONVENTIONS_ALIGNMENT_PLAN_2026_10_13.md`).
+- **Consumer is the Withering game (GLB + primitives + collision matrix); Tabletop Simulator is no longer a target.** The 25,000-vertex cap is gone. The OBJ + atlas, per-tier split and collision OBJ exports were removed from this repo (they live in tags `v0.2.0` and `v0.3.0`).
 - **Matrix parity and determinism.** Geometry/wall/floor/pavement changes must keep the collision matrix identical (or change it deliberately), keep seeded RNG call order, and be deterministic per seed. Run `npm test` and `npm run check:all` (baseline 37 findings).
 - **Flat surfaces + axis-aligned boxes.** All horizontal surfaces must be perfectly flat, slab thickness constant, geometry limited to axis-aligned boxes. No curves.
 - **Everything reachable + sightlines controlled.** The connectivity pass must verify access from ground; no unbroken line of sight > 24".
@@ -45,7 +45,7 @@ Return a single structured brief. Keep it scannable — use headers and bullets,
 
 ## Architecture snapshot
 - Pipeline: [7-stage summary from CLAUDE.md / GENERATION_PIPELINE.md]
-- Export: [GLB + geometry JSON + collision matrix summary; OBJ only with deprecated --obj]
+- Export: [GLB + geometry JSON + collision matrix summary]
 
 ## Current focus
 - [What is actively being worked on, from active plans]

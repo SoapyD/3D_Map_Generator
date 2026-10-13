@@ -29,7 +29,7 @@ Run `node src/index.js --seed 42` and verify it completes without error.
 Run `node src/index.js --seed 100` and verify it completes without error.
 
 **Gate 4: Determinism and matrix parity**
-Run `node src/index.js --seed 42` twice and confirm identical GLB and geometry JSON hashes. The old 25,000-vertex TTS cap no longer applies; the OBJ is only written with the deprecated `--obj` flag.
+Run `node src/index.js --seed 42` twice and confirm identical GLB and geometry JSON hashes. There is no vertex cap and no OBJ output.
 
 **Gate 5: Config completeness**
 Grep all .js files under `src/` for numeric literals that should be in config. Flag any new magic numbers not present in `src/config.js`.
@@ -38,7 +38,7 @@ Grep all .js files under `src/` for numeric literals that should be in config. F
 For each import statement in every source file, verify the imported name is actually used in that file.
 
 **Gate 7: Scene builder and collision matrix in sync**
-Verify that any geometry type rendered by the GLB scene builder (floors, walls, walkways, cover, ladders, platforms, courtyards, street scatter) is also written to the collision matrix where it should be collidable. Do not require OBJ parity: the OBJ exporter is deprecated.
+Verify that any geometry type rendered by the GLB scene builder (floors, walls, walkways, cover, ladders, platforms, courtyards, street scatter) is also written to the collision matrix where it should be collidable.
 
 ### Step 2: Write the report
 

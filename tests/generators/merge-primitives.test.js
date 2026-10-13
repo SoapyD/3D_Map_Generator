@@ -5,13 +5,17 @@ import { buildGeometry } from '../../src/generators/geometry/index.js';
 import { mergePrimitives } from '../../src/generators/geometry/merge-primitives.js';
 import { mergeTwoBoxes } from '../../src/generators/geometry/merge/merge-two-boxes.js';
 import { tierOf } from '../../src/export/assign-primitive-tier.js';
-import { buildCollisionObj } from '../../src/export/collision-buffer.js';
 
 const SEEDS = [42, 100, 7];
 const EPS = 1e-6;
 // The pass ships disabled (the greedy rect cover leaves nothing to merge); tests enable it explicitly.
 const OPTS = { ...GEOMETRY.primitiveMerge, enabled: true };
 const OFF = { ...OPTS, enabled: false };
+const COLLIDABLE_PREFIXES = [
+  'skirt_', 'border_', 'river_', 'street_', 'pavement_', 'base_floor', 'floor_', 'roof_',
+  'cover_', 'interior_cover_', 'street_scatter_', 'walkway_', 'bridge_', 'pillar_',
+  'ladder_platform_', 'junction_platform_', 'deleted_',
+];
 const family = (name) => name.replace(/(_-?\d+)+$/, '');
 
 /** Merged geometry (pass enabled) and the unmerged baseline for the same seed. */
@@ -50,17 +54,14 @@ function overlapPairs(prims) {
   return n;
 }
 
+/** Total volume of the collidable slab primitives (walking surfaces; the same prefix set the collider used). */
 function collisionVolume(geometry) {
-  let vol = 0, vs = [];
-  const flush = () => {
-    if (vs.length === 8) vol += (vs[6][0] - vs[0][0]) * (vs[6][1] - vs[0][1]) * (vs[6][2] - vs[0][2]);
-    vs = [];
-  };
-  for (const line of buildCollisionObj(geometry).objString.split('\n')) {
-    if (line.startsWith('o ')) flush();
-    else if (line.startsWith('v ')) vs.push(line.slice(2).split(' ').map(Number));
+  let vol = 0;
+  for (const p of geometry.primitives) {
+    if (p.type !== 'slab' || !COLLIDABLE_PREFIXES.some((prefix) => p.name.startsWith(prefix))) continue;
+    if (p.name.includes('_wall_') || p.name.includes('_batt_')) continue; // bridge deck only
+    vol += p.w * p.h * p.d;
   }
-  flush();
   return vol;
 }
 

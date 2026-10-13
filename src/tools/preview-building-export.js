@@ -9,7 +9,6 @@ import { generateConnectivity } from '../generators/connectivity/index.js';
 import { buildGeometry } from '../generators/geometry/index.js';
 import { buildScene } from '../generators/scene/index.js';
 import { exportToGlb } from '../export/glb-exporter.js';
-import { exportToObj } from '../export/obj-geometry/export-to-obj.js';
 
 /**
  * Run the generation pipeline and export results.
@@ -79,24 +78,10 @@ export async function runPipelineAndExport(buildingsList, args, config) {
   await mkdir(config.outputDir, { recursive: true });
 
   const baseName = `preview_${args.type}_${args.shape}_${args.seed}`;
-  const fmt = args.format;
 
-  let glbPath, objPath, vertCount;
-
-  if (fmt === 'glb' || fmt === 'both') {
-    glbPath = `output/${baseName}.glb`;
-    await exportToGlb(scene, glbPath);
-  }
-
-  if (fmt === 'obj' || fmt === 'both') {
-    objPath = await exportToObj(geometry, config, config.outputDir, baseName);
-    const { readFileSync } = await import('fs');
-    const objContent = readFileSync(objPath, 'utf8');
-    vertCount = (objContent.match(/^v /gm) || []).length;
-  }
+  const glbPath = `output/${baseName}.glb`;
+  await exportToGlb(scene, glbPath);
 
   console.log(`\nDone!`);
-  if (glbPath) console.log(`  GLB: ${glbPath}`);
-  if (objPath) console.log(`  OBJ: ${objPath}`);
-  if (vertCount) console.log(`  Vertices: ${vertCount}`);
+  console.log(`  GLB: ${glbPath}`);
 }

@@ -8,7 +8,7 @@ Many existing Mordheim tabletop maps (originally Tabletop Simulator workshop map
 
 ## Solution
 
-A procedural generator that creates seed-based 3D ruined city maps optimized for Mordheim gameplay. The consumer is the Withering game (GLB + geometry primitives + collision matrix). Tabletop Simulator was the original target and is no longer supported: the OBJ/atlas export is deprecated and kept only for consumers pinned to v0.2.0.
+A procedural generator that creates seed-based 3D ruined city maps optimized for Mordheim gameplay. The consumer is the Withering game (GLB + geometry primitives + collision matrix). Tabletop Simulator was the original target and is no longer supported: the OBJ/atlas, collision OBJ and per-tier exports were removed (they live in git tags v0.2.0 and v0.3.0).
 
 ## Core Design Principles
 

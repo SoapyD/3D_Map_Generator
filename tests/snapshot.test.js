@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { runStages, countPrims, quiet } from './helpers/run-stages.js';
-import { buildObjAndAtlas } from '../src/export/obj-geometry/build-obj-and-atlas.js';
+import { createHash } from 'crypto';
+import { runStages, countPrims } from './helpers/run-stages.js';
 
 /**
- * Regression guards: object and (legacy OBJ) face counts for fixed seeds on the default config
+ * Regression guards: object counts and a collision-matrix hash for fixed seeds on the default config
  * (48x48, 4 tiers). If a count changes, generation changed. Review the change, then update.
  * Counts were last regenerated after the pipeline moved to the matrix-based stages
  * (foundations/buildings/floors/roofs/streets/connectivity/ladders/walls/cover/geometry).
@@ -28,10 +28,10 @@ function countObjects(seed) {
   };
 }
 
-function objFaceCount(seed) {
-  const { geometry, config } = runStages(seed);
-  const { objString } = quiet(() => buildObjAndAtlas(geometry, config));
-  return objString.split('\n').filter(l => l.startsWith('f ')).length;
+/** SHA-256 of the collision matrix cells, the Withering client's contract; must not move unless generation does. */
+function matrixHash(seed) {
+  const { matrix } = runStages(seed);
+  return createHash('sha256').update(Uint8Array.from(matrix.toDebugJSON().cells)).digest('hex');
 }
 
 describe.each([42, 100])('Snapshot regression - seed %i', (seed) => {
@@ -49,11 +49,10 @@ describe.each([42, 100])('Snapshot regression - seed %i', (seed) => {
     for (const key of Object.keys(fresh)) expect(fresh[key]).toBe(base[key]);
   });
 
-  // Legacy OBJ export (deprecated; no vertex cap applies). Determinism guard: building twice is identical.
-  it(`seed ${seed}: legacy OBJ face count is deterministic and non-empty`, () => {
-    const first = objFaceCount(seed);
-    expect(first).toBeGreaterThan(0);
-    expect(objFaceCount(seed)).toBe(first);
+  it(`seed ${seed}: collision matrix is identical across fresh runs`, () => {
+    const again = runStages(seed, { textureSet: 'base' });
+    const hash = createHash('sha256').update(Uint8Array.from(again.matrix.toDebugJSON().cells)).digest('hex');
+    expect(hash).toBe(matrixHash(seed));
   });
 
   it(`seed ${seed}: geometry has at least one primitive of each core kind`, () => {
@@ -85,8 +84,8 @@ describe('Snapshot regression - seed 42', () => {
     `);
   });
 
-  it('seed 42 legacy OBJ face count is locked', () => {
-    expect(objFaceCount(42)).toMatchInlineSnapshot(`13364`);
+  it('seed 42 collision matrix hash is locked', () => {
+    expect(matrixHash(42)).toMatchInlineSnapshot(`"21e068c102d08532d72558fb145e27a772100e6398512703d0ef57af0e03f820"`);
   });
 });
 
@@ -110,7 +109,7 @@ describe('Snapshot regression - seed 100', () => {
     `);
   });
 
-  it('seed 100 legacy OBJ face count is locked', () => {
-    expect(objFaceCount(100)).toMatchInlineSnapshot(`13706`);
+  it('seed 100 collision matrix hash is locked', () => {
+    expect(matrixHash(100)).toMatchInlineSnapshot(`"bba4456c8deb62fbc988221d8044ba1e999768789bf92ff2ce8a55e5c367828a"`);
   });
 });

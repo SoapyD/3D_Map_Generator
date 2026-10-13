@@ -1,7 +1,6 @@
 /**
- * Tier assignment — maps each geometry primitive to exactly one vertical tier so the
- * OBJ/collider exports can be split into per-tier files (stacked, independently movable
- * objects in Tabletop Simulator). Pure: no side effects, no I/O.
+ * Tier assignment — maps each geometry primitive to exactly one vertical tier (the former per-tier
+ * export split used it; it now serves the merge-pass tests and tier queries). Pure: no side effects, no I/O.
  *
  * Tier model (see docs/PROJECT_OVERVIEW.md): the map is a stack of flat slabs. Tier `i`'s
  * floor slab ends flush at its walking surface y = floorSurfaceY(i) and its walls start there;

@@ -17,13 +17,8 @@ import { runPipeline } from './pipeline.js';
 import { buildScene } from './generators/scene/index.js';
 import { buildGlbBuffer } from './export/glb-exporter.js';
 
-// DEPRECATED legacy entry points (each warns once per process): in-memory OBJ + atlas PNG and the separate
-// collider OBJ for Tabletop Simulator. Kept unchanged only for consumers pinned to older versions (v0.2.0);
-// new code should use generateToBuffer (GLB) and the primitives + collision matrix.
-export { generateObjToBuffers } from './generate-obj-buffers.js';
-export { generateColliderToBuffer } from './generate-collider-buffer.js';
-// DEPRECATED: per-tier split (manifest + shared atlas + per-tier OBJ/collider) for the legacy TTS elevator/reveal feature.
-export { generateTiersToBuffers } from './generate-tiers-buffers.js';
+// The in-memory OBJ + atlas, collider OBJ and per-tier split exports (generateObjToBuffers,
+// generateColliderToBuffer, generateTiersToBuffers) were removed; they live in tags v0.2.0 and v0.3.0.
 
 /**
  * Run the full generation pipeline for the given seed and return a GLB Buffer.

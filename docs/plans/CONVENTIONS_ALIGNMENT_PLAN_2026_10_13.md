@@ -1,6 +1,6 @@
 # Conventions Alignment Plan — 2026-10-13
 
-**Status (2026-10-13): Phases 1, 2, 3a and 4 (4a and 4b) implemented, uncommitted on `feature/primitive-merge` (Phases 1-2 committed as a74f324). Phase 3b (deletion) NOT STARTED: blocked until the wyrdwars_manager pin PR (#317, pins the generator to v0.2.0 / c97bb01) is merged and the owner says to delete.** Results are in "Phase 1 and 2 results" below; the manifest sections B, C, D, F, N were updated for the new code. Companion: [`CONVENTIONS_ALIGNMENT_MANIFEST_2026_10_13.md`](CONVENTIONS_ALIGNMENT_MANIFEST_2026_10_13.md) (file:line refs and regenerating greps). This plan supersedes Track 2 (Phase B) of [`PRIMITIVE_MERGE_PLAN_2026_10_13.md`](PRIMITIVE_MERGE_PLAN_2026_10_13.md).
+**Status (2026-10-13): Phases 1, 2, 3a, 3b and 4 (4a and 4b) implemented, uncommitted on `feature/primitive-merge` (Phases 1-2 committed as a74f324, the 3a deprecation as 9ac6876). Phase 3b (deletion) is DONE in the working tree, see "Phase 3b results". MERGE ORDER: do not merge this branch to this repo's default branch before wyrdwars_manager PR #317 (pins the generator to v0.2.0 / c97bb01) is merged. That project's dependency is currently unpinned and floats on the default branch, so merging first would break its OBJ / tier / collider imports.** Results are in "Phase 1 and 2 results" below; the manifest sections B, C, D, F, N were updated for the new code. Companion: [`CONVENTIONS_ALIGNMENT_MANIFEST_2026_10_13.md`](CONVENTIONS_ALIGNMENT_MANIFEST_2026_10_13.md) (file:line refs and regenerating greps). This plan supersedes Track 2 (Phase B) of [`PRIMITIVE_MERGE_PLAN_2026_10_13.md`](PRIMITIVE_MERGE_PLAN_2026_10_13.md).
 
 ## Summary
 
@@ -137,9 +137,25 @@ Context decided by the owner: the generator no longer targets Tabletop Simulator
 - **Not done (by design).** No code or test file was deleted. `src/export/obj-geometry/`, `export-tiers.js`, the collision OBJ files, `src/lib.js` exports, `GEOMETRY.objAtlas*`/`uvHash*` and the `pngjs` OBJ imports all remain.
 - **Observed during this step.** `test/lib.test.js` (the stale top-level `test/` folder, uses `node:test`, not run by vitest) still imports the deprecated exports and would now emit the one-time warning if run by hand.
 
-### Phase 3b — deletion (NOT STARTED; BLOCKED)
+### Phase 3b — deletion (DONE 2026-10-13, owner instruction; uncommitted)
 
-Out of scope until (1) the wyrdwars_manager pin PR #317 is merged (so it no longer follows the unpinned generator) and (2) the owner says to delete. Then use the removal footprint table below, ship as the next minor or major, and run the gates at the end of this section. Until then the footprint table is the to-do list, not done work.
+**Merge-order note (read before merging).** `wyrdwars_manager` is pinned to v0.2.0 in its open PR #317, which is NOT yet merged. Until it is, its generator dependency is unpinned and floats on this repo's default branch. This branch removes the exports it imports (`generateObjToBuffers`, `generateColliderToBuffer`, `generateTiersToBuffers`), so **do not merge this branch to the default branch before PR #317 is merged.** The old behaviour stays available in git tags `v0.2.0` and `v0.3.0`. `package.json` version was not bumped.
+
+**Deleted**
+- OBJ + atlas exporter: all of `src/export/obj-geometry/` (24 files), `src/generate-obj-buffers.js`, the `--obj` flag and `DEFAULTS.obj`, the lazy OBJ branch in `src/index.js`. The 3" subdivision went with it.
+- Per-tier split: `src/export/export-tiers.js`, `src/generate-tiers-buffers.js`, `--split-tiers`, `DEFAULTS.splitTiers`.
+- Collision OBJ: `src/export/collision-buffer.js`, `src/export/collision-exporter.js`, `src/generate-collider-buffer.js`.
+- Deprecation helper (served only the above): `src/core/warn-deprecated-once.js`, `DEPRECATION` in `src/config.js`.
+- Config: `GEOMETRY.objAtlasTileSize`, `objSegmentPixelSize`, `objAtlasPadding`, `uvHashU`, `uvHashV` (grep: nothing in the GLB path used them; the GLB uses `GEOMETRY.uvKeyOffset` and `glbTileSize`, both kept).
+- Library: `src/lib.js` now exports only `generateToBuffer`. `package.json` `exports` still points at `src/lib.js` (unchanged).
+- Tests: `tests/export/obj-exporter.test.js`, `tests/export/collision-exporter.test.js`, `tests/export/export-tiers.test.js`, `tests/core/warn-deprecated-once.test.js`, stale `test/lib.test.js` (replaced by `tests/lib.test.js`, a vitest test of the surviving export list and `generateToBuffer` determinism). `tests/generators/merge-primitives.test.js` and `tests/snapshot.test.js` were rewritten onto primitives and the collision matrix (the volume test sums collidable slab volumes; the snapshot lock is now a SHA-256 of the matrix cells for seeds 42 and 100).
+- Vertex hook and agent: `.claude/hooks/check-vertex-count.mjs` (and its entry in `.claude/settings.json`), `.claude/agents/vertex-optimiser.md`.
+
+**Changed (not deleted).** `src/index.js` takes the output directory and base name from the new `src/export/get-output-base-name.js` (the old `getObjOutputPath` lived in the deleted folder). `src/tools/preview-building-export.js` and `parse-preview-args.js` lost their OBJ branch and `--format/--glb/--obj` flags; the building preview tool stays broken for its older reason (it imports the removed `BUILDING` config section), so the rest of `src/tools/` was left alone. `tierOf` / `assign-primitive-tier.js` is kept: `tests/export/assign-primitive-tier.test.js` and `tests/generators/merge-primitives.test.js` import it (its only production caller, the tier export, is gone, so it is now a tested helper only). `uvOrigin` on merged primitives (`build-merged-prim.js`) has no reader any more but is kept because the merge tests assert it. `pngjs` stays (GLB texture pools).
+
+**Docs updated.** CLAUDE.md, README.md, `11-scene-and-export.md`, `docs_and_config_guide.md`, `profiles.md`, `FOLDER_STRUCTURE.md`, `GENERATION_PIPELINE.md`, `PROJECT_OVERVIEW.md`, agent files (`_session-brief`, `pr-shipper`, `release-validator`, `status-tracker`, `task-runner`, `test-builder`), and the merge plan. Historical plans and the manifests still describe the deleted files on purpose.
+
+**Gates.** `npm test` passes; `npm run check:all` is 31 findings (was 37; the deleted files carried findings); `npm run check:file-sizes` has no new entries; ripgrep for every removed module, function, flag and config key finds only historical plan text; `node src/index.js --seed 7` and `--profile withering --seed 3` write the GLB and geometry JSON; `--seed 7 --preview` served `/tabs.json`, `/loaded-model.glb` and `/texture-report.json`; `src/lib.js` loads and exports `generateToBuffer` only. Not verified: that the tags `v0.2.0` / `v0.3.0` exist, and wyrdwars_manager itself (not touched).
 
 ### Original gate analysis (before the 2026-10-13 decision)
 

@@ -28,7 +28,7 @@ Each stage has a detailed flow doc (input contract, algorithm, output contract, 
 | 8 | Walls | Edge-detected walls with window/blob/row damage | [8-walls](processes/pipeline-flows/8-walls.md) |
 | 9 | Cover | Rooftop, courtyard, interior and street scatter | [9-cover](processes/pipeline-flows/9-cover.md) |
 | 10 | Geometry | Matrix and stage data → renderer-agnostic primitives | [10-geometry](processes/pipeline-flows/10-geometry.md) |
-| 11 | Scene & Export | Three.js scene → GLB + geometry JSON (always). Deprecated, only on request: OBJ + atlas and collision OBJ (`--obj`), per-tier split (`--split-tiers`) | [11-scene-and-export](processes/pipeline-flows/11-scene-and-export.md) |
+| 11 | Scene & Export | Three.js scene → GLB + geometry JSON (with the collision matrix); the OBJ / collider / per-tier exports were removed (tags v0.2.0, v0.3.0) | [11-scene-and-export](processes/pipeline-flows/11-scene-and-export.md) |
 
 CLAUDE.md groups these into 7 headline stages (Grid, Buildings, Floors, Walls, Connectivity, Cover, Export). Roofs, Streets, Ladders and Geometry are the finer-grained steps inside that grouping.
 

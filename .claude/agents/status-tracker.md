@@ -52,13 +52,12 @@ Last updated: YYYY-MM-DD
 | Format | Status | Notes |
 |--------|--------|-------|
 | GLB | Complete | Hand-built binary |
-| OBJ | Deprecated | Only with `--obj`; kept for consumers pinned to v0.2.0 |
 | Collision | Complete | Floors/walkways/cover |
 
 ## Config Coverage
 <list of features controlled by config vs hardcoded>
 
-## Primitive Counts (informational; the 25k TTS vertex cap is retired)
+## Primitive Counts (informational)
 | Seed | Primitives | Notes |
 |------|------------|-------|
 | 42 | <count> | <from the geometry JSON or snapshot test> |

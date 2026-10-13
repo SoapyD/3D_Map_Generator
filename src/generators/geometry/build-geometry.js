@@ -3,11 +3,10 @@
  *
  * Converts pipeline data into an array of renderer-agnostic primitives.
  * Each primitive describes WHAT to render (position, size, texture key)
- * without knowing HOW (Three.js meshes vs OBJ vertices).
+ * without knowing HOW (Three.js meshes vs preview boxes).
  *
  * The output can be serialised as a handover file (_geometry.json)
- * and consumed by scene-builder.js (GLB), obj-exporter.js (OBJ),
- * and collision-exporter.js independently.
+ * and consumed by the scene builder (GLB) and the Withering client independently.
  */
 
 import { buildFloorPrimitives } from './build-floor-primitives.js';
@@ -94,7 +93,7 @@ export function buildGeometry(data, config) {
     }
   }
 
-  // Merge adjacent same-texture boxes last, so every consumer (GLB, OBJ, collision, preview) sees one list.
+  // Merge adjacent same-texture boxes last, so every consumer (GLB, geometry JSON, preview) sees one list.
   const merged = mergePrimitives(primitives, config?.primitiveMerge ?? GEOMETRY.primitiveMerge);
   return { version: 1, primitives: merged };
 }

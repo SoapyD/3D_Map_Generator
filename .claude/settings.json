@@ -23,15 +23,6 @@
               "command": "node .claude/hooks/check-exports.mjs"
             }
           ]
-        },
-        {
-          "matcher": "Bash",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node .claude/hooks/check-vertex-count.mjs"
-            }
-          ]
         }
       ]
     }

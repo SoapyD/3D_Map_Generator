@@ -31,7 +31,7 @@ Read all source files in `src/`. For each module, check if a corresponding test 
 
 1. **Core utilities** — `src/core/rng.js`, `src/core/geometry.js` (foundation everything depends on)
 2. **Generator stages** — grid, buildings, floors, walls, connectivity, cover (deterministic pipeline)
-3. **Exporters** — obj-exporter, glb-exporter, collision-exporter (output correctness)
+3. **Exporters** — glb-exporter (output correctness)
 4. **Config** — parseArgs, default values
 
 ### Step 3: Write tests for core utilities
@@ -87,12 +87,6 @@ Each generator is a pure function (data in, enriched data out), so test the cont
 
 ### Step 5: Write tests for exporters
 
-**OBJ exporter tests (legacy/deprecated export; only when touching it):**
-- Output contains valid OBJ syntax (v, vt, vn, f lines)
-- Atlas PNG is generated with correct dimensions
-- Face count for a known seed matches expected value (no vertex cap applies)
-- UV coordinates fall within the 0-1 atlas range
-- All face indices reference valid vertices
 
 **GLB exporter tests:**
 - Output starts with glTF magic bytes (0x46546C67)
