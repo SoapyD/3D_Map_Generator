@@ -1,57 +1,32 @@
 /**
- * Simple HTTP preview server.
- * Serves the GLB file and an HTML viewer page.
+ * Unified preview entry for generated runs (--preview, alias --visualize).
+ * Serves the tabbed shell plus the Loaded map and Visualizer pages (viewer.html stays at /model.html) from one server.
  */
 
-import http from 'http';
-import { readFile } from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { readFile } from 'fs/promises';
+import { PREVIEW } from '../config.js';
+import { createMapState } from './loaded-map/map-state.js';
+import { createPreviewServer } from './preview-routes.js';
+import { buildRunFixture } from './run-fixture.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+async function preloadRun(mapState, glbPath, config) {
+  if (!config) return;
+  try {
+    const geometry = JSON.parse(await readFile(glbPath.replace(/\.glb$/, '_geometry.json'), 'utf-8'));
+    const fixture = buildRunFixture(geometry, config);
+    if (fixture) mapState.load(JSON.stringify(fixture));
+  } catch {
+    // Loaded map tab stays on its "load a fixture" message.
+  }
+}
 
-export function startPreview(glbPath, port = 3000, mode = 'preview') {
-  const server = http.createServer(async (req, res) => {
-    try {
-      if (req.url === '/' || req.url === '/index.html') {
-        const html = await readFile(path.join(__dirname, 'viewer.html'), 'utf-8');
-        res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end(html);
-      } else if (req.url === '/visualizer.html') {
-        const html = await readFile(path.join(__dirname, 'visualizer.html'), 'utf-8');
-        res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end(html);
-      } else if (req.url === '/debug_frames.json') {
-        const data = await readFile(path.join(process.cwd(), 'output', 'debug_frames.json'), 'utf-8');
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(data);
-      } else if (req.url === '/model.glb') {
-        const data = await readFile(glbPath);
-        res.writeHead(200, {
-          'Content-Type': 'model/gltf-binary',
-          'Access-Control-Allow-Origin': '*',
-        });
-        res.end(data);
-      } else if (req.url === '/geometry.json') {
-        const geometryPath = glbPath.replace(/\.glb$/, '_geometry.json');
-        const data = await readFile(geometryPath, 'utf-8');
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(data);
-      } else {
-        res.writeHead(404);
-        res.end('Not found');
-      }
-    } catch (err) {
-      res.writeHead(500);
-      res.end(err.message);
-    }
-  });
-
-  const url = mode === 'visualize'
-    ? `http://localhost:${port}/visualizer.html`
-    : `http://localhost:${port}`;
-
-  server.listen(port, () => {
-    console.log(`Preview: ${url}`);
-  });
+export async function startPreview(glbPath, port = PREVIEW.port, mode = PREVIEW.defaultMode, config = null) {
+  const mapState = createMapState();
+  await preloadRun(mapState, glbPath, config);
+  const framesDir = config?.outputDir ?? path.join(process.cwd(), 'output');
+  const framesPath = path.join(framesDir, 'debug_frames.json');
+  const server = createPreviewServer({ mode, glbPath, mapState, framesPath, textureSet: config?.textureSet });
+  server.listen(port, () => console.log(`Preview: http://localhost:${port}`));
+  return server;
 }

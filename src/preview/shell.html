@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Map Preview</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #111; font-family: sans-serif; }
+    body { display: flex; flex-direction: column; }
+    #tabs { display: flex; gap: 2px; background: #222; padding: 4px 4px 0; }
+    #tabs button { padding: 6px 16px; border: 0; border-radius: 4px 4px 0 0; background: #333; color: #ddd; cursor: pointer; }
+    #tabs button.active { background: #555; color: #fff; }
+    #tabs button:disabled { color: #777; background: #262626; cursor: not-allowed; }
+    #frames { flex: 1; position: relative; }
+    iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: none; }
+    iframe.active { display: block; }
+  </style>
+</head>
+<body>
+  <div id="tabs"></div>
+  <div id="frames"></div>
+  <script>
+    (async () => {
+      const state = await (await fetch('/tabs.json')).json();
+      const tabsEl = document.getElementById('tabs');
+      const framesEl = document.getElementById('frames');
+      const buttons = {}, frames = {};
+
+      function select(id) {
+        for (const t of state.tabs) {
+          const on = t.id === id;
+          buttons[t.id].classList.toggle('active', on);
+          frames[t.id].classList.toggle('active', on);
+          // Lazy-load so hidden pages do not start WebGL or fetch until first shown.
+          if (on && !frames[t.id].src) frames[t.id].src = t.path + location.search;
+        }
+        try { localStorage.setItem(state.storageKey + ':' + state.mode, id); } catch (e) { /* storage unavailable */ }
+      }
+
+      for (const t of state.tabs) {
+        const b = document.createElement('button');
+        b.textContent = t.label;
+        b.disabled = !t.enabled;
+        if (!t.enabled) b.title = t.reason;
+        b.addEventListener('click', () => select(t.id));
+        tabsEl.appendChild(b);
+        buttons[t.id] = b;
+        const f = document.createElement('iframe');
+        framesEl.appendChild(f);
+        frames[t.id] = f;
+      }
+
+      let start = state.initial;
+      try {
+        const saved = localStorage.getItem(state.storageKey + ':' + state.mode);
+        if (saved && state.tabs.some((t) => t.id === saved && t.enabled)) start = saved;
+      } catch (e) { /* storage unavailable */ }
+      select(start);
+    })();
+  </script>
+</body>
+</html>

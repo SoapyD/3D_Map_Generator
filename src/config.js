@@ -28,6 +28,7 @@ export const DEFAULTS = {
   textureSet: 'base',
   flatLadders: true,  // true = flat front-facing quads, false = 3D boxes (single source of truth)
   preview: false,
+  previewMap: null,   // --preview-map FIXTURE: textured preview of a frozen withering-map fixture (skips generation)
   visualize: false,
   debug: false,
   debugConnectivity: false, // --debug-connectivity: write connectivity debug JSON
@@ -41,6 +42,40 @@ export const DEFAULTS = {
 
 // --- Buildings --- (_old_system only)
 // export const BUILDING = { ... };  // see _old_system/config.js
+
+// --- Loaded-map texture preview (--preview-map) ---
+export const LOADED_MAP = {
+  port: 3010,
+  textureSets: ['base', 'loaded'],
+  fixtureFormats: ['withering-map/1', 'withering-map/2'],
+  legacyLevelHeight: 4,        // /1 fixtures record no pitch (mirrors Withering LEGACY_LEVEL_HEIGHT)
+  legacyFloorThickness: 1,     // /1 fixtures record no slab thickness (mirrors Withering LEGACY_FLOOR_THICKNESS)
+  maxUploadBytes: 64 * 1024 * 1024,
+  fallbackColor: '#ff00ff',    // page recolour for meshes whose texture fell back
+  camera: {
+    moveSpeed: 20,             // WASD/QE fly speed, inches per second
+    fastMultiplier: 3,         // held Shift
+  },
+};
+
+// --- Unified preview server (--preview, alias --visualize, and --preview-map) ---
+export const PREVIEW = {
+  port: LOADED_MAP.port,
+  defaultMode: 'run',
+  // 'run' = generated map (--preview / --visualize, frames always recorded); 'preview-map' = fixture only, no generation.
+  modes: { run: 'run', previewMap: 'preview-map' },
+  // Tab order; `needs` is what must exist for the tab to be enabled ('run' = generated map with recorded frames).
+  // viewer.html stays routable at /model.html but is not a tab.
+  tabs: [
+    { id: 'loaded-map', label: 'Loaded map', path: '/loaded-map.html', needs: null, disabledReason: '' },
+    { id: 'visualizer', label: 'Visualizer', path: '/visualizer.html', needs: 'run', disabledReason: 'Needs a generated map: run with --preview instead of --preview-map.' },
+  ],
+  initialTab: { run: 'loaded-map', 'preview-map': 'loaded-map' },
+  storageKey: 'previewTab',
+  noRunMessage: 'No generated run in this mode (started with --preview-map). Run with --preview.',
+  noVisualizeMessage: 'Visualizer frames unavailable (no generated run). Start with --preview.',
+  noFixtureMessage: 'Load a fixture with --preview-map or the file picker.',
+};
 
 // --- Walls ---
 export const WALL = {
@@ -242,14 +277,15 @@ export function parseArgs(argv) {
   for (let i = 2; i < argv.length; i++) {
     const arg = argv[i];
 
-    if (arg === '--preview') {
+    // --preview implies frame recording (Visualizer tab); --visualize is an alias.
+    if (arg === '--preview' || arg === '--visualize') {
       config.preview = true;
+      config.visualize = true;
       continue;
     }
 
-    if (arg === '--visualize') {
-      config.visualize = true;
-      config.preview = true;
+    if (arg === '--textures') {
+      config.textureSet = argv[++i] ?? config.textureSet;
       continue;
     }
 

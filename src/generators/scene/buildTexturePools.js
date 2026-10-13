@@ -46,6 +46,7 @@ export function buildTexturePools(packName = 'base') {
           opacity: hasAlpha ? avgAlpha : 1.0,
         });
         mat._pngBuffer = pngBuffer;
+        mat._fileName = f; // read by the loaded-map texture report
         return mat;
       });
     }
@@ -53,6 +54,8 @@ export function buildTexturePools(packName = 'base') {
     // Fallback: if no textures found, create a grey material
     if (!pools[cat] || pools[cat].length === 0) {
       pools[cat] = [new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.85 })];
+      // Tag the silent fallback so the loaded-map texture report can expose it.
+      pools[cat][0]._fallbackReason = existsSync(catDir) ? 'pool-empty' : 'file-missing';
     }
   }
 
