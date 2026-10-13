@@ -90,19 +90,44 @@
       setCut(null);
     }
 
+    // Fallback highlight. Merged meshes (userData.primitives = [{ name, indexStart, indexCount }]) cannot be
+    // recoloured per primitive, so while highlighting we add an overlay mesh per merged mesh that shares its
+    // vertex data, indexes only the fallback primitives' triangles and uses the flat highlight material
+    // (polygonOffset pulls it in front of the textured surface). Unmerged meshes (older GLBs) swap material by name.
+    function overlayFor(mesh, bad) {
+      const ranges = mesh.userData.primitives.filter((p) => bad.has(p.name));
+      if (!ranges.length) return null;
+      const src = mesh.geometry.index.array;
+      const picked = [];
+      for (const r of ranges) for (let i = r.indexStart; i < r.indexStart + r.indexCount; i++) picked.push(src[i]);
+      const geo = new THREE.BufferGeometry();
+      for (const name of ['position', 'normal', 'uv']) if (mesh.geometry.getAttribute(name)) geo.setAttribute(name, mesh.geometry.getAttribute(name));
+      geo.setIndex(picked);
+      const overlay = new THREE.Mesh(geo, fallbackMat);
+      overlay.name = 'fallback_overlay';
+      return overlay;
+    }
+
     function applyHighlight() {
       if (!model || !report) return;
-      fallbackMat ??= new THREE.MeshBasicMaterial({ color: report.highlightColor });
+      fallbackMat ??= new THREE.MeshBasicMaterial({ color: report.highlightColor, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
       const bad = new Set();
       for (const r of report.rows) {
         if (r.status === 'ok') continue;
         for (const n of r.names) { bad.add(n); bad.add(n + '_box'); }
       }
-      model.traverse((m) => {
-        if (!m.isMesh) return;
-        m.userData.orig ??= m.material;
-        m.material = highlight && bad.has(m.name) ? fallbackMat : m.userData.orig;
-      });
+      const meshes = [];
+      model.traverse((m) => { if (m.isMesh && m.name !== 'fallback_overlay') meshes.push(m); });
+      for (const m of meshes) {
+        if (m.userData.overlay) { m.remove(m.userData.overlay); m.userData.overlay.geometry.dispose(); m.userData.overlay = null; }
+        if (m.userData.primitives) {
+          const overlay = highlight ? overlayFor(m, bad) : null;
+          if (overlay) { m.add(overlay); m.userData.overlay = overlay; }
+        } else {
+          m.userData.orig ??= m.material;
+          m.material = highlight && bad.has(m.name) ? fallbackMat : m.userData.orig;
+        }
+      }
       $('hilite').classList.toggle('active', highlight);
     }
 
