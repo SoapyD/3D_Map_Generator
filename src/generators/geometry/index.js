@@ -9,3 +9,4 @@ export { emitBattlements } from './emit-battlements.js';
 export { buildBridgePrimitives } from './build-bridge-primitives.js';
 export { buildBoxSlabPrimitives } from './build-scatter-primitives.js';
 export { buildCourtyardPrimitives } from './build-courtyard-primitives.js';
+export { mergePrimitives } from './merge-primitives.js';

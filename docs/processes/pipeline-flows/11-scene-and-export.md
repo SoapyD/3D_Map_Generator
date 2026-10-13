@@ -1,6 +1,6 @@
 # Stage 11: Scene Build and Export
 
-> Last verified: 2026-10-13 against src/export/export-tiers.js (manifest v2)
+> Last verified: 2026-10-13 against src/export/export-tiers.js (manifest v2); primitive merge + uvOrigin + OBJ grid fix added
 
 ## Overview
 
@@ -96,7 +96,18 @@ Each tier entry carries its **XZ footprint bounds** (identical across tiers — 
 
 `levelHeight` in the manifest is the vertical distance between stacked tier floors (floor surface to floor surface, = `tierHeight`, 3" by default) — the elevator lift delta a TTS script applies. Manifest **version 2** changed its meaning (v1: `tierHeight + slabThickness`, 4") and added `floorThickness` (rendered slab thickness, 0.25"); `slabThickness` is the 1" matrix cell, not the rendered thickness.
 
+### Merged primitives and `uvOrigin`
+
+The geometry stage may merge adjacent boxes (see stage 10, "Primitive merge pass"). A merged primitive carries `uvOrigin` (the first constituent's box). The per-object UV offset hash (`GEOMETRY.uvHashU/V`) reads `uvOrigin` when present, in every exporter: `addSharedFlat` and `addSharedWall` (OBJ, corner x/y/z) and `createSlab` via `build-primitive-mesh.js` / `uv-origin-center.js` (GLB, box centre). The first segment of a merged piece therefore keeps its previous texture offset; later 3" segments continue the pattern from there, so a merged span is not tile-for-tile identical to its unmerged constituents. Disable with `GEOMETRY.primitiveMerge.enabled = false`.
+
+### Unused vertex grids (OBJ)
+
+`addSharedFlat` only writes the top vertex grid when `emitTop` is set and the bottom grid when `emitBottom` is set (a `simpleBottom` writes just its 4 corners). Faces are unchanged; previously both full grids were always written (half of them unreferenced for `emitBottom: false` slabs such as pavements, streets and `skirt_bottom`).
+
 ### Wall end-cap coverage
+
+Coverage is always computed against the **merged** wall list (`geometry.primitives` filtered to `type === 'wall'`, in both `buildObjAndAtlas` and `exportTiers`), so a merged run has no internal seam cap and keeps its real end caps. Verified on seeds 1/7/100: the set of uncovered end-cap rectangles is identical before and after merging.
+
 
 `wallEdgeCovered(wallPrim, side, allWallPrims)` decides whether to suppress a wall's end-cap face. N/S walls are trimmed at corners to yield to E/W walls — so the check must verify the covering wall spans the **full face extent**, not just the edge point:
 

@@ -1,6 +1,6 @@
 # Stage 10: Geometry Build
 
-> Last verified: 2026-04-24
+> Last verified: 2026-10-13 (primitive merge pass added)
 
 ## Overview
 
@@ -76,15 +76,26 @@ Each primitive is a plain JS object:
   w, h, d,              // dimensions
   textureKey: string,
   // additional fields vary by type (emitTop, emitBottom, thinAxis, axis, ...)
+  // uvOrigin?: { x, y, z, w, h, d }  // only on merged primitives: first constituent's box (UV hash origin)
 }
 ```
+
+### Primitive merge pass
+
+After all builders have run, `buildGeometry` calls `mergePrimitives(primitives, config.primitiveMerge ?? GEOMETRY.primitiveMerge)` (`src/generators/geometry/merge-primitives.js`; helpers in `src/generators/geometry/merge/`). It joins adjacent boxes into one primitive so the OBJ spends fewer vertices; the merged list is what GLB, OBJ, collision, tier export and the loaded-map preview all consume. Switch it off with `GEOMETRY.primitiveMerge.enabled = false` (unmerged baseline for A/B comparison).
+
+- **Groups** (`GEOMETRY.primitiveMerge.types`): `wall` (`wall_N`), `pavement` (`pavement_N`), `floor` (`floor_fN_x_z` slabs). Edges, ladders, ceilings, roofs, bridges (`bridge_*`, including `_wall_`/`_batt_` pieces) and everything else are never merged.
+- **Candidates must share** type, `textureKey`, `y`, `h`, the flags (`shared`, `emitTop`, `emitBottom`, `simpleBottom`, `rotateUV`, `axis`) and the name family (`floor_fN` so the tier named by the prefix never changes). Walls also share their line (axis plus the fixed cross-coordinate and thickness), so only collinear walls can join.
+- **Geometry rule**: two boxes merge only when their union is exactly a rectangle (equal extent on one axis, touching end-to-end on the other). Overlaps and gaps never merge. The pass is a deterministic greedy pairwise fixpoint in primitive order (no RNG).
+- **Result**: the merged primitive keeps the earlier constituent's name and position in the list (so name prefixes, `tierOf` and the collision allowlist behave as before) and gains `uvOrigin: { x, y, z, w, h, d }` = the first constituent's box, so the exporters hash the same origin for the per-object UV offset (see stage 11). The input list is not mutated.
+- **Wall note**: wall primitives are 1" (or 0.75") tall rows. Rows are never merged vertically (different `y`), so on default-profile maps almost no walls merge; the savings come from pavements and floor plates.
 
 ## Output Contract
 
 ```js
 {
   version: 1,
-  primitives: object[],   // flat array of all primitive objects
+  primitives: object[],   // flat array of all primitive objects (after the merge pass)
 }
 // Written to disk as `<baseName>_geometry.json` with collisionMatrix embedded
 ```
@@ -92,6 +103,7 @@ Each primitive is a plain JS object:
 ## Key Files
 
 - [src/generators/geometry/build-geometry.js](../../../../src/generators/geometry/build-geometry.js) — entry point
+- [src/generators/geometry/merge-primitives.js](../../../../src/generators/geometry/merge-primitives.js) — merge pass (helpers in `merge/`)
 - [src/generators/geometry/build-map-skirt-primitives.js](../../../../src/generators/geometry/build-map-skirt-primitives.js) — base box panels
 - [src/generators/geometry/build-river-primitives.js](../../../../src/generators/geometry/build-river-primitives.js)
 - [src/generators/geometry/build-river-bank-primitives.js](../../../../src/generators/geometry/build-river-bank-primitives.js)

@@ -6,7 +6,7 @@ const SEGS_PER_TILE = GEOMETRY.objAtlasTileSize / GEOMETRY.objSegmentPixelSize;
 /**
  * Shared-vertex wall (building walls).
  */
-export function addSharedWall(state, name, x0, y0, z0, sizeX, sizeY, sizeZ, uv) {
+export function addSharedWall(state, name, x0, y0, z0, sizeX, sizeY, sizeZ, uv, uvOrigin = null) {
   const isWallZ = sizeZ < 1;
   const isWallX = sizeX < 1;
 
@@ -24,8 +24,10 @@ export function addSharedWall(state, name, x0, y0, z0, sizeX, sizeY, sizeZ, uv) 
   const fract = (v) => v - Math.floor(v);
   const [hu0, hu1] = GEOMETRY.uvHashU;
   const [hv0, hv1, hv2] = GEOMETRY.uvHashV;
-  const baseSegU = Math.floor(fract(x0 * hu0 + z0 * hu1) * SEGS_PER_TILE);
-  const baseSegV = Math.floor(fract(x0 * hv0 + z0 * hv1 + y0 * hv2) * SEGS_PER_TILE);
+  // A merged primitive hashes its first constituent's origin so its texture offset is unchanged.
+  const { x: hx, y: hy, z: hz } = uvOrigin ?? { x: x0, y: y0, z: z0 };
+  const baseSegU = Math.floor(fract(hx * hu0 + hz * hu1) * SEGS_PER_TILE);
+  const baseSegV = Math.floor(fract(hx * hv0 + hz * hv1 + hy * hv2) * SEGS_PER_TILE);
 
   state.objLines.push(`o ${name}`);
 

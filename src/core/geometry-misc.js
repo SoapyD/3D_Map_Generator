@@ -11,13 +11,14 @@ import * as THREE from 'three';
  * @param {number} height - Size along Y
  * @param {number} depth - Size along Z
  * @param {THREE.Material} material
+ * @param {{ rotateUV?: boolean, uvOrigin?: {x:number,y:number,z:number} }} [opts] uvOrigin: centre for the UV offset hash
  * @returns {THREE.Mesh}
  */
 import { GEOMETRY } from '../config.js';
 
 const TILE_SIZE = GEOMETRY.glbTileSize;
 
-export function createSlab(x, y, z, width, height, depth, material, { rotateUV = false } = {}) {
+export function createSlab(x, y, z, width, height, depth, material, { rotateUV = false, uvOrigin = null } = {}) {
   const geometry = new THREE.BoxGeometry(width, height, depth);
 
   // Scale UVs so textures tile at a fixed real-world scale
@@ -42,8 +43,10 @@ export function createSlab(x, y, z, width, height, depth, material, { rotateUV =
     const fract = (v) => v - Math.floor(v);
     const [hu0, hu1] = GEOMETRY.uvHashU;
     const [hv0, hv1, hv2] = GEOMETRY.uvHashV;
-    const offU = fract(x * hu0 + z * hu1);
-    const offV = fract(x * hv0 + z * hv1 + y * hv2);
+    // uvOrigin (merged primitives) = first constituent's centre, so the offset is unchanged
+    const { x: hx, y: hy, z: hz } = uvOrigin ?? { x, y, z };
+    const offU = fract(hx * hu0 + hz * hu1);
+    const offV = fract(hx * hv0 + hz * hv1 + hy * hv2);
 
     for (let face = 0; face < 6; face++) {
       const [su, sv] = scales[face];

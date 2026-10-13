@@ -28,6 +28,8 @@ import { buildRiverBankPrimitives } from './build-river-bank-primitives.js';
 import { buildStreetPrimitives } from './build-street-primitives.js';
 import { buildPavementPrimitives } from './build-pavement-primitives.js';
 import { buildMapSkirtPrimitives } from './build-map-skirt-primitives.js';
+import { mergePrimitives } from './merge-primitives.js';
+import { GEOMETRY } from '../../config.js';
 
 // ─── Main builder ─────────────────────────────────────────────────────
 
@@ -92,5 +94,7 @@ export function buildGeometry(data, config) {
     }
   }
 
-  return { version: 1, primitives };
+  // Merge adjacent same-texture boxes last, so every consumer (GLB, OBJ, collision, preview) sees one list.
+  const merged = mergePrimitives(primitives, config?.primitiveMerge ?? GEOMETRY.primitiveMerge);
+  return { version: 1, primitives: merged };
 }

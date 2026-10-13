@@ -131,7 +131,7 @@ export function emitPrimitivesToObj(primitives, config, atlasCtx, wallPrimsForCo
           addSimpleBox(state, prim.name, prim.x, prim.y, prim.z, prim.w, prim.h, prim.d, uv);
         } else if (prim.shared) {
           addSharedFlat(state, prim.name, prim.x, prim.y, prim.z, prim.w, prim.h, prim.d, uv,
-            prim.emitBottom, prim.rotateUV, prim.simpleBottom, prim.emitTop);
+            prim.emitBottom, prim.rotateUV, prim.simpleBottom, prim.emitTop, prim.uvOrigin);
         } else {
           addSubBox(state, prim.name, prim.x, prim.y, prim.z, prim.w, prim.h, prim.d, uv, true, prim.rotateUV, prim.thinAxis || null);
         }
@@ -139,7 +139,7 @@ export function emitPrimitivesToObj(primitives, config, atlasCtx, wallPrimsForCo
       }
 
       case 'wall': {
-        addSharedWall(state, prim.name, prim.x, prim.y, prim.z, prim.w, prim.h, prim.d, uv);
+        addSharedWall(state, prim.name, prim.x, prim.y, prim.z, prim.w, prim.h, prim.d, uv, prim.uvOrigin);
 
         // Wall edge faces
         function addWallEdge(v0, v1, v2, v3, nx, ny, nz) {

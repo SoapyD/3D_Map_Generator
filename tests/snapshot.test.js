@@ -49,11 +49,9 @@ describe.each([42, 100])('Snapshot regression - seed %i', (seed) => {
     for (const key of Object.keys(fresh)) expect(fresh[key]).toBe(base[key]);
   });
 
-  // Seed 100 currently produces 25,862 vertices in a single OBJ, over the 25k TTS limit
-  // (CLAUDE.md critical constraint). Known violation reported to the maintainer: marked as
-  // an expected failure so the suite stays green but flips red (it.fails) as soon as it is fixed.
-  const knownOverLimit = seed === 100;
-  (knownOverLimit ? it.fails : it)(`seed ${seed}: OBJ vertex count stays under the 25k TTS limit`, () => {
+  // TTS hard cap (CLAUDE.md). Seed 100 used to exceed it (25,522); the exporter grid fix plus the
+  // primitive merge pass bring every seed well under (see PRIMITIVE_MERGE_PLAN).
+  it(`seed ${seed}: OBJ vertex count stays under the 25k TTS limit`, () => {
     expect(objVertexCount(seed)).toBeLessThan(25000);
   });
 
@@ -77,7 +75,7 @@ describe('Snapshot regression - seed 42', () => {
         "internalWalls": 9,
         "ladderSegments": 29,
         "pillars": 20,
-        "primitives": 1284,
+        "primitives": 1079,
         "roofs": 24,
         "streetScatter": 14,
         "walkways": 20,
@@ -87,7 +85,7 @@ describe('Snapshot regression - seed 42', () => {
   });
 
   it('seed 42 OBJ vertex count is locked', () => {
-    expect(objVertexCount(42)).toMatchInlineSnapshot(`23878`);
+    expect(objVertexCount(42)).toMatchInlineSnapshot(`20196`);
   });
 });
 
@@ -102,7 +100,7 @@ describe('Snapshot regression - seed 100', () => {
         "internalWalls": 9,
         "ladderSegments": 31,
         "pillars": 6,
-        "primitives": 1355,
+        "primitives": 1127,
         "roofs": 25,
         "streetScatter": 17,
         "walkways": 22,
@@ -112,6 +110,6 @@ describe('Snapshot regression - seed 100', () => {
   });
 
   it('seed 100 OBJ vertex count is locked', () => {
-    expect(objVertexCount(100)).toMatchInlineSnapshot(`25522`);
+    expect(objVertexCount(100)).toMatchInlineSnapshot(`21638`);
   });
 });

@@ -6,7 +6,7 @@ const SEGS_PER_TILE = GEOMETRY.objAtlasTileSize / GEOMETRY.objSegmentPixelSize;
 /**
  * Shared-vertex flat surface (floors, bridge decks, ceilings).
  */
-export function addSharedFlat(state, name, x0, y0, z0, sizeX, sizeY, sizeZ, uv, emitBottom = true, rotateUV = false, simpleBottom = false, emitTop = true) {
+export function addSharedFlat(state, name, x0, y0, z0, sizeX, sizeY, sizeZ, uv, emitBottom = true, rotateUV = false, simpleBottom = false, emitTop = true, uvOrigin = null) {
   const segsX = Math.max(1, Math.ceil(sizeX / SEG_SIZE));
   const segsZ = Math.max(1, Math.ceil(sizeZ / SEG_SIZE));
   const stepX = sizeX / segsX;
@@ -20,29 +20,45 @@ export function addSharedFlat(state, name, x0, y0, z0, sizeX, sizeY, sizeZ, uv, 
   const fract = (v) => v - Math.floor(v);
   const [hu0, hu1] = GEOMETRY.uvHashU;
   const [hv0, hv1, hv2] = GEOMETRY.uvHashV;
-  const baseSegU = Math.floor(fract(x0 * hu0 + z0 * hu1) * SEGS_PER_TILE);
-  const baseSegV = Math.floor(fract(x0 * hv0 + z0 * hv1 + y0 * hv2) * SEGS_PER_TILE);
+  // A merged primitive hashes its first constituent's origin so its texture offset is unchanged.
+  const { x: hx, y: hy, z: hz } = uvOrigin ?? { x: x0, y: y0, z: z0 };
+  const baseSegU = Math.floor(fract(hx * hu0 + hz * hu1) * SEGS_PER_TILE);
+  const baseSegV = Math.floor(fract(hx * hv0 + hz * hv1 + hy * hv2) * SEGS_PER_TILE);
 
   const yTop = y0 + sizeY;
 
   state.objLines.push(`o ${name}`);
 
   const gridW = segsX + 1;
+  const gridCount = gridW * (segsZ + 1);
+
+  // Only emit vertex grids that a face references: the top grid needs emitTop,
+  // the bottom grid needs emitBottom (a simpleBottom needs just its 4 corners).
   const voTop = state.vertOff;
-  for (let gz = 0; gz <= segsZ; gz++) {
-    for (let gx = 0; gx <= segsX; gx++) {
-      state.objLines.push(`v ${(x0 + gx * stepX).toFixed(6)} ${yTop.toFixed(6)} ${(z0 + gz * stepZ).toFixed(6)}`);
+  if (emitTop) {
+    for (let gz = 0; gz <= segsZ; gz++) {
+      for (let gx = 0; gx <= segsX; gx++) {
+        state.objLines.push(`v ${(x0 + gx * stepX).toFixed(6)} ${yTop.toFixed(6)} ${(z0 + gz * stepZ).toFixed(6)}`);
+      }
     }
+    state.vertOff += gridCount;
   }
-  state.vertOff += gridW * (segsZ + 1);
 
   const voBot = state.vertOff;
-  for (let gz = 0; gz <= segsZ; gz++) {
-    for (let gx = 0; gx <= segsX; gx++) {
-      state.objLines.push(`v ${(x0 + gx * stepX).toFixed(6)} ${y0.toFixed(6)} ${(z0 + gz * stepZ).toFixed(6)}`);
+  if (emitBottom && simpleBottom) {
+    const xEnd = x0 + segsX * stepX, zEnd = z0 + segsZ * stepZ;
+    for (const [cx, cz] of [[x0, z0], [xEnd, z0], [xEnd, zEnd], [x0, zEnd]]) {
+      state.objLines.push(`v ${cx.toFixed(6)} ${y0.toFixed(6)} ${cz.toFixed(6)}`);
     }
+    state.vertOff += 4;
+  } else if (emitBottom) {
+    for (let gz = 0; gz <= segsZ; gz++) {
+      for (let gx = 0; gx <= segsX; gx++) {
+        state.objLines.push(`v ${(x0 + gx * stepX).toFixed(6)} ${y0.toFixed(6)} ${(z0 + gz * stepZ).toFixed(6)}`);
+      }
+    }
+    state.vertOff += gridCount;
   }
-  state.vertOff += gridW * (segsZ + 1);
 
   state.objLines.push('vn 0 1 0');
   state.objLines.push('vn 0 -1 0');
@@ -76,7 +92,7 @@ export function addSharedFlat(state, name, x0, y0, z0, sizeX, sizeY, sizeZ, uv, 
       if (emitBottom) {
         if (simpleBottom) {
           if (sx === 0 && sz === 0) {
-            const b0 = voBot, b1 = voBot + segsX, b2 = voBot + segsZ * gridW + segsX, b3 = voBot + segsZ * gridW;
+            const b0 = voBot, b1 = voBot + 1, b2 = voBot + 2, b3 = voBot + 3;
             const uo = state.uvOff;
             state.objLines.push(`vt ${uv.uMin.toFixed(6)} ${uv.vMin.toFixed(6)}`);
             state.objLines.push(`vt ${uv.uMax.toFixed(6)} ${uv.vMin.toFixed(6)}`);

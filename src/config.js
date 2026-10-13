@@ -211,6 +211,13 @@ export const GEOMETRY = {
   // UV hash constants for per-object tiling offset (shared by GLB + OBJ)
   uvHashU: [0.7123, 0.3917],     // multipliers for U offset: x * [0] + z * [1]
   uvHashV: [0.5431, 0.9281, 0.1637], // multipliers for V offset: x * [0] + z * [1] + y * [2]
+  // Primitive merge pass (end of buildGeometry): joins adjacent same-texture boxes into one to save OBJ vertices.
+  // A merged primitive keeps its first constituent's box as `uvOrigin`, so that piece's UV offset is unchanged.
+  primitiveMerge: {
+    enabled: true,                          // false = unmerged baseline (A/B tests)
+    types: ['wall', 'pavement', 'floor'],   // merge groups: wall_N, pavement_N, floor_fN_x_z slabs
+    epsilon: 0.0001,                        // inches; edge-touch / equality tolerance
+  },
   // OBJ ladder mesh dimensions
   ladderPoleWidth: 0.24,
   ladderPoleDepth: 0.24,

@@ -3,6 +3,7 @@ import { createSlab } from '../../core/geometry-misc.js';
 import { createLadderMesh } from '../../core/create-ladder-mesh.js';
 import { LADDER_DISPLAY } from '../../config.js';
 import { buildCeilingMesh } from './build-ceiling-mesh.js';
+import { uvOriginCenter } from './uv-origin-center.js';
 
 export function buildPrimitiveMesh(prim, getMaterial, ladderOpts) {
   const meshes = [];
@@ -12,7 +13,7 @@ export function buildPrimitiveMesh(prim, getMaterial, ladderOpts) {
       const mat = getMaterial(prim);
       const mesh = createSlab(
         prim.x + prim.w / 2, prim.y + prim.h / 2, prim.z + prim.d / 2,
-        prim.w, prim.h, prim.d, mat, { rotateUV: prim.rotateUV || false },
+        prim.w, prim.h, prim.d, mat, { rotateUV: prim.rotateUV || false, uvOrigin: uvOriginCenter(prim) },
       );
       mesh.name = prim.name;
       meshes.push(mesh);
@@ -23,7 +24,7 @@ export function buildPrimitiveMesh(prim, getMaterial, ladderOpts) {
       const mat = getMaterial(prim);
       const mesh = createSlab(
         prim.x + prim.w / 2, prim.y + prim.h / 2, prim.z + prim.d / 2,
-        prim.w, prim.h, prim.d, mat,
+        prim.w, prim.h, prim.d, mat, { uvOrigin: uvOriginCenter(prim) },
       );
       mesh.name = prim.name;
       meshes.push(mesh);
