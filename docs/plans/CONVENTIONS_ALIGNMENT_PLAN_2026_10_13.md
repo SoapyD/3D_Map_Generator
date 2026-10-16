@@ -1,6 +1,6 @@
 # Conventions Alignment Plan — 2026-10-13
 
-**Status (2026-10-13): Phases 1, 2, 3a, 3b and 4 (4a and 4b) implemented, uncommitted on `feature/primitive-merge` (Phases 1-2 committed as a74f324, the 3a deprecation as 9ac6876). Phase 3b (deletion) is DONE in the working tree, see "Phase 3b results". MERGE ORDER: do not merge this branch to this repo's default branch before wyrdwars_manager PR #317 (pins the generator to v0.2.0 / c97bb01) is merged. That project's dependency is currently unpinned and floats on the default branch, so merging first would break its OBJ / tier / collider imports.** Results are in "Phase 1 and 2 results" below; the manifest sections B, C, D, F, N were updated for the new code. Companion: [`CONVENTIONS_ALIGNMENT_MANIFEST_2026_10_13.md`](CONVENTIONS_ALIGNMENT_MANIFEST_2026_10_13.md) (file:line refs and regenerating greps). This plan supersedes Track 2 (Phase B) of [`PRIMITIVE_MERGE_PLAN_2026_10_13.md`](PRIMITIVE_MERGE_PLAN_2026_10_13.md).
+**Status (2026-10-13): Phases 1, 2, 3a, 3b and 4 (4a and 4b) implemented, uncommitted on `feature/primitive-merge` (Phases 1-2 committed as a74f324, the 3a deprecation as 9ac6876). Phase 3b (deletion) is DONE in the working tree, see "Phase 3b results". MERGE ORDER: do not merge this branch to this repo's default branch before wyrdwars_manager PR #317 (pins the generator to v0.2.0 / c97bb01) is merged. That project's dependency is currently unpinned and floats on the default branch, so merging first would break its OBJ / tier / collider imports.** Results are in "Phase 1 and 2 results" below; the manifest sections B, C, D, F, N were updated for the new code. Companion: [`CONVENTIONS_ALIGNMENT_MANIFEST_2026_10_13.md`](CONVENTIONS_ALIGNMENT_MANIFEST_2026_10_13.md) (file:line refs and regenerating greps). This plan supersedes Track 2 (Phase B) of [`PRIMITIVE_MERGE_PLAN_2026_10_13.md`](archive/PRIMITIVE_MERGE_PLAN_2026_10_13.md).
 
 ## Summary
 
@@ -192,7 +192,7 @@ Phase 3 could start only after the owner chose (a) migrating wyrdwars to the GLB
 
 ## Phase 4 — Docs, CLAUDE.md and agents (text only) — DONE (4a and 4b, 2026-10-13)
 
-Both 4a and 4b were applied together with Phase 3a, worded as "TTS is no longer a target; deprecated, kept for v0.2.0 consumers" rather than "removed", because 3b has not run. Files changed: `CLAUDE.md`, `README.md`, `docs/PROJECT_OVERVIEW.md`, `docs/GENERATION_PIPELINE.md`, `docs/FOLDER_STRUCTURE.md`, `docs/AGENTS_AND_HOOKS.md`, `docs/IMPLEMENTATION_PHASES.md` (historical banner), `docs/issues.md` (seed 7/100 cap entries closed), `docs/architecture/design_philosophy.md`, `docs/architecture/docs_and_config_guide.md`, `docs/processes/pipeline-flows/10-geometry.md`, `11-scene-and-export.md`, `docs/plans/PRIMITIVE_MERGE_PLAN_2026_10_13.md` (Track 2 / Phase B superseded), source comments in `src/config.js`, `src/lib.js`, `src/pipeline.js`, `src/index.js`, `src/export/collision-buffer.js`, `src/export/export-tiers.js`, `src/generate-*-buffers.js`, and `package.json` description (version not bumped). `8-walls.md:7` already described the greedy cover after Phase 1. When 3b runs, the legacy sections in these docs must be deleted rather than re-worded.
+Both 4a and 4b were applied together with Phase 3a, worded as "TTS is no longer a target; deprecated, kept for v0.2.0 consumers" rather than "removed", because 3b has not run. Files changed: `CLAUDE.md`, `README.md`, `docs/PROJECT_OVERVIEW.md`, `docs/GENERATION_PIPELINE.md`, `docs/FOLDER_STRUCTURE.md`, `docs/AGENTS_AND_HOOKS.md`, `docs/IMPLEMENTATION_PHASES.md` (historical banner), `docs/issues.md` (seed 7/100 cap entries closed), `docs/architecture/design_philosophy.md`, `docs/architecture/docs_and_config_guide.md`, `docs/processes/pipeline-flows/10-geometry.md`, `11-scene-and-export.md`, `docs/plans/archive/PRIMITIVE_MERGE_PLAN_2026_10_13.md` (Track 2 / Phase B superseded), source comments in `src/config.js`, `src/lib.js`, `src/pipeline.js`, `src/index.js`, `src/export/collision-buffer.js`, `src/export/export-tiers.js`, `src/generate-*-buffers.js`, and `package.json` description (version not bumped). `8-walls.md:7` already described the greedy cover after Phase 1. When 3b runs, the legacy sections in these docs must be deleted rather than re-worded.
 
 Original task list:
 
@@ -202,7 +202,7 @@ Original task list:
   - `docs/processes/pipeline-flows/8-walls.md:7`: correct the "fewest rectangles" wording until Phase 1 lands.
   - Agents with the 25k rule (Phase 3 list above). The hook, if still present.
   - `docs/issues.md:3-4`: close the cap issue after Phase 1 (seed 7 and seed 100 cap entries).
-  - `PRIMITIVE_MERGE_PLAN_2026_10_13.md` Track 2 (`:127-137`), open decision 5 (`:145`) and `:154`, `:172`: mark superseded by Phase 3.
+  - `archive/PRIMITIVE_MERGE_PLAN_2026_10_13.md` Track 2 (`:127-137`), open decision 5 (`:145`) and `:154`, `:172`: mark superseded by Phase 3.
 - **4b. With Phase 3.**
   - `docs/processes/pipeline-flows/11-scene-and-export.md` (`:3, 33, 44-46, 56-63, 73-75, 77, 90-103, 131, 137-138`).
   - `docs/architecture/docs_and_config_guide.md:16, 29, 68, 79, 89`.

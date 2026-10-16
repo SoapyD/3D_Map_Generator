@@ -1,6 +1,6 @@
 # Merged Meshes Plan - 2026-10-13
 
-Status: **implemented, uncommitted on `feature/merged-meshes` (branched from `feature/primitive-merge` at d8754d0)**. Owner-approved. Browser checks are still open (see the end).
+Status: **Complete, archived 2026-10-16.** Implemented on `feature/merged-meshes` (branched from `feature/primitive-merge` at d8754d0), merged to `dev` as PR #42 and tested. Owner-approved. Outcome: the GLB scene holds one mesh per (material, tier) group instead of one per primitive, with the same geometry (seed 7: 678 glTF meshes -> 82; seed 100: 646 -> 86). The primitives list, geometry JSON and collision matrix are unchanged. The browser checks listed under "Visual verification" were run by the owner after the plan was written and the merged-mesh output was confirmed correct.
 
 ## Goal
 
@@ -37,6 +37,6 @@ Medians of 3 `generateToBuffer` runs (whole generation, not only the scene build
 
 The GLB gets smaller (about 28%), not bigger: per-mesh accessors, buffer views and min/max disappear, and the per-primitive names move into one `extras` list per merged mesh. Images were already embedded once per material, so no exporter fix was needed.
 
-## Not visually verified
+## Visual verification
 
-No browser was available. The fallback highlight overlay with merged meshes, the tier cut-away on merged meshes and the textured appearance (UV continuity, alpha sorting) are verified only by geometry/UV equivalence and by running the overlay function against a GLTFLoader-loaded GLB. To look: `node src/index.js --seed 7 --preview --textures loaded`, open http://localhost:3010, use "Highlight fallbacks" and the Ground / Tier buttons.
+Checked by the owner in the browser after merge (confirmed 2026-10-16). When the plan was written no browser was available. The fallback highlight overlay with merged meshes, the tier cut-away on merged meshes and the textured appearance (UV continuity, alpha sorting) are verified only by geometry/UV equivalence and by running the overlay function against a GLTFLoader-loaded GLB. To look: `node src/index.js --seed 7 --preview --textures loaded`, open http://localhost:3010, use "Highlight fallbacks" and the Ground / Tier buttons.
