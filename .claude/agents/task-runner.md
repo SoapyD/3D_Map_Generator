@@ -13,7 +13,6 @@ Reads project plans and status docs, builds a prioritised work list, and impleme
 
 - **CLAUDE.md:** (MANDATORY -- always read)
 - **docs/plans/FUTURE_FEATURES.md:** (read if exists) feature roadmap
-- **docs/plans/VERTEX_LIMIT_PLAN.md:** (read if working on vertex budget)
 - **docs/plans/PACKAGE_INTEGRATION_PLAN.md:** (read if working on wyrdwars integration)
 - **docs/status/PROJECT_STATUS.md:** (read if exists) current state
 
@@ -40,8 +39,8 @@ For each item:
 1. Read the relevant source files
 2. Implement the change following CLAUDE.md rules
 3. Test with `node src/index.js --seed 42` (and seed 100 if geometry changed)
-4. Verify vertex count if geometry was modified
-5. Check both GLB and OBJ output if export logic changed
+4. Verify primitive counts and collision-matrix parity if geometry was modified
+5. Check the GLB and geometry JSON output if export logic changed
 6. Mark the item as done
 
 ### Step 4: Update status
@@ -54,6 +53,5 @@ After all items are complete, update `docs/status/PROJECT_STATUS.md` with what c
 - Implement one item at a time with verification before moving on.
 - No magic numbers — all values go in config.js.
 - Test with at least 2 seeds after generation changes.
-- Always check vertex count after geometry changes.
+- Always check primitive counts and matrix parity after geometry changes.
 - Flag any item that's ambiguous or risky — don't guess.
-- Keep OBJ exporter and GLB scene builder in sync.

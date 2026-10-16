@@ -9,7 +9,7 @@ A **profile** is a named, swappable set of config overrides. It lets one codebas
 | Where | How |
 |---|---|
 | CLI | `node src/index.js --profile withering --seed 3` (explicit flags such as `--size 28x28` still win over the profile) |
-| Library | `generateToBuffer(seed, { profile: 'withering' })`; also `generateObjToBuffers`, `generateColliderToBuffer`, `generateTiersToBuffers` |
+| Library | `generateToBuffer(seed, { profile: 'withering' })` |
 | Direct `runPipeline` | put `profile: 'withering'` in the config you pass (merge `profileDefaults('withering')` into it first for the size/tier defaults) |
 
 No profile = exactly the original behaviour. An unknown name fails with the list of valid names.
@@ -26,7 +26,7 @@ npm run preview -- --profile withering --seed 3
 `npm run visualize` hard-codes `--seed 42 --size 48x48`. Explicit flags win over profile defaults, so that script overrides the profile's map size. To view a profile, run the CLI directly:
 
 ```
-node src/index.js --profile withering --seed 3 --visualize
+node src/index.js --profile withering --seed 3 --preview
 ```
 
 There are no per-profile npm scripts yet.
@@ -73,7 +73,7 @@ Small test ground for *The Withering* (`Game_Template/docs/plans/withering`).
 | Connections up to the full map | `CONNECTIVITY.maxLengthMapFraction: 1` (default 0.5). On this profile it changes little, because small blocks make most connections short anyway |
 | Fewer objects | 50% chance for each cover group; 1 ladder path per building |
 
-Measured over 40 seeds: no errors, no floor or roof above the top tier, about 250 primitives per map on average versus about 1,360 for the default (roughly 5× fewer), and about 5,600 OBJ vertices versus about 24,000.
+Measured over 40 seeds: no errors, no floor or roof above the top tier, about 250 primitives per map on average versus about 1,360 for the default (roughly 5× fewer).
 
 ## Interpretation notes
 

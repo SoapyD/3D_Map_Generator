@@ -6,7 +6,7 @@
  * used to inline their own stage lists, which silently drifted — lib.js fell
  * behind index.js (no collision matrix, missing roofs/streets/ladders) and threw
  * the moment a matrix-dependent stage ran. Keeping the order here means the
- * browser GLB and the TTS OBJ are always generated from the same geometry.
+ * browser GLB and the geometry JSON are always generated from the same geometry.
  *
  * Returns the built geometry plus the collision matrix. The CLI embeds the
  * matrix in its viewer handover and debug dumps; lib.js ignores it.
@@ -31,7 +31,7 @@ import { applyProfile } from './profiles/apply-profile.js';
  * @param {object} config - fully-resolved config (DEFAULTS already merged in)
  * @param {object} rng    - seeded RNG from createRng(config.seed)
  * @param {object} [opts]
- * @param {object|null} [opts.recorder] - debug recorder for --visualize (CLI only); no-op when absent
+ * @param {object|null} [opts.recorder] - debug recorder for --preview (CLI only); no-op when absent
  * @param {boolean} [opts.log]          - print per-stage banners (CLI only)
  * @returns {{ geometry: object, matrix: object }}
  */

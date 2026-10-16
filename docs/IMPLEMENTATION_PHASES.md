@@ -1,5 +1,7 @@
 # Implementation Phases
 
+> **Historical document (2026-10-13).** Written when Tabletop Simulator was the target. TTS is no longer a target (the consumer is the Withering game) and the OBJ/atlas export is deprecated; see `docs/plans/CONVENTIONS_ALIGNMENT_PLAN_2026_10_13.md`. The phases below are kept as originally written, including Phase 6 (TTS integration), which is obsolete.
+
 ## Phase 1: Foundation & Floor Generation
 
 **Goal**: Generate flat floor slabs with cutouts and export a viewable 3D file.

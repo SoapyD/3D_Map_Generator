@@ -7,7 +7,7 @@
  *
  * Shares the exact stage sequence with the CLI via runPipeline (src/pipeline.js),
  * so the in-process GLB matches `node src/index.js` output. Only the sink differs:
- * the CLI writes GLB/OBJ files, this returns the GLB as a Buffer.
+ * the CLI writes the GLB (and geometry JSON) to files, this returns the GLB as a Buffer.
  */
 
 import { DEFAULTS } from './config.js';
@@ -17,12 +17,8 @@ import { runPipeline } from './pipeline.js';
 import { buildScene } from './generators/scene/index.js';
 import { buildGlbBuffer } from './export/glb-exporter.js';
 
-// In-memory OBJ + collider entry points for Tabletop Simulator (obj + atlas PNG diffuse, and the
-// separate collider mesh). Re-exported here so the package's single public entry (lib.js) exposes them.
-export { generateObjToBuffers } from './generate-obj-buffers.js';
-export { generateColliderToBuffer } from './generate-collider-buffer.js';
-// Per-tier split (manifest + shared atlas + per-tier OBJ/collider) for the TTS elevator/reveal feature.
-export { generateTiersToBuffers } from './generate-tiers-buffers.js';
+// The in-memory OBJ + atlas, collider OBJ and per-tier split exports (generateObjToBuffers,
+// generateColliderToBuffer, generateTiersToBuffers) were removed; they live in tags v0.2.0 and v0.3.0.
 
 /**
  * Run the full generation pipeline for the given seed and return a GLB Buffer.

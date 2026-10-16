@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { runStages, countPrims, quiet } from './helpers/run-stages.js';
-import { buildObjAndAtlas } from '../src/export/obj-geometry/build-obj-and-atlas.js';
+import { createHash } from 'crypto';
+import { runStages, countPrims } from './helpers/run-stages.js';
 
 /**
- * Regression guards: object and vertex counts for fixed seeds on the default config
+ * Regression guards: object counts and a collision-matrix hash for fixed seeds on the default config
  * (48x48, 4 tiers). If a count changes, generation changed. Review the change, then update.
  * Counts were last regenerated after the pipeline moved to the matrix-based stages
  * (foundations/buildings/floors/roofs/streets/connectivity/ladders/walls/cover/geometry).
@@ -28,10 +28,10 @@ function countObjects(seed) {
   };
 }
 
-function objVertexCount(seed) {
-  const { geometry, config } = runStages(seed);
-  const { objString } = quiet(() => buildObjAndAtlas(geometry, config));
-  return objString.split('\n').filter(l => l.startsWith('v ')).length;
+/** SHA-256 of the collision matrix cells, the Withering client's contract; must not move unless generation does. */
+function matrixHash(seed) {
+  const { matrix } = runStages(seed);
+  return createHash('sha256').update(Uint8Array.from(matrix.toDebugJSON().cells)).digest('hex');
 }
 
 describe.each([42, 100])('Snapshot regression - seed %i', (seed) => {
@@ -49,12 +49,10 @@ describe.each([42, 100])('Snapshot regression - seed %i', (seed) => {
     for (const key of Object.keys(fresh)) expect(fresh[key]).toBe(base[key]);
   });
 
-  // Seed 100 currently produces 25,862 vertices in a single OBJ, over the 25k TTS limit
-  // (CLAUDE.md critical constraint). Known violation reported to the maintainer: marked as
-  // an expected failure so the suite stays green but flips red (it.fails) as soon as it is fixed.
-  const knownOverLimit = seed === 100;
-  (knownOverLimit ? it.fails : it)(`seed ${seed}: OBJ vertex count stays under the 25k TTS limit`, () => {
-    expect(objVertexCount(seed)).toBeLessThan(25000);
+  it(`seed ${seed}: collision matrix is identical across fresh runs`, () => {
+    const again = runStages(seed, { textureSet: 'base' });
+    const hash = createHash('sha256').update(Uint8Array.from(again.matrix.toDebugJSON().cells)).digest('hex');
+    expect(hash).toBe(matrixHash(seed));
   });
 
   it(`seed ${seed}: geometry has at least one primitive of each core kind`, () => {
@@ -77,17 +75,17 @@ describe('Snapshot regression - seed 42', () => {
         "internalWalls": 9,
         "ladderSegments": 29,
         "pillars": 20,
-        "primitives": 1284,
+        "primitives": 802,
         "roofs": 24,
         "streetScatter": 14,
         "walkways": 20,
-        "walls": 485,
+        "walls": 276,
       }
     `);
   });
 
-  it('seed 42 OBJ vertex count is locked', () => {
-    expect(objVertexCount(42)).toMatchInlineSnapshot(`23878`);
+  it('seed 42 collision matrix hash is locked', () => {
+    expect(matrixHash(42)).toMatchInlineSnapshot(`"21e068c102d08532d72558fb145e27a772100e6398512703d0ef57af0e03f820"`);
   });
 });
 
@@ -102,16 +100,16 @@ describe('Snapshot regression - seed 100', () => {
         "internalWalls": 9,
         "ladderSegments": 31,
         "pillars": 6,
-        "primitives": 1355,
+        "primitives": 810,
         "roofs": 25,
         "streetScatter": 17,
         "walkways": 22,
-        "walls": 587,
+        "walls": 327,
       }
     `);
   });
 
-  it('seed 100 OBJ vertex count is locked', () => {
-    expect(objVertexCount(100)).toMatchInlineSnapshot(`25522`);
+  it('seed 100 collision matrix hash is locked', () => {
+    expect(matrixHash(100)).toMatchInlineSnapshot(`"bba4456c8deb62fbc988221d8044ba1e999768789bf92ff2ce8a55e5c367828a"`);
   });
 });

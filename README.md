@@ -1,6 +1,6 @@
 # Mordheim 3D Map Generator
 
-Procedural ruined city map generator for Mordheim / Tabletop Simulator. Generates seed-based 3D terrain maps with buildings, walls, walkways, ladders, and cover — all with perfectly flat surfaces so models don't tip over.
+Procedural ruined city map generator for Mordheim. The output (GLB, geometry primitives and collision matrix) is consumed by the Withering game; Tabletop Simulator is no longer a target. Generates seed-based 3D terrain maps with buildings, walls, walkways, ladders, and cover — all with perfectly flat surfaces so models don't tip over.
 
 ## Quick Start
 
@@ -10,9 +10,10 @@ node src/index.js --seed 42
 ```
 
 Outputs:
-- `output/mordheim_map_42.glb` — GLB file for browser preview
-- `output/mordheim_map_42.obj` — OBJ file for TTS import
-- `output/mordheim_map_42.png` — Texture atlas
+- `output/mordheim_map_42.glb` — GLB file (browser preview, Withering game)
+- `output/mordheim_map_42_geometry.json` — primitives plus the collision matrix
+
+The OBJ + atlas, collision OBJ and per-tier exports were removed in this version. They live in git tags `v0.2.0` and `v0.3.0` (check out a tag to use them).
 
 ## CLI Options
 
@@ -23,8 +24,10 @@ Outputs:
 | `--tiers N` | Number of elevated tiers (+ base) | 4 |
 | `--tier-height N` | Vertical spacing between tiers (inches) | 3 |
 | `--debug` | Use flat debug colours instead of textures | off |
-| `--preview` | Start basic browser preview (model + grid toggle) on localhost:3010 | off |
-| `--visualize` | Start the full visualizer on localhost:3010 — layer/grid toggles, prior-step playback, debug overlays | off |
+| `--preview` | Generate, then start the viewer on localhost:3010 (see [Running the viewer](#running-the-viewer)). Always records debug frames to `output/debug_frames.json` | off |
+| `--visualize` | Alias of `--preview` | off |
+| `--preview-map FILE` | Skip generation; start the viewer from a frozen `withering-map/1` or `/2` fixture. The Visualizer tab is greyed out | none |
+| `--textures NAME` | Texture pack the Loaded map tab starts with (`base` or `loaded`). Alias of `--texture-set`, so it also sets the pack used for export | base |
 | `--profile NAME` | Swap in a named config profile, e.g. `withering` (small 3-level test ground). See `docs/architecture/profiles.md` | none |
 | `--texture-set NAME` | Texture pack folder name in assets/textures/ | base |
 
@@ -40,23 +43,71 @@ node src/index.js --seed 42 --debug
 # Custom map size
 node src/index.js --seed 42 --size 36x36
 
-# Browser visualize preview
-node src/index.js --seed 42 --visualize 
+# Generate and open the viewer at http://localhost:3010
+node src/index.js --seed 42 --preview
 
 # Use custom texture pack
 node src/index.js --seed 42 --texture-set my_textures
 ```
 
-Run the `withering` profile through npm: `npm run generate -- --profile withering --seed 3` (also works with `npm run preview`). `npm run visualize` fixes the size at 48x48, which overrides a profile's size, so for the viewer use `node src/index.js --profile withering --seed 3 --visualize`.
+Run the `withering` profile through npm: `npm run generate -- --profile withering --seed 3` (also works with `npm run preview`). `npm run visualize` fixes the size at 48x48, which overrides a profile's size, so for the viewer use `node src/index.js --profile withering --seed 3 --preview`.
 
-## Importing into Tabletop Simulator
+## Running the viewer
 
-1. Upload the `.obj` and `.png` files somewhere accessible via URL (Steam Cloud, Imgur, etc.)
-2. In TTS: Objects > Components > Custom > Custom Model
-3. Set **Model/Mesh** URL to the `.obj` file
-4. Set **Diffuse/Image** URL to the `.png` file
-5. Set **Collider/Mesh** URL to the same `.obj` file (required for collision)
-6. Scale down as needed (try 0.05-0.1)
+One server (`src/preview/`) serves a tabbed page at **http://localhost:3010**. Stop it with **Ctrl+C**. Three.js loads from the jsDelivr CDN, so the browser needs internet access.
+
+```bash
+npm run preview                                            # = node src/index.js --preview (random seed)
+node src/index.js --seed 42 --preview                      # generate seed 42, then open the viewer
+node src/index.js --profile withering --seed 3 --preview   # Withering test ground (npm run preview -- --profile withering --seed 3 also works)
+node src/index.js --seed 42 --preview --textures loaded    # start the Loaded map tab on the 'loaded' pack
+node src/index.js --preview-map FIXTURE.json               # no generation: view a frozen withering-map fixture
+node src/index.js --preview-map FIXTURE.json --textures loaded
+```
+
+`--visualize` is an alias of `--preview` and behaves the same. `--preview` always records debug frames to `output/debug_frames.json`.
+
+### Tabs and which mode enables them
+
+| Tab | `--preview` (generated run) | `--preview-map FILE` (fixture only) |
+|-----|-----------------------------|--------------------------------------|
+| **Loaded map** (opens first) | Enabled. Shows the current run, textured | Enabled. Shows the fixture |
+| **Visualizer** | Enabled. Stage-by-stage replay of the pipeline: layer and grid toggles, prior-step playback, debug overlays | Greyed out, with a tooltip: no generated run |
+
+- **Loaded map** shows only the map's primitives with textures (3-inch repeat, as in the GLB). It has no game content. The page remembers the last tab you picked per mode.
+- The fixture format is `withering-map/1` or `/2`. A `/1` fixture has no recorded pitch or slab thickness, so the legacy values (4" pitch, 1" slab) are used.
+
+### Loaded map controls
+
+- **Textures** dropdown: `base` or `loaded`. Switching reloads the model. Only these two packs are offered; any other `--texture-set` name shows as `base`.
+- **Ground / Tier N / All** buttons: cut-away. The cut keeps everything at or below that tier's floor level and hides the rest. **All** removes the cut.
+- **Highlight fallbacks**: recolours in magenta every mesh whose texture status is not `ok`.
+- **Load fixture** file picker: posts a JSON fixture to the server and reloads. If the file is invalid, the errors appear in red and the view is cleared.
+- **Texture report** (bottom left): one row per texture key with count, key, `pool[index]`, file and status. Rows that are not `ok` are red.
+
+Report statuses:
+
+| Status | Meaning |
+|--------|---------|
+| `ok` | Key resolved to a real file in its pool |
+| `unknown-key` | Key is not recognised, so it uses the first wall texture |
+| `pool-empty` | Pool folder has no PNGs, so the mesh is flat grey |
+| `file-missing` | Pool folder does not exist, so the mesh is flat grey |
+| `bad-index` | Key's index is not a number (shown as `?`) |
+
+The header shows the fixture's generator revision and `(dirty)` if it was cut from uncommitted code. A generated run shows `current-run`. Textures always come from the current assets, not those present when the fixture was cut.
+
+### Camera
+
+- **W / S**: forward / back. **A / D**: strafe left / right. **Q / E**: down / up. **Shift**: 3x faster.
+- Mouse drag orbits and the scroll wheel zooms.
+- Click the 3D view first so the keys have focus. Keys are ignored while the dropdown or file picker has focus.
+
+Design history: `docs/plans/archive/LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md`.
+
+## Legacy Tabletop Simulator export (removed)
+
+The OBJ + atlas and collision OBJ outputs for Tabletop Simulator, and `--obj` / `--split-tiers`, were removed. Use git tag `v0.2.0` or `v0.3.0` if you need them.
 
 ## Generation Pipeline
 
@@ -66,7 +117,7 @@ Run the `withering` profile through npm: `npm run generate -- --profile witherin
 4. **Walls** — Quadrant-driven with upper/lower damage rows
 5. **Connectivity** — Walkways (blue), yellow/red/orange ladders
 6. **Cover** — Rooftop, ground, and interior cover objects
-7. **Export** — GLB + OBJ with texture atlas
+7. **Export** — GLB + geometry JSON (with the collision matrix)
 
 ## Configuration
 
@@ -92,7 +143,7 @@ assets/textures/base/
 ### Included packs
 
 - **`base`** — default solid colour textures, fully opaque
-- **`transparent_base`** — same as base but walls have 85% opacity (15% transparent). Transparency works in GLB viewers but **not in TTS** (TTS doesn't support transparent PNGs on custom models)
+- **`transparent_base`** — same as base but walls have 85% opacity (15% transparent). Transparency works in GLB viewers
 
 ### Switching texture packs
 
@@ -120,26 +171,3 @@ PNGs with alpha channels are automatically detected. Materials with alpha < 100%
 1. Copy the base pack
 2. Edit the wall PNGs to have a lower alpha (e.g. 85%)
 3. Use `--texture-set your_transparent_pack`
-
-Note: TTS does not support PNG transparency on custom models. The transparent pack is useful for the GLB browser preview only.
-
-### Regenerating procedural textures
-
-```bash
-node src/generators/generate-textures.js
-```
-
-## Debug Colours
-
-When using `--debug`, elements are colour-coded:
-- Grey — base ground
-- Brown tones — building floors (by tier)
-- Tan — walls
-- Blue — walkways
-- Green — blocked walkways (hit a wall)
-- Yellow — walkway ladders
-- Red — ground ladders
-- Orange — free-standing ladders
-- Purple — cover objects
-- Grey — interior cover
-- Pink — deleted building footprints (debug)

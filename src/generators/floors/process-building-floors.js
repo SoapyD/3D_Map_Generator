@@ -2,7 +2,6 @@ import { FLOOR } from '../../config.js';
 import { floorCellY, floorSurfaceY, floorGeomY } from '../../core/levels.js';
 import { pickAdjacentToRemoved } from '../selectors/index.js';
 import { quadrantsToSections } from './quadrants-to-sections.js';
-import { ruinsToSections } from './ruins-small-to-sections.js';
 
 /**
  * Generates floor plates for a single building shell.
@@ -46,9 +45,7 @@ export function processBuildingFloors(building, buildingIndex, config, rng) {
 
     const present = new Set([0, 1, 2, 3].filter(q => !removed.has(q)));
     let rects;
-    if (building.size === 'ruins-small') {
-      rects = ruinsToSections(building);
-    } else if (isRuins) {
+    if (isRuins) {
       rects = [{ x: building.x, z: building.z, w: building.w, d: building.d }];
     } else {
       rects = quadrantsToSections(building, present);

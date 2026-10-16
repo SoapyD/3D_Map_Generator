@@ -3,6 +3,7 @@ import { createSlab } from '../../core/geometry-misc.js';
 import { createLadderMesh } from '../../core/create-ladder-mesh.js';
 import { LADDER_DISPLAY } from '../../config.js';
 import { buildCeilingMesh } from './build-ceiling-mesh.js';
+import { textureKeyUvOffset } from './texture-key-uv-offset.js';
 
 export function buildPrimitiveMesh(prim, getMaterial, ladderOpts) {
   const meshes = [];
@@ -12,7 +13,7 @@ export function buildPrimitiveMesh(prim, getMaterial, ladderOpts) {
       const mat = getMaterial(prim);
       const mesh = createSlab(
         prim.x + prim.w / 2, prim.y + prim.h / 2, prim.z + prim.d / 2,
-        prim.w, prim.h, prim.d, mat, { rotateUV: prim.rotateUV || false },
+        prim.w, prim.h, prim.d, mat, { rotateUV: prim.rotateUV || false, uvOffset: textureKeyUvOffset(prim.textureKey) },
       );
       mesh.name = prim.name;
       meshes.push(mesh);
@@ -23,7 +24,7 @@ export function buildPrimitiveMesh(prim, getMaterial, ladderOpts) {
       const mat = getMaterial(prim);
       const mesh = createSlab(
         prim.x + prim.w / 2, prim.y + prim.h / 2, prim.z + prim.d / 2,
-        prim.w, prim.h, prim.d, mat,
+        prim.w, prim.h, prim.d, mat, { uvOffset: textureKeyUvOffset(prim.textureKey) },
       );
       mesh.name = prim.name;
       meshes.push(mesh);
@@ -59,7 +60,7 @@ export function buildPrimitiveMesh(prim, getMaterial, ladderOpts) {
         const height = prim.y1 - prim.y0;
         const box = createSlab(
           prim.x + prim.w / 2, prim.y0 + height / 2, prim.z + prim.d / 2,
-          prim.w, height, prim.d, mat,
+          prim.w, height, prim.d, mat, { uvOffset: textureKeyUvOffset(prim.textureKey) },
         );
         box.name = prim.name + '_box';
         meshes.push(box);

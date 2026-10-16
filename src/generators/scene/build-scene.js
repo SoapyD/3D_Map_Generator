@@ -3,14 +3,16 @@
  *
  * Consumes the handover primitives produced by geometry-builder.js.
  * Only handles HOW to render (Three.js meshes, materials), not WHAT.
+ * Meshes are merged per (material, tier) when GEOMETRY.mergeMeshes.enabled (see merge-scene-meshes.js).
  */
 
 import * as THREE from 'three';
 import { buildTexturePools } from './buildTexturePools.js';
 import { resolveDebugMaterial } from './resolve-debug-material.js';
 import { resolveTexturedMaterial } from './resolve-textured-material.js';
-import { LADDER_DISPLAY } from '../../config.js';
+import { LADDER_DISPLAY, GEOMETRY } from '../../config.js';
 import { buildPrimitiveMesh } from './build-primitive-mesh.js';
+import { mergeSceneMeshes } from './merge-scene-meshes.js';
 
 /**
  * Build a Three.js scene from geometry primitives.
@@ -40,12 +42,19 @@ export function buildScene(geometry, config) {
     rungInset: LADDER_DISPLAY.rungInset,
   };
 
+  const mergeCfg = config.mergeMeshes ?? GEOMETRY.mergeMeshes;
+  const entries = [];
   for (const prim of geometry.primitives) {
-    const meshes = buildPrimitiveMesh(prim, getMaterial, ladderOpts);
-    for (const mesh of meshes) {
-      scene.add(mesh);
+    for (const mesh of buildPrimitiveMesh(prim, getMaterial, ladderOpts)) {
+      entries.push({ prim, mesh });
     }
   }
+
+  // Merged: one mesh per (material, tier); disabled: one mesh per primitive (the original layout).
+  const meshes = mergeCfg.enabled
+    ? mergeSceneMeshes(entries, config, mergeCfg)
+    : entries.map((e) => e.mesh);
+  for (const mesh of meshes) scene.add(mesh);
 
   return scene;
 }

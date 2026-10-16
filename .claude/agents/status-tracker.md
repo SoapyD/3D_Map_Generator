@@ -52,17 +52,16 @@ Last updated: YYYY-MM-DD
 | Format | Status | Notes |
 |--------|--------|-------|
 | GLB | Complete | Hand-built binary |
-| OBJ | Complete | Subdivided + atlas |
 | Collision | Complete | Floors/walkways/cover |
 
 ## Config Coverage
 <list of features controlled by config vs hardcoded>
 
-## Vertex Budget
-| Seed | Vertices | Status |
-|------|----------|--------|
-| 42 | 24,672 | Warning (close to 25k) |
-| 100 | 18,752 | OK |
+## Primitive Counts (informational)
+| Seed | Primitives | Notes |
+|------|------------|-------|
+| 42 | <count> | <from the geometry JSON or snapshot test> |
+| 100 | <count> | <from the geometry JSON or snapshot test> |
 
 ## Outstanding Items
 <prioritized list from FUTURE_FEATURES.md, noting which are started/blocked/planned>

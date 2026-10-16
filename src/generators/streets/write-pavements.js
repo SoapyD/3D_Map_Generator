@@ -1,4 +1,5 @@
 import { CELL, STAGE } from '../collision/matrix.js';
+import { coverGridWithRects } from '../../core/grid-rect-cover/index.js';
 
 export function writePavements(blocks, matrix, config) {
   const { slabThickness } = config;
@@ -29,30 +30,24 @@ export function writePavements(blocks, matrix, config) {
   return { cellCount: cells.length, rects: cellsToRects(cells, ox, oz, cs) };
 }
 
-// Group cells into row-run rects: for each Z row, merge contiguous X runs.
+// Greedy rect cover of the pavement cells (shared helper). Spans are in cell indices of the
+// cells' bounding box; each is mapped back to world inches.
 function cellsToRects(cells, ox, oz, cs) {
   if (!cells.length) return [];
 
-  const byRow = new Map();
+  let minCx = Infinity, maxCx = -Infinity, minCz = Infinity, maxCz = -Infinity;
+  const keys = new Set();
   for (const { cx, cz } of cells) {
-    if (!byRow.has(cz)) byRow.set(cz, []);
-    byRow.get(cz).push(cx);
+    minCx = Math.min(minCx, cx); maxCx = Math.max(maxCx, cx);
+    minCz = Math.min(minCz, cz); maxCz = Math.max(maxCz, cz);
+    keys.add(`${cx},${cz}`);
   }
 
-  const rects = [];
-  for (const [cz, cxList] of byRow) {
-    cxList.sort((a, b) => a - b);
-    let start = cxList[0], end = cxList[0];
-    for (let i = 1; i < cxList.length; i++) {
-      if (cxList[i] === end + 1) {
-        end = cxList[i];
-      } else {
-        rects.push({ x: ox + start * cs, z: oz + cz * cs, w: (end - start + 1) * cs, d: cs });
-        start = end = cxList[i];
-      }
-    }
-    rects.push({ x: ox + start * cs, z: oz + cz * cs, w: (end - start + 1) * cs, d: cs });
-  }
-
-  return rects;
+  return coverGridWithRects(
+    maxCx - minCx + 1, maxCz - minCz + 1,
+    (c, r) => keys.has(`${minCx + c},${minCz + r}`),
+  ).map((span) => ({
+    x: ox + (minCx + span.col) * cs, z: oz + (minCz + span.row) * cs,
+    w: span.cols * cs, d: span.rows * cs,
+  }));
 }

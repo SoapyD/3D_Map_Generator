@@ -10,7 +10,6 @@ export function parsePreviewArgs(argv) {
     interiorWalls: false,
     textureSet: 'base',
     debug: false,
-    format: 'both',  // 'glb', 'obj', 'both'
   };
 
   for (let i = 2; i < argv.length; i++) {
@@ -20,9 +19,6 @@ export function parsePreviewArgs(argv) {
     else if (arg === '--seed' && argv[i + 1]) args.seed = parseInt(argv[++i]);
     else if (arg === '--tiers' && argv[i + 1]) args.tiers = parseInt(argv[++i]);
     else if (arg === '--interior-walls') args.interiorWalls = true;
-    else if (arg === '--format' && argv[i + 1]) args.format = argv[++i];
-    else if (arg === '--glb') args.format = 'glb';
-    else if (arg === '--obj') args.format = 'obj';
     else if (arg === '--texture-set' && argv[i + 1]) args.textureSet = argv[++i];
     else if (arg === '--debug') args.debug = true;
   }

@@ -28,12 +28,11 @@ export const DEFAULTS = {
   textureSet: 'base',
   flatLadders: true,  // true = flat front-facing quads, false = 3D boxes (single source of truth)
   preview: false,
+  previewMap: null,   // --preview-map FIXTURE: textured preview of a frozen withering-map fixture (skips generation)
   visualize: false,
   debug: false,
   debugConnectivity: false, // --debug-connectivity: write connectivity debug JSON
   debugMatrix: false,       // --debug-matrix: serialise collision-matrix write history
-  obj: false,
-  splitTiers: false,  // also emit one OBJ + collider per tier + a manifest (TTS elevator/reveal)
   outputDir: 'output',
   allRivers: false,   // treat every street corridor as a river
   profile: null,      // --profile NAME: swap in a named config profile (see src/profiles/)
@@ -41,6 +40,40 @@ export const DEFAULTS = {
 
 // --- Buildings --- (_old_system only)
 // export const BUILDING = { ... };  // see _old_system/config.js
+
+// --- Loaded-map texture preview (--preview-map) ---
+export const LOADED_MAP = {
+  port: 3010,
+  textureSets: ['base', 'loaded'],
+  fixtureFormats: ['withering-map/1', 'withering-map/2'],
+  legacyLevelHeight: 4,        // /1 fixtures record no pitch (mirrors Withering LEGACY_LEVEL_HEIGHT)
+  legacyFloorThickness: 1,     // /1 fixtures record no slab thickness (mirrors Withering LEGACY_FLOOR_THICKNESS)
+  maxUploadBytes: 64 * 1024 * 1024,
+  fallbackColor: '#ff00ff',    // page recolour for meshes whose texture fell back
+  camera: {
+    moveSpeed: 20,             // WASD/QE fly speed, inches per second
+    fastMultiplier: 3,         // held Shift
+  },
+};
+
+// --- Unified preview server (--preview, alias --visualize, and --preview-map) ---
+export const PREVIEW = {
+  port: LOADED_MAP.port,
+  defaultMode: 'run',
+  // 'run' = generated map (--preview / --visualize, frames always recorded); 'preview-map' = fixture only, no generation.
+  modes: { run: 'run', previewMap: 'preview-map' },
+  // Tab order; `needs` is what must exist for the tab to be enabled ('run' = generated map with recorded frames).
+  // viewer.html stays routable at /model.html but is not a tab.
+  tabs: [
+    { id: 'loaded-map', label: 'Loaded map', path: '/loaded-map.html', needs: null, disabledReason: '' },
+    { id: 'visualizer', label: 'Visualizer', path: '/visualizer.html', needs: 'run', disabledReason: 'Needs a generated map: run with --preview instead of --preview-map.' },
+  ],
+  initialTab: { run: 'loaded-map', 'preview-map': 'loaded-map' },
+  storageKey: 'previewTab',
+  noRunMessage: 'No generated run in this mode (started with --preview-map). Run with --preview.',
+  noVisualizeMessage: 'Visualizer frames unavailable (no generated run). Start with --preview.',
+  noFixtureMessage: 'Load a fixture with --preview-map or the file picker.',
+};
 
 // --- Walls ---
 export const WALL = {
@@ -170,13 +203,21 @@ export const GRID = {
 // --- Geometry ---
 export const GEOMETRY = {
   glbTileSize: 3,            // GLB only: inches per texture repeat
-  objAtlasTileSize: 256,     // OBJ atlas: pixels per tile
-  objSegmentPixelSize: 128,  // OBJ atlas: pixels per 3" segment (256 = full tile, 128 = 2/tile, 64 = 4/tile)
-  objAtlasPadding: 4,        // pixels of padding around each atlas tile
-  // UV hash constants for per-object tiling offset (shared by GLB + OBJ)
-  uvHashU: [0.7123, 0.3917],     // multipliers for U offset: x * [0] + z * [1]
-  uvHashV: [0.5431, 0.9281, 0.1637], // multipliers for V offset: x * [0] + z * [1] + y * [2]
-  // OBJ ladder mesh dimensions
+  // GLB texture offset, one per texture key (not per box, so adjacent boxes stay seamless): the key's
+  // string hash (multiplier hashBase) scaled by scaleU / scaleV, fractional part.
+  uvKeyOffset: { hashBase: 31, scaleU: 0.7123, scaleV: 0.5431 },
+  // Primitive merge pass (end of buildGeometry): joins adjacent same-texture boxes into one (was for the removed OBJ vertex cap; off by default).
+  // A merged primitive keeps its first constituent's box as `uvOrigin` (no longer read by any exporter; the GLB uses world-space UVs).
+  primitiveMerge: {
+    enabled: false,                         // off: after the greedy rect cover (walls/pavements/floors) it removes 0% of primitives; kept for A/B tests
+    types: ['wall', 'pavement', 'floor'],   // merge groups: wall_N, pavement_N, floor_fN_x_z slabs
+    epsilon: 0.0001,                        // inches; edge-touch / equality tolerance
+  },
+  // Scene/GLB mesh merge (buildScene): instead of one THREE.Mesh per primitive, geometries are merged into one mesh per
+  // (material[, tier]) group. enabled=false reproduces the per-primitive meshes exactly. byTier splits each material by tierOf().
+  // Per-primitive names/ranges survive in the merged mesh's userData.primitives (glTF extras).
+  mergeMeshes: { enabled: true, byTier: true },
+  // Ladder mesh dimensions
   ladderPoleWidth: 0.24,
   ladderPoleDepth: 0.24,
   ladderRungHeight: 0.18,
@@ -242,14 +283,15 @@ export function parseArgs(argv) {
   for (let i = 2; i < argv.length; i++) {
     const arg = argv[i];
 
-    if (arg === '--preview') {
+    // --preview implies frame recording (Visualizer tab); --visualize is an alias.
+    if (arg === '--preview' || arg === '--visualize') {
       config.preview = true;
+      config.visualize = true;
       continue;
     }
 
-    if (arg === '--visualize') {
-      config.visualize = true;
-      config.preview = true;
+    if (arg === '--textures') {
+      config.textureSet = argv[++i] ?? config.textureSet;
       continue;
     }
 
@@ -265,16 +307,6 @@ export function parseArgs(argv) {
 
     if (arg === '--debug-matrix') {
       config.debugMatrix = true;
-      continue;
-    }
-
-    if (arg === '--obj') {
-      config.obj = true;
-      continue;
-    }
-
-    if (arg === '--split-tiers') {
-      config.splitTiers = true;
       continue;
     }
 
