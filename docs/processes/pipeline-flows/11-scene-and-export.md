@@ -44,7 +44,7 @@ The GLB is always written:
 |---|---|---|
 | GLB | `exportToGlb(scene, outputPath)` | `<baseName>.glb` |
 
-The in-memory library has one export, `generateToBuffer` (returns the GLB). The former `generateObjToBuffers`, `generateColliderToBuffer` and `generateTiersToBuffers` were removed with the OBJ paths. There is no vertex cap.
+The in-memory library has two exports. `generateToBuffer(seed, opts)` returns the GLB. `generateMapData(seed, opts)` returns `{ seed, opts, matrix, primitives }` — the raw collision matrix (`{ W, D, maxY, belowGround, ox, oz, cellSize, cells }`, `cells` a `Uint8Array`, index `cx + cz*W + (cy+belowGround)*W*D`, 255 = empty) and the unfiltered geometry primitives, with `opts` extended by `levelHeight` and `floorThickness`. Both share `runPipeline`, so the data matches the GLB and the CLI geometry JSON for a seed; `generateMapData` silences the stages' `console.log` output. It is synchronous. The former `generateObjToBuffers`, `generateColliderToBuffer` and `generateTiersToBuffers` were removed with the OBJ paths. There is no vertex cap.
 
 Data files:
 
