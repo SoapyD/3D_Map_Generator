@@ -84,5 +84,4 @@ Procedural generator for ruined city maps optimized for Mordheim gameplay. The c
 - `docs/BUILDING_REFERENCE.md` — building size classes and placement
 - `docs/issues.md` — known open issues
 - `docs/plans/CONVENTIONS_ALIGNMENT_PLAN_2026_10_13.md` and `docs/plans/CONVENTIONS_ALIGNMENT_MANIFEST_2026_10_13.md` — conventions alignment (shared rect cover, world-space GLB UVs, TTS/OBJ removal, Phase 3b done)
-- `docs/plans/PRIMITIVE_MERGE_PLAN_2026_10_13.md` — primitive merge (Track 2 superseded by the conventions plan)
-- `docs/plans/` — active plans; completed plans are in `docs/plans/archive/` (e.g. `VERTEX_LIMIT_PLAN_2026_03_30.md`, `VERTEX_OPTIMISATION_PLAN_2026_03_29.md`, `WATERWAYS_PLAN_2026_03_30.md`, `WALKWAY_IMPROVEMENTS_PLAN_2026_03_30.md`, `BUILDING_ADDITIONS_PLAN_2026_03_30.md`, `PACKAGE_INTEGRATION_PLAN_2026_03_28.md`, `FUTURE_FEATURES_2026_03_30.md`)
+- `docs/plans/` — active plans; completed plans are in `docs/plans/archive/` (e.g. `VERTEX_LIMIT_PLAN_2026_03_30.md`, `VERTEX_OPTIMISATION_PLAN_2026_03_29.md`, `WATERWAYS_PLAN_2026_03_30.md`, `WALKWAY_IMPROVEMENTS_PLAN_2026_03_30.md`, `BUILDING_ADDITIONS_PLAN_2026_03_30.md`, `PACKAGE_INTEGRATION_PLAN_2026_03_28.md`, `FUTURE_FEATURES_2026_03_30.md`, `PRIMITIVE_MERGE_PLAN_2026_10_13.md`)

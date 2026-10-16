@@ -1,6 +1,6 @@
 # Thin Floor Slabs Plan — 2026-10-11
 
-Status: **implemented in the working tree on `feature/thin-floor-slabs`** (decisions: 2.75" headroom, thin ground slab, thin roofs; tests live in `tests/`, not `test/`). File list and line-level hits: [`THIN_FLOOR_SLABS_MANIFEST_2026_10_11.md`](THIN_FLOOR_SLABS_MANIFEST_2026_10_11.md) (sections A–L, each with its regenerating grep). Section letters are referenced below as **[M-A]** etc.
+Status: **Complete, archived 2026-10-16.** Implemented on `feature/thin-floor-slabs` and shipped in v0.3.0 (dev PR #39). Outcome: a tier now costs `tierHeight` (3") of pitch instead of 4", and floor slabs are 0.25" thick and sit flush with the tier surface; a 4-tier map is 12" tall instead of 16". Decisions as implemented: 2.75" headroom, thin ground slab, thin roofs. Tests live in `tests/`, not `test/`. File list and line-level hits: [`THIN_FLOOR_SLABS_MANIFEST_2026_10_11.md`](THIN_FLOOR_SLABS_MANIFEST_2026_10_11.md) (sections A–L, each with its regenerating grep). Section letters are referenced below as **[M-A]** etc.
 
 ## Problem
 

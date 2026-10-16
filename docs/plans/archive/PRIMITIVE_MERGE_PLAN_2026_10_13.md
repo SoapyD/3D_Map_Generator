@@ -1,6 +1,6 @@
 # Primitive Merge Plan — 2026-10-13
 
-Status: **Phase A implemented, uncommitted on `feature/primitive-merge` (A0 + merge pass + tests; measured results in "Implementation status and results" below)**. Phase B (Track 2) is SUPERSEDED and will not be done: TTS is no longer a target and the OBJ export has since been deleted (conventions alignment plan, Phase 3b; old code in tags v0.2.0 / v0.3.0, so the OBJ file and line references below point at deleted code and are historical). The 25,000-vertex cap is retired. The merge pass itself was later disabled by default (see the conventions plan, Phase 1 and 2 results). Target release **v0.4.0** (`package.json:3` is 0.3.0). Phase A is the merge pass; Phase B (OBJ without atlas) is an **open decision** that needs the owner. Preview work on `feature/loaded-map-preview` (see [`LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md`](LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md)) is built first and is used to compare merged vs unmerged output. File and line refs: [`PRIMITIVE_MERGE_MANIFEST_2026_10_13.md`](PRIMITIVE_MERGE_MANIFEST_2026_10_13.md) (sections A–H, each with its regenerating grep). Section letters are referenced below as **[M-A]** etc.
+Status: **Complete, archived 2026-10-16.** Phase A (merge pass, with the A0 exporter-only drop) is implemented on `feature/primitive-merge`, merged to `dev` as PR #41 and tested. Phase B (Track 2, OBJ without atlas) is **SUPERSEDED** and was not done: TTS is no longer a target and the OBJ export has since been deleted (conventions alignment plan, Phase 3b; old code in tags v0.2.0 / v0.3.0, so the OBJ file and line references below point at deleted code and are historical). The 25,000-vertex cap is retired. The merge pass itself is **disabled by default** (see the conventions plan, Phase 1 and 2 results). Outcome: with the merge pass on, default-profile vertex counts on seeds 1, 7, 42, 100 and 2024 fell from 23,878–26,490 to 20,196–22,604 (plan results table below). Target release was **v0.4.0** (`package.json:3` was 0.3.0). The preview work it was compared against is archived in [`LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md`](LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md). File and line refs: [`PRIMITIVE_MERGE_MANIFEST_2026_10_13.md`](PRIMITIVE_MERGE_MANIFEST_2026_10_13.md) (sections A–H, each with its regenerating grep). Section letters are referenced below as **[M-A]** etc.
 
 ## Context
 
@@ -126,7 +126,7 @@ Not visually verified: textures, seams and tier bands of merged output in TTS or
 
 ## Track 2 — OBJ without atlas or subdivision (Phase B, SUPERSEDED)
 
-**SUPERSEDED (2026-10-13).** Tabletop Simulator is no longer a target and the OBJ export is deprecated, so this proposal is dropped. See [`CONVENTIONS_ALIGNMENT_PLAN_2026_10_13.md`](CONVENTIONS_ALIGNMENT_PLAN_2026_10_13.md) (Phase 3). Kept below for history only.
+**SUPERSEDED (2026-10-13).** Tabletop Simulator is no longer a target and the OBJ export is deprecated, so this proposal is dropped. See [`CONVENTIONS_ALIGNMENT_PLAN_2026_10_13.md`](../CONVENTIONS_ALIGNMENT_PLAN_2026_10_13.md) (Phase 3). Kept below for history only.
 
 Proposal: write one `.mtl` material per texture key, use UVs that repeat every 3" like the GLB path, and remove the atlas and subdivision. This would remove `SEG_SIZE` from `add-shared-flat.js:3`, `add-shared-wall.js:3` and `add-sub-box.js:6`, the atlas build in `build-obj-and-atlas.js:52-104`, and the atlas PNG write at `:100-101`.
 
@@ -134,7 +134,7 @@ Proposal: write one `.mtl` material per texture key, use UVs that repeat every 3
 - **Why it is risky:**
   - Unverified: TTS may not repeat UVs beyond 0–1, or may not accept multiple materials per custom model. Our belief is that a TTS custom model takes a single diffuse image. That is why the atlas exists, but no doc records it (grep of `docs/` finds only the mechanism at `11-scene-and-export.md:75`).
   - The THIN_FLOOR_SLABS plan relies on the 3" segment grid (`THIN_FLOOR_SLABS_PLAN_2026_10_11.md:27`). It would need revisiting.
-  - The loaded-map preview already uses GLB-style 3" repeat UVs (`archive/LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md:36`). It can act as the visual reference for Phase B.
+  - The loaded-map preview already uses GLB-style 3" repeat UVs (`LOADED_MAP_TEXTURE_PREVIEW_PLAN_2026_10_13.md:36`). It can act as the visual reference for Phase B.
 - **Gate:** build a small hand-made OBJ (two quads, UVs 0–4 for a 1-tile texture, two materials) and load it in TTS. Check: repeat works, multi-material works, vertex count is as expected. Do not commit Phase B until this passes.
 - **If TTS needs one image:** either split OBJs per texture (more files, more load) or stay on the atlas and rely on Phase A alone.
 

@@ -1,5 +1,7 @@
 # Primitive Merge — Grepped File Manifest
 
+Status: **Archived 2026-10-16** with `PRIMITIVE_MERGE_PLAN_2026_10_13.md` (plan complete; Phase A in PR #41). Line numbers below are as of generation and are not kept current.
+
 Companion to `PRIMITIVE_MERGE_PLAN_2026_10_13.md`. Generated 2026-10-13 on branch `dev` from live reads and greps. Line numbers will drift (refs below updated 2026-10-13 after Phase A0-A3 landed on `feature/primitive-merge`); re-run the command under each heading before starting a phase. `_old_system/` is excluded throughout and is not touched.
 
 Shorthand: `EX` = `--exclude-dir=_old_system`; scope is `src tests scripts`.
